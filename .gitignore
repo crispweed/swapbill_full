@@ -1,0 +1,4 @@
+*.pyc
+/SwapBill.cache
+/SwapBill.cache.python3
+__pycache__
