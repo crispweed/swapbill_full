@@ -11,9 +11,6 @@ from SwapBill.Sync import SyncAndReturnState
 from SwapBill.Amounts import ToSatoshis, FromSatoshis
 PY3 = sys.version_info.major > 2
 
-class ReindexingRequiredException(Exception):
-	pass
-
 class Config(object):
 	pass
 config = Config()

@@ -54,8 +54,8 @@ def Create(tx, scriptPubKeyLookup):
 		txid = tx.inputTXID(i)
 		vout = tx.inputVOut(i)
 		scriptPubKey = scriptPubKeyLookup.lookupScriptPubKey((txid, vout))
-		assert type(txid) == str
-		assert type(scriptPubKey) == str
+		#assert type(txid) == str
+		#assert type(scriptPubKey) == str
 		txIDBytes = binascii.unhexlify(txid.encode('ascii'))[::-1]
 		assert len(txIDBytes) == 32
 		data += txIDBytes
