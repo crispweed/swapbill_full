@@ -5,7 +5,7 @@ from SwapBill.Amounts import ToSatoshis
 def CalculateRequired(rpcHost, rawTransactionHex):
 	## calculates fee requirement based on code in litecoind at time of writing
 	## assuming we want the transaction relayed independantly of litecoind priority calculations
-	assert type(rawTransactionHex) == str
+	#assert type(rawTransactionHex) == str
 	rawTransactionBytes = RawTransaction.FromHex(rawTransactionHex) ## note that we can count bytes more efficiently, and without dependency on RawTransaction, but this also checks input data validity
 	byteSize = len(rawTransactionBytes)
 	multiplier = (1 + int(byteSize / 1000))
@@ -16,7 +16,7 @@ def CalculateRequired(rpcHost, rawTransactionHex):
 	return multiplier * 100000
 
 def CalculatePaid(rpcHost, rawTransactionHex):
-	assert type(rawTransactionHex) == str
+	#assert type(rawTransactionHex) == str
 	decodedTX = rpcHost.call('decoderawtransaction', rawTransactionHex)
 	inputAmount = 0
 	for txIn in decodedTX['vin']:
@@ -29,7 +29,7 @@ def CalculatePaid(rpcHost, rawTransactionHex):
 	return inputAmount - outputAmount
 
 def TransactionFeeIsSufficient(rpcHost, rawTransactionHex):
-	assert type(rawTransactionHex) == str
+	#assert type(rawTransactionHex) == str
 	feePaid = CalculatePaid(rpcHost, rawTransactionHex)
 	return feePaid >= CalculateRequired(rpcHost, rawTransactionHex)
 
