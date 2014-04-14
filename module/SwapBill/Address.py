@@ -62,14 +62,14 @@ def base58_decode (s, version):
 		raise BadAddress('checksum mismatch')
 	return data
 
-def FromData(addressVersion, data):
+def FromPubKeyHash(addressVersion, data):
 	assert type(addressVersion) is type(b'.')
 	assert type(data) is type(b'.')
 	assert len(addressVersion) == 1
 	assert len(data) == 20
 	return base58_check_encode(data, addressVersion)
 
-def ToData(addressVersion, address):
+def ToPubKeyHash(addressVersion, address):
 	assert type(addressVersion) is type(b'.')
 	assert len(addressVersion) == 1
 	return base58_decode(address, addressVersion)

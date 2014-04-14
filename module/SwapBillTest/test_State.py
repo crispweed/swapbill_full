@@ -4,7 +4,9 @@ from SwapBill import State
 
 class Test(unittest.TestCase):
 	def test_balance_add_and_subtract(self):
-		state = State.State(100)
+		state = State.State(100, 'mockhash')
+		assert state.startBlockMatches('mockhash')
+		assert not state.startBlockMatches('mockhosh')
 		state.addToBalance('a', 10)
 		state.addToBalance('b', 20)
 		state.addToBalance('c', 30)

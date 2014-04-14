@@ -1,93 +1,123 @@
 from __future__ import print_function
 import sys
-try:
-	import cPickle as pickle
-except ImportError:
+PY3 = sys.version_info.major > 2
+if PY3:
 	import pickle
+else:
+	import cPickle as pickle
 from os import path
-from SwapBill import BlockChain, BlockChainFollower
+from collections import deque
+from SwapBill import State, DecodeTransaction, TransactionTypes, LTCTrading, SourceLookup, ControlAddressEncoding
 
 class ReindexingRequiredException(Exception):
 	pass
 
 if sys.version_info > (3, 0):
-	cacheFileName = 'SwapBill.cache.python3'
+	cacheFileName = 'SwapBill.py3.cache'
 else:
 	cacheFileName = 'SwapBill.cache'
+cacheVersion = 0.5
 
-def _load(config):
+def _load():
 	if not path.exists(cacheFileName):
 		raise ReindexingRequiredException('no cache file found')
 	f = open(cacheFileName, 'rb')
-	cacheVersion = pickle.load(f)
-	if cacheVersion != config.clientVersion:
+	savedCacheVersion = pickle.load(f)
+	if savedCacheVersion != cacheVersion:
 		raise ReindexingRequiredException('cached data is from old version')
-	follower = pickle.load(f)
-	tracker = pickle.load(f)
+	blockIndex = pickle.load(f)
+	blockHash = pickle.load(f)
+	state = pickle.load(f)
 	f.close()
-	if cacheVersion != config.clientVersion:
-		raise ReindexingRequiredException('cached data is from old version')
-	print('cache version matches')
-	if not tracker.setupMatches(config.startBlockIndex, config.startBlockHash):
-		raise ReindexingRequiredException('cached data config is not compatible with current config')
-	return follower, tracker
+	return blockIndex, blockHash, state
 
-def _save(config, follower, tracker):
+def _save(blockIndex, blockHash, state):
 	try:
 		f = open(cacheFileName, 'wb')
-		pickle.dump(config.clientVersion, f, 2)
-		pickle.dump(follower, f, 2)
-		pickle.dump(tracker, f, 2)
+		pickle.dump(cacheVersion, f, 2)
+		pickle.dump(blockIndex, f, 2)
+		pickle.dump(blockHash, f, 2)
+		pickle.dump(state, f, 2)
 		f.close()
 	except:
 		print("Error, failed to write cache:", sys.exc_info()[0])
 
+def _processBlock(config, rpcHost, state, blockHash):
+	block = rpcHost.call('getblock', blockHash)
+	sourceLookup = SourceLookup.Lookup(config.addressVersion, rpcHost)
+	transactions = block['tx']
+	assert len(transactions) >= 1
+	for txHash in transactions[1:]:
+		litecoinTXHex = rpcHost.call('getrawtransaction', txHash)
+		hostTX = DecodeTransaction.Transaction(litecoinTXHex, rpcHost)
+		try:
+			decodedTX = TransactionTypes.Decode(sourceLookup, hostTX)
+		except ControlAddressEncoding.NotSwapBillControlAddress:
+			continue
+		except TransactionTypes.NotValidSwapBillTransaction:
+			continue
+		except TransactionTypes.UnsupportedTransaction:
+			continue
+		decodedTX.apply(state)
+		print('applied transaction:', decodedTX)
+		LTCTrading.Match(state)
+
 def SyncAndReturnState(config, rpcHost):
 	try:
-		follower, tracker = _load(config)
+		blockIndex, blockHash, state = _load()
 	except ReindexingRequiredException as e:
-		print('Full index generation required (' + str(e) + ')')
+		print('Failed to load from cache, full index generation required (' + str(e) + ')')
 		loaded = False
 	else:
 		loaded = True
-	if not loaded:
-		follower = BlockChainFollower.Follower(config)
-		tracker = BlockChain.Tracker(config, rpcHost)
+	if loaded and rpcHost.call('getblockhash', blockIndex) != blockHash:
+		print('The block corresponding with cached state has been orphaned, full index generation required.')
+		loaded = False
+	if loaded and not state.startBlockMatches(config.startBlockHash):
+		print('Start config does not match config from loaded state, , full index generation required.')
+		loaded = False
+	if loaded:
+		print('Loaded cached state data successfully')
+	else:
+		blockIndex = config.startBlockIndex
+		blockHash = config.startBlockHash
+		assert rpcHost.call('getblockhash', blockIndex) == blockHash
+		state = State.State(blockIndex, blockHash)
 
-	currentHash = tracker.currentHash()
+	print('Starting from block', blockIndex)
+
+	toProcess = deque()
+	mostRecentHash = blockHash
 	while True:
-		increment = tracker.update(config, rpcHost)
-		if increment == 0:
+		block = rpcHost.call('getblock', mostRecentHash)
+		if not 'nextblockhash' in block:
 			break
-		if increment == -1:
-			follower.removeBlock(config, rpcHost, currentHash)
-			currentHash = tracker.currentHash()
-		else:
-			assert increment == 1
-			currentHash = tracker.currentHash()
-			follower.addBlock(config, rpcHost, currentHash)
+		if len(toProcess) == config.blocksBehindForCachedState:
+			## advance cached state
+			_processBlock(config, rpcHost, state, blockHash)
+			popped = toProcess.popleft()
+			blockIndex += 1
+			blockHash = popped
+		mostRecentHash = block['nextblockhash']
+		toProcess.append(mostRecentHash)
 
-	_save(config, follower, tracker)
-	return follower._state
+	_save(blockIndex, blockHash, state)
 
-def RewindLastBlockWithTransactions(config, rpcHost):
-	try:
-		follower, tracker = _load(config)
-	except ReindexingRequiredException as e:
-		print('Failed to load cache to rewind (' + str(e) + ')')
-		return
-	startingLogSize = len(follower._log)
-	while len(follower._log) == startingLogSize:
-		currentHash = tracker.currentHash()
-		follower.removeBlock(config, rpcHost, currentHash)
-		tracker.rewindOneBlock(config, rpcHost)
-	_save(config, follower, tracker)
+	while len(toProcess) > 0:
+		## advance in memory state
+		_processBlock(config, rpcHost, state, blockHash)
+		state.advanceToNextBlock()
+		popped = toProcess.popleft()
+		blockIndex += 1
+		blockHash = popped
+
+	_processBlock(config, rpcHost, state, blockHash)
+
+	return state
 
 def LoadAndReturnStateWithoutUpdate(config):
 	try:
-		follower, tracker = _load(config)
+		blockIndex, blockHash, state = _load()
 	except ReindexingRequiredException as e:
-		print('Could not load cache, so returning empty initial state! (' + str(e) + ')')
-		follower = BlockChainFollower.Follower(config)
-		tracker = BlockChain.Tracker(config, rpcHost, follower)
-	return follower._state
+		print('Could not load cached state, so returning empty initial state! (' + str(e) + ')')
+	return state

@@ -1,6 +1,6 @@
 import struct
 
-class InvalidControlAddress(Exception):
+class NotSwapBillControlAddress(Exception):
 	pass
 
 prefix = b'SWB'
@@ -21,13 +21,13 @@ def Encode(transaction):
 	amountHigh = (amount >> 16)
 	return prefix + formatStruct.pack(typeCode, amountLow, amountHigh, maxBlock) + extraData
 
-def Decode(address):
-	assert type(address) is type(b'0')
-	assert len(address) == 20
-	decodedPrefix = address[:3]
+def Decode(pubKeyHash):
+	assert type(pubKeyHash) is type(b'0')
+	assert len(pubKeyHash) == 20
+	decodedPrefix = pubKeyHash[:3]
 	if prefix != decodedPrefix:
-		raise InvalidControlAddress
-	typeCode, amountLow, amountHigh, maxBlock = formatStruct.unpack(address[3:-6])
-	extraData = address[-6:]
+		raise NotSwapBillControlAddress
+	typeCode, amountLow, amountHigh, maxBlock = formatStruct.unpack(pubKeyHash[3:-6])
+	extraData = pubKeyHash[-6:]
 	amount = (amountHigh << 16) + amountLow
 	return typeCode, amount, maxBlock, extraData

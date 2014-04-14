@@ -1,86 +1,95 @@
 from __future__ import print_function
 import struct
-from SwapBill import ControlAddressEncoding, Address
+from SwapBill import ControlAddressEncoding, HostTransaction
 from SwapBill.ChooseInputs import ChooseInputs
 
-def _build_Common(config, swapBillTransaction, unspent, forceIncludeLast, reSeedAddress, changeAddress, seedDestination):
+class InsufficientFunds(Exception):
+	pass
+class ControlAddressBelowDustLimit(Exception):
+	pass
+class PubKeyHashNotExplicitlySpecified(Exception):
+	pass
+
+def _build_Common(dustLimit, transactionFee, swapBillTransaction, unspent, forceIncludeLast, reSeedPubKeyHash, changePubKeyHash):
 	unspentAmounts, unspentAsInputs = unspent
 
-	if sum(unspentAmounts) < (config.minimumTransactionAmount + config.transactionFee):
-		print('Unspent outputs are not sufficient with the configured minimum transaction amount.')
-		print('Configured minimum transaction ({}) plus configured transaction fee ({}) = {})'.format(config.minimumTransactionAmount, config.transactionFee, config.minimumTransactionAmount + config.transactionFee))
-		print('Unspent outputs reported by litecoind sum to {}'.format(sum(unspentAmounts)))
-		return None
+	hostedTX = HostTransaction.InMemoryTransaction()
 
 	if hasattr(swapBillTransaction, 'controlAddressAmount'):
-		targetAmounts = [swapBillTransaction.controlAddressAmount]
+		if swapBillTransaction.controlAddressAmount < dustLimit:
+			raise ControlAddressBelowDustLimit()
+		outAmounts = [swapBillTransaction.controlAddressAmount]
 	else:
-		targetAmounts = [config.dustOutputAmount]
+		outAmounts = [dustLimit]
 	controlAddressData = ControlAddressEncoding.Encode(swapBillTransaction)
-	targetAddresses = [Address.FromData(config.addressVersion, controlAddressData)]
+	outDestinations = [controlAddressData]
 
-	if hasattr(swapBillTransaction, 'destinationAddress'):
-		if seedDestination:
-			destinationAmount = config.seedAmount
+	if hasattr(swapBillTransaction, 'destination'):
+		outDestinations.append(swapBillTransaction.destination)
+		if hasattr(swapBillTransaction, 'destinationAmount'):
+			outAmounts.append(swapBillTransaction.destinationAmount)
 		else:
-			destinationAmount = config.dustOutputAmount
-		targetAddresses.append(swapBillTransaction.destinationAddress)
-		targetAmounts.append(destinationAmount)
+			outAmounts.append(dustLimit)
 
-	if sum(targetAmounts) < config.minimumTransactionAmount:
-		backingAmount = config.minimumTransactionAmount - sum(targetAmounts)
-		targetAddresses.append(changeAddress)
-		targetAmounts.append(backingAmount)
+	if not reSeedPubKeyHash is None:
+		outDestinations.append(reSeedPubKeyHash)
+		outAmounts.append(dustLimit)
 
-	totalRequired = sum(targetAmounts) + config.transactionFee
+	totalRequired = sum(outAmounts) + transactionFee
 	if sum(unspentAmounts) < totalRequired:
-		print('Unspent outputs are not sufficient for the requested transaction.')
-		print('Total required, with fee ({}) = {}'.format(config.transactionFee, totalRequired))
-		print('Unspent outputs reported by litecoind sum to {}'.format(sum(unspentAmounts)))
-		return None
+		raise InsufficientFunds('total required', totalRequired, 'transaction fee', transactionFee, 'sum of unspent', sum(unspentAmounts))
 
 	if forceIncludeLast:
-		outputAssignments, outputsTotal = ChooseInputs(unspentAmounts[:-1], totalRequired)
+		#assert config.maxInputs > 0
+		if totalRequired > unspentAmounts[-1]:
+			#outputAssignments, outputsTotal = ChooseInputs(maxInputs=config.maxInputs - 1, unspentAmounts=unspentAmounts[:-1], amountRequired=totalRequired - unspentAmounts[-1])
+			outputAssignments, outputsTotal = ChooseInputs(maxInputs=len(unspentAmounts), unspentAmounts=unspentAmounts[:-1], amountRequired=totalRequired - unspentAmounts[-1])
+		else:
+			outputAssignments = []
+			outputsTotal = 0
 		outputAssignments.append(len(unspentAmounts) - 1)
 		outputsTotal += unspentAmounts[-1]
 	else:
-		outputAssignments, outputsTotal = ChooseInputs(unspentAmounts, totalRequired)
-	inputs = []
+		#outputAssignments, outputsTotal = ChooseInputs(maxInputs=config.maxInputs, unspentAmounts=unspentAmounts, amountRequired=totalRequired)
+		outputAssignments, outputsTotal = ChooseInputs(maxInputs=len(unspentAmounts), unspentAmounts=unspentAmounts, amountRequired=totalRequired)
+	#assert len(outputAssignments) <= config.maxInputs
+
+	#if outputsTotal < totalRequired:
+		#print('Cannot pay for transaction within the current maximum inputs constraint (maximum {} inputs).'.format(config.maxInputs))
+		#print('Available unspent output amounts reported by litecoind:')
+		#print(unspentAmounts)
+		#return None
+
+	hostedTX._inputs = []
+
 	for i in outputAssignments:
-		inputs.append(unspentAsInputs[i])
+		hostedTX.addInput(unspentAsInputs[i][0], unspentAsInputs[i][1])
 
 	if outputsTotal > totalRequired:
 		overSupply = outputsTotal - totalRequired
-		if targetAddresses[-1] == changeAddress:
-			targetAmounts[-1] += overSupply
-		else:
-			targetAddresses.append(changeAddress)
-			targetAmounts.append(overSupply)
+		if overSupply >= dustLimit:
+			outDestinations.append(changePubKeyHash)
+			outAmounts.append(overSupply)
+		elif outDestinations[-1] == reSeedPubKeyHash:
+			outAmounts[-1] += overSupply
 
-	if not reSeedAddress is None:
-		if targetAddresses[-1] == changeAddress:
-			## use change to reseed
-			if targetAmounts[-1] <= config.seedAmount:
-				targetAddresses[-1] = reSeedAddress
-			else:
-				targetAmounts[-1] -= config.seedAmount
-				targetAmounts.append(config.seedAmount)
-				targetAddresses.append(reSeedAddress)
+	hostedTX.addOutputsFromSeparateLists(outDestinations, outAmounts)
 
-	return inputs, targetAddresses, targetAmounts
+	return hostedTX
 
-def Build_FundedByAccount(config, swapBillTransaction, fundingAccountUnspent, changeAddress, seedDestination):
-	assert not hasattr(swapBillTransaction, 'sourceAddress')
-	return _build_Common(config, swapBillTransaction, fundingAccountUnspent, False, None, changeAddress, seedDestination)
+def Build_FundedByAccount(dustLimit, transactionFee, swapBillTransaction, fundingAccountUnspent, changePubKeyHash):
+	assert not hasattr(swapBillTransaction, 'source')
+	return _build_Common(dustLimit, transactionFee, swapBillTransaction, fundingAccountUnspent, False, None, changePubKeyHash)
 
-def Build_WithSourceAddress(config, swapBillTransaction, sourceAddress, sourceAddressSingleUnspent, backerAccountUnspent, changeAddress, seedDestination):
-	assert swapBillTransaction.sourceAddress == sourceAddress
+def Build_WithSourceAddress(dustLimit, transactionFee, swapBillTransaction, sourceAddressSingleUnspent, backerAccountUnspent, changePubKeyHash):
 	sourceUnspentAmount, sourceUnspentAsInput = sourceAddressSingleUnspent
 	unspentAmounts, unspentAsInputs = backerAccountUnspent
+	unspentAmounts = list(unspentAmounts)
+	unspentAsInputs = list(unspentAsInputs)
 	unspentAmounts.append(sourceUnspentAmount)
 	unspentAsInputs.append(sourceUnspentAsInput)
-	return _build_Common(config, swapBillTransaction, (unspentAmounts, unspentAsInputs), True, sourceAddress, changeAddress, seedDestination)
+	return _build_Common(dustLimit, transactionFee, swapBillTransaction, (unspentAmounts, unspentAsInputs), True, swapBillTransaction.source, changePubKeyHash)
 
-def Build_Native(config, fundingAccountUnspent, destination, amount, changeAddress):
+def Build_Native(addressVersion, dustLimit, transactionFee, fundingAccountUnspent, destination, amount, changePubKeyHash):
 	pass
 

@@ -1,3 +1,4 @@
+from __future__ import print_function
 import heapq
 
 class Heap(object):
@@ -8,20 +9,18 @@ class Heap(object):
 		self._entryCount = 0 # used to avoid priority ties
 
 	def _hasExpired(self, expiry):
-		return self._blockCount >= expiry
+		return self._blockCount > expiry
 	def _hasExpiredOffers(self):
 		for offer in self._offerByExchangeRate:
-			if self._hasExpired(offer[4]):
+			if self._hasExpired(offer[2]):
 				return True
 		return False
 
-	def addOffer(self, address, amount, exchangeRate, expiry):
-		assert amount >= 0
-		if amount == 0 or self._hasExpired(expiry):
-			return
+	#details = address, amount, extraData=None
+	def addOffer(self, exchangeRate, expiry, details):
 		if self._higherExchangeRateIsBetterOffer:
 			exchangeRate = -exchangeRate
-		entry = (exchangeRate, self._entryCount, address, amount, expiry)
+		entry = (exchangeRate, self._entryCount, expiry, details)
 		self._entryCount += 1
 		heapq.heappush(self._offerByExchangeRate, entry)
 
@@ -33,7 +32,7 @@ class Heap(object):
 		expired = []
 		unexpired = []
 		for offer in self._offerByExchangeRate:
-			if self._hasExpired(offer[4]):
+			if self._hasExpired(offer[2]):
 				expired.append(offer)
 			else:
 				unexpired.append(offer)
@@ -52,16 +51,25 @@ class Heap(object):
 		if self._higherExchangeRateIsBetterOffer:
 			return -self._offerByExchangeRate[0][0]
 		return self._offerByExchangeRate[0][0]
-	def currentBestAmount(self):
+	def currentBestExpiry(self):
 		assert not self.empty()
-		return self._offerByExchangeRate[0][3]
+		return self._offerByExchangeRate[0][2]
 
+	def peekCurrentBest(self):
+		assert not self.empty()
+		exchangeRate, entryCount, expiry, details = self._offerByExchangeRate[0]
+		return details
 	def popCurrentBest(self):
 		assert not self.empty()
-		return heapq.heappop(self._offerByExchangeRate)
+		entry = heapq.heappop(self._offerByExchangeRate)
+		exchangeRate, entryCount, expiry, details = entry
+		return details
 
-	def partiallyUseCurrentBest(self, amount):
-		assert not self.empty()
-		assert self.currentBestAmount() > amount
-		e = self._offerByExchangeRate[0]
-		self._offerByExchangeRate[0] = (e[0], e[1], e[2], e[3] - amount, e[4])
+	def getSortedExchangeRateAndDetails(self):
+		result = []
+		for entry in sorted(self._offerByExchangeRate):
+			exchangeRate, entryCount, expiry, details = entry
+			if self._higherExchangeRateIsBetterOffer:
+				exchangeRate = -exchangeRate
+			result.append((exchangeRate, details))
+		return result
