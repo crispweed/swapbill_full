@@ -93,6 +93,7 @@ class InsufficientTransactionFees(Exception):
 def CreateSignAndSend(tx, scriptPubKeyLookup):
 	unsignedData = RawTransaction.Create(tx, scriptPubKeyLookup)
 	unsignedHex = RawTransaction.ToHex(unsignedData)
+	#signingResult = rpcHost.call('signrawtransaction_simplified', unsignedHex)
 	signingResult = rpcHost.call('signrawtransaction', unsignedHex)
 	if signingResult['complete'] != True:
 			raise SigningFailed()
@@ -189,7 +190,7 @@ elif args.action == 'post_ltc_sell':
 	tx.init_FromUserRequirements(source=source, swapBillDesired=swapBillToBuy, exchangeRate=exchangeRate)
 	CheckAndSend_FromAddress(tx)
 
-if args.action == 'complete_ltc_sell':
+elif args.action == 'complete_ltc_sell':
 	state = SyncAndReturnState(config, rpcHost)
 	pendingExchangeID = int(args.pending_exchange_id)
 	if not pendingExchangeID in state._pendingExchanges:
