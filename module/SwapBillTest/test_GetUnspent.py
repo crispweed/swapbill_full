@@ -1,17 +1,12 @@
 from __future__ import print_function
 import unittest
 from SwapBill import GetUnspent
-
-class MockRPCHost(object):
-	def __init__(self):
-		self._d = {}
-	def call(self, *arguments):
-		return self._d[arguments]
+from SwapBillTest.MockRPC import Host
 
 class Test(unittest.TestCase):
 	def test(self):
 		addressVersion = b'\x6f'
-		rpcHost = MockRPCHost()
+		rpcHost = Host()
 
 		pubKeyHash1 = b'SWB\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00extrad'
 		address1 = 'mo7cukkECVHPxAEApxTJAQnbRj8xSHUzkH'

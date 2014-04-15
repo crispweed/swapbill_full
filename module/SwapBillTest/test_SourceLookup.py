@@ -1,25 +1,16 @@
 from __future__ import print_function
 import unittest
 from SwapBill import SourceLookup
-#from SwapBill import RPC ## for setup only
-
-class MockRPCHost(object):
-	def __init__(self):
-		self._d = {}
-	def call(self, *arguments):
-		if hasattr(self, '_actualHost'):
-			print(arguments.__repr__())
-			print(self._actualHost.call(*arguments).__repr__())
-		return self._d[arguments]
+from SwapBillTest.MockRPC import Host
 
 class Test(unittest.TestCase):
 	def test(self):
 		addressVersion = b'\x6f'
-		rpcHost = MockRPCHost()
+		rpcHost = Host()
 
 		lookup = SourceLookup.Lookup(addressVersion, rpcHost)
 
-		#rpcHost._actualHost = RPC.Host(b'http://litecoinrpc:**password**@localhost:19332')
+		#rpcHost._connect('**password**')
 
 		txID = "227ad2f0546ce25ec6f74708620d386f8a7bf74c3eb086292fbd472d0c6a4b8c"
 		vOut = 0
