@@ -1,5 +1,13 @@
 import struct, binascii
 
+class NotSwapBillTransaction(Exception):
+	pass
+class NotEnoughOutputs(Exception):
+	pass
+
+class _RanOutOfData(Exception):
+	pass
+
 # Constants
 OP_RETURN = b'\x6a'
 OP_PUSHDATA1 = b'\x4c'
@@ -25,11 +33,19 @@ def _decodeVarInt(data, startPos):
 	assert type(data) == type(b'')
 	firstByte = data[startPos:startPos + 1]
 	if firstByte == b'\xff':
+		if startPos + 9 > len(data):
+			raise _RanOutOfData()
 		return startPos + 9, struct.unpack("<Q", data[startPos + 1:startPos + 9])[0]
 	if firstByte == b'\xfe':
+		if startPos + 5 > len(data):
+			raise _RanOutOfData()
 		return startPos + 5, struct.unpack("<L", data[startPos + 1:startPos + 5])[0]
 	if firstByte == b'\xfd':
+		if startPos + 3 > len(data):
+			raise _RanOutOfData()
 		return startPos + 3, struct.unpack("<H", data[startPos + 1:startPos + 3])[0]
+	if startPos + 1 > len(data):
+		raise _RanOutOfData()
 	return startPos + 1, struct.unpack("<B", data[startPos:startPos + 1])[0]
 
 def _opPush(i):
@@ -54,8 +70,8 @@ def Create(tx, scriptPubKeyLookup):
 		txid = tx.inputTXID(i)
 		vout = tx.inputVOut(i)
 		scriptPubKey = scriptPubKeyLookup.lookupScriptPubKey((txid, vout))
-		assert type(txid) == str
-		assert type(scriptPubKey) == str
+		#assert type(txid) == str
+		#assert type(scriptPubKey) == str
 		txIDBytes = binascii.unhexlify(txid.encode('ascii'))[::-1]
 		assert len(txIDBytes) == 32
 		data += txIDBytes
@@ -86,11 +102,63 @@ def Create(tx, scriptPubKeyLookup):
 	data += struct.pack("<L", 0)                # LockTime
 	return data
 
+def UnexpectedFormat_Fast(txBytes, controlAddressPrefix):
+	## TODO: optimise this by putting the control address at the end of the transaction!
+	assert type(txBytes) is type(b'')
+	assert type(controlAddressPrefix) is type(b'')
+	assert len(controlAddressPrefix) <= 20
+	if len(txBytes) < 6: ## actual minimum is greater than this, work this out!
+		return True
+	version = struct.unpack("<L", txBytes[:4])[0]
+	if version != 1:
+		return True
+	pos = 4
+	try:
+		pos, numberOfInputs = _decodeVarInt(txBytes, pos)
+		for i in range(numberOfInputs):
+			pos += 36
+			pos, scriptLen = _decodeVarInt(txBytes, pos)
+			pos += scriptLen
+			pos += 4
+		pos, numberOfOutputs = _decodeVarInt(txBytes, pos)
+		if numberOfOutputs == 0:
+			return True
+		for i in range(numberOfOutputs):
+			pos += 8
+			pos, scriptLen = _decodeVarInt(txBytes, pos)
+			if i == 0:
+				script = txBytes[pos:pos + scriptLen]
+				expectedScriptStart = OP_DUP
+				expectedScriptStart += OP_HASH160
+				expectedScriptStart += _opPush(20)
+				expectedScriptEnd = OP_EQUALVERIFY
+				expectedScriptEnd += OP_CHECKSIG
+				if len(script) != len(expectedScriptStart) + 20 + len(expectedScriptEnd):
+					return True
+				if not script.startswith(expectedScriptStart):
+					return True
+				if not script[len(expectedScriptStart):].startswith(controlAddressPrefix):
+					return True
+				if not script.endswith(expectedScriptEnd):
+					return True
+			pos += scriptLen
+	except _RanOutOfData:
+		return True
+	if pos + 4 != len(txBytes):
+		return True
+	return False
+
 def ExtractOutputPubKeyHash(txBytes, outputIndex):
 	assert type(txBytes) is type(b'')
+	assert outputIndex >= 0
+
+	if UnexpectedFormat_Fast(txBytes, b''):
+		raise NotSwapBillTransaction()
+
 	pos = 4
+
 	pos, numberOfInputs = _decodeVarInt(txBytes, pos)
-	#print(numberOfInputs)
+
 	for i in range(numberOfInputs):
 		pos += 32
 		pos += 4
@@ -99,23 +167,23 @@ def ExtractOutputPubKeyHash(txBytes, outputIndex):
 		pos += scriptLen
 		pos += 4
 		assert pos < len(txBytes)
+
 	pos, numberOfOutputs = _decodeVarInt(txBytes, pos)
-	assert numberOfOutputs > 0
-	#print(numberOfOutputs)
+
+	if outputIndex >= numberOfOutputs:
+		raise NotEnoughOutputs()
+
 	for i in range(outputIndex):
 		pos += 8
 		pos, scriptLen = _decodeVarInt(txBytes, pos)
 		pos += scriptLen
+
 	pos += 8
 	pos, scriptLen = _decodeVarInt(txBytes, pos)
-	scriptStart = OP_DUP
-	scriptStart += OP_HASH160
-	scriptStart += _opPush(20)
-	#if len(scriptStart) + 20 >= scriptLen:
-		#print(pos)
-		#print(scriptLen)
-	assert len(scriptStart) + 20 < scriptLen
-	pos += len(scriptStart)
+	expectedScriptStart = OP_DUP
+	expectedScriptStart += OP_HASH160
+	expectedScriptStart += _opPush(20)
+	pos += len(expectedScriptStart)
 	assert len(txBytes) > pos + 20
 	return txBytes[pos:pos + 20]
 
