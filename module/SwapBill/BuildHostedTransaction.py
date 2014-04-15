@@ -60,8 +60,6 @@ def _build_Common(dustLimit, transactionFee, swapBillTransaction, unspent, force
 		#print(unspentAmounts)
 		#return None
 
-	hostedTX._inputs = []
-
 	for i in outputAssignments:
 		hostedTX.addInput(unspentAsInputs[i][0], unspentAsInputs[i][1])
 
@@ -92,4 +90,3 @@ def Build_WithSourceAddress(dustLimit, transactionFee, swapBillTransaction, sour
 
 def Build_Native(addressVersion, dustLimit, transactionFee, fundingAccountUnspent, destination, amount, changePubKeyHash):
 	pass
-
