@@ -23,24 +23,6 @@ config.startBlockIndex = 241432
 ## from: litecoind -testnet getblockhash 241432
 config.startBlockHash = '3fa2cf2d644b74b7f6407a1d3a9d15ad98f85da9adecbac0b1560c11c0393eed'
 
-## testnet address version (so bitcoin testnet, but looks like this also works for litecoin testnet)
-## TODO: set this up dependant on config.useTestNet
-config.addressVersion = b'\x6f'
-
-with open(path.join(path.expanduser("~"), '.litecoin', 'litecoin.conf'), mode='rb') as f:
-	configFileBuffer = f.read()
-litecoinConfig = ParseConfig.Parse(configFileBuffer)
-
-## TODO get this also from litecoin config file, where relevant (with defaults)
-RPC_HOST = 'localhost'
-if config.useTestNet:
-	RPC_PORT = 19332
-else:
-	RPC_PORT = 9332
-assert int(RPC_PORT) > 1 and int(RPC_PORT) < 65535
-
-rpcHost = RPC.Host('http://' + litecoinConfig['rpcuser'] + ':' + litecoinConfig['rpcpassword'] + '@' + RPC_HOST + ':' + str(RPC_PORT))
-
 parser = argparse.ArgumentParser(prog='SwapBillClient', description='the reference implementation of the SwapBill protocol')
 #parser.add_argument('-V', '--version', action='version', version="SwapBillClient version %s" % config.clientVersion)
 parser.add_argument('--config-file', help='the location of the configuration file')
@@ -76,6 +58,54 @@ subparsers.add_parser('show_offers', help='show current SwapBill exchange offers
 subparsers.add_parser('show_pending_exchanges', help='show current SwapBill pending exchange payments')
 
 args = parser.parse_args()
+
+## Read custom configuration file
+if args.config_file == None:        
+        args.config_file = path.join(path.expanduser("~"), '.litecoin', 'litecoin.conf')    
+
+## Open config
+try:        
+        with open(args.config_file, mode='rb') as f:
+                configFileBuffer = f.read()
+except FileNotFoundError:        
+        configFileBuffer = b''
+
+clientConfig = ParseConfig.Parse(configFileBuffer)
+
+## testnet address version (so bitcoin testnet, but looks like this also works for litecoin testnet)
+## TODO: set this up dependant on config.useTestNet
+config.addressVersion = b'\x6f'
+
+## RPC HOST
+try:        
+        RPC_HOST = clientConfig['externalip']
+except KeyError:
+        RPC_HOST = 'localhost'
+
+## RPC PORT
+try:
+        RPC_PORT = clientConfig['rpcport']
+except KeyError:
+        if config.useTestNet:
+                RPC_PORT = 19332
+        else:
+                RPC_PORT = 9332
+
+assert int(RPC_PORT) > 1 and int(RPC_PORT) < 65535
+
+## RPC USER
+try:
+        RPC_USER = clientConfig['rpcuser']
+except KeyError:
+        RPC_USER = 'rpcuser'
+
+## RPC PASSWORD
+try:
+        RPC_PASSWORD = clientConfig['rpcpassword']
+except KeyError:        
+        RPC_PASSWORD = 'rpcpass'
+
+rpcHost = RPC.Host('http://' + RPC_USER + ':' + RPC_PASSWORD + '@' + RPC_HOST + ':' + str(RPC_PORT))
 
 print("current litecoind block count = {}".format(rpcHost.call('getblockcount')))
 
