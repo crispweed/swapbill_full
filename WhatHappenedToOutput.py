@@ -51,16 +51,6 @@ spendVOut = int(sys.argv[2])
 spendTX = rpcHost.call('getrawtransaction', spendTXID, 1)
 blockHash = spendTX['blockhash']
 
-#transactionsSince = rpcHost.call('listsinceblock', blockHash)['transactions']
-#for txInfo in transactionsSince:
-	#tx = rpcHost.call('getrawtransaction', txInfo['txid'], 1)
-	#for txIn in tx['vin']:
-		#print(txIn)
-		#if not 'coinbase' in txIn and txIn['txid'] == spendTXID and txIn['vout'] == spendVOut:
-			#print("spent by ", txIn['txid'])
-			#exit()
-
-
 while True:
 	block = rpcHost.call('getblock', blockHash)
 	for txHash in block['tx'][1:]: ## skip coinbase transactions
@@ -73,37 +63,5 @@ while True:
 		break
 	blockHash = block['nextblockhash']
 
-
-
-##... can do this much more directly, without using BlockChain.Tracker
-#config.startBlockHash = blockHash
-#config.startBlockIndex = rpcHost.call('getblock', blockHash)['height']
-#tracker = BlockChain.Tracker(config, rpcHost)
-#currentChainSince = [blockHash]
-#while True:
-	#increment = tracker.update(config, rpcHost)
-	#if increment == 0:
-		#break
-	#if increment == -1:
-		#currentChainSince = currentChainSince[:-1]
-	#else:
-		#assert increment == 1
-		#currentChainSince.append(tracker.currentHash())
-
-#currentChainSince = ['2eba420de998e73a62a976c0e306f9cd98f35e7a13d7fed765342adb836c4114']
-
-#print("Checking all transaction in currently reported best chain")
-#print("chain start:", currentChainSince[0])
-#print("chain end:", currentChainSince[-1])
-#print("chain length:", len(currentChainSince))
-
-#for h in currentChainSince[::-1]:
-	#block = rpcHost.call('getblock', h)
-	#for txHash in block['tx'][1:]: ## skip coinbase transactions
-		#tx = rpcHost.call('getrawtransaction', txHash, 1)
-		#for txIn in tx['vin']:
-			#if txIn['txid'] == spendTXID and txIn['vout'] == spendVOut:
-				#print("spent by ", tx['txid'])
-				#exit()
 
 print("No spent found in transactions in currently reported best chain")

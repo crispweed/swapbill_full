@@ -42,14 +42,14 @@ def _save(blockIndex, blockHash, state):
 	except:
 		print("Error, failed to write cache:", sys.exc_info()[0])
 
-def _processBlock(config, rpcHost, state, blockHash):
-	block = rpcHost.call('getblock', blockHash)
-	sourceLookup = SourceLookup.Lookup(config.addressVersion, rpcHost)
+def _processBlock(host, state, blockHash):
+	block = host._rpcHost.call('getblock', blockHash)
+	sourceLookup = SourceLookup.Lookup(host._addressVersion, host._rpcHost)
 	transactions = block['tx']
 	assert len(transactions) >= 1
 	for txHash in transactions[1:]:
-		litecoinTXHex = rpcHost.call('getrawtransaction', txHash)
-		hostTX = DecodeTransaction.Transaction(litecoinTXHex, rpcHost)
+		litecoinTXHex = host._rpcHost.call('getrawtransaction', txHash)
+		hostTX = DecodeTransaction.Transaction(litecoinTXHex, host._rpcHost)
 		try:
 			decodedTX = TransactionTypes.Decode(sourceLookup, hostTX)
 		except ControlAddressEncoding.NotSwapBillControlAddress:
@@ -62,7 +62,7 @@ def _processBlock(config, rpcHost, state, blockHash):
 		print('applied transaction:', decodedTX)
 		LTCTrading.Match(state)
 
-def SyncAndReturnState(config, rpcHost):
+def SyncAndReturnState(config, host):
 	try:
 		blockIndex, blockHash, state = _load()
 	except ReindexingRequiredException as e:
@@ -70,7 +70,7 @@ def SyncAndReturnState(config, rpcHost):
 		loaded = False
 	else:
 		loaded = True
-	if loaded and rpcHost.call('getblockhash', blockIndex) != blockHash:
+	if loaded and host._rpcHost.call('getblockhash', blockIndex) != blockHash:
 		print('The block corresponding with cached state has been orphaned, full index generation required.')
 		loaded = False
 	if loaded and not state.startBlockMatches(config.startBlockHash):
@@ -81,7 +81,7 @@ def SyncAndReturnState(config, rpcHost):
 	else:
 		blockIndex = config.startBlockIndex
 		blockHash = config.startBlockHash
-		assert rpcHost.call('getblockhash', blockIndex) == blockHash
+		assert host._rpcHost.call('getblockhash', blockIndex) == blockHash
 		state = State.State(blockIndex, blockHash)
 
 	print('Starting from block', blockIndex)
@@ -89,12 +89,12 @@ def SyncAndReturnState(config, rpcHost):
 	toProcess = deque()
 	mostRecentHash = blockHash
 	while True:
-		block = rpcHost.call('getblock', mostRecentHash)
+		block = host._rpcHost.call('getblock', mostRecentHash)
 		if not 'nextblockhash' in block:
 			break
 		if len(toProcess) == config.blocksBehindForCachedState:
 			## advance cached state
-			_processBlock(config, rpcHost, state, blockHash)
+			_processBlock(host, state, blockHash)
 			popped = toProcess.popleft()
 			blockIndex += 1
 			blockHash = popped
@@ -105,19 +105,19 @@ def SyncAndReturnState(config, rpcHost):
 
 	while len(toProcess) > 0:
 		## advance in memory state
-		_processBlock(config, rpcHost, state, blockHash)
+		_processBlock(host, state, blockHash)
 		state.advanceToNextBlock()
 		popped = toProcess.popleft()
 		blockIndex += 1
 		blockHash = popped
 
-	_processBlock(config, rpcHost, state, blockHash)
+	_processBlock(host, state, blockHash)
 
 	return state
 
-def LoadAndReturnStateWithoutUpdate(config):
-	try:
-		blockIndex, blockHash, state = _load()
-	except ReindexingRequiredException as e:
-		print('Could not load cached state, so returning empty initial state! (' + str(e) + ')')
-	return state
+#def LoadAndReturnStateWithoutUpdate(config):
+	#try:
+		#blockIndex, blockHash, state = _load()
+	#except ReindexingRequiredException as e:
+		#print('Could not load cached state, so returning empty initial state! (' + str(e) + ')')
+	#return state

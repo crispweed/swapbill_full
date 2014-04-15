@@ -1,12 +1,11 @@
 from __future__ import print_function
 import sys, argparse, binascii, traceback, struct
-import csv
 from os import path
 scriptPath = path.dirname(path.abspath(__file__))
 sys.path.append(path.join(scriptPath, 'module'))
 sys.dont_write_bytecode = True
-from SwapBill import RPC, RawTransaction, Address, TransactionFee, ScriptPubKeyLookup
-from SwapBill import TransactionTypes, BuildHostedTransaction, GetUnspent, Sync, ParseConfig
+from SwapBill import RawTransaction, Address, TransactionFee, ScriptPubKeyLookup
+from SwapBill import TransactionTypes, BuildHostedTransaction, Sync, Host
 from SwapBill.Sync import SyncAndReturnState
 from SwapBill.Amounts import ToSatoshis, FromSatoshis
 PY3 = sys.version_info.major > 2
@@ -15,7 +14,7 @@ class Config(object):
 	pass
 config = Config()
 config.blocksBehindForCachedState = 20
-config.useTestNet = True
+#config.useTestNet = True
 config.startBlockIndex = 241432
 ## from: litecoind -testnet getblockhash 241432
 config.startBlockHash = '3fa2cf2d644b74b7f6407a1d3a9d15ad98f85da9adecbac0b1560c11c0393eed'
@@ -56,86 +55,21 @@ subparsers.add_parser('show_pending_exchanges', help='show current SwapBill pend
 
 args = parser.parse_args()
 
-## Read custom configuration file
-if args.config_file == None:
-	args.config_file = path.join(path.expanduser("~"), '.litecoin', 'litecoin.conf')
+host = Host.Host(useTestNet=True, configFile=args.config_file)
 
-## Open config
-try:
-	with open(args.config_file, mode='rb') as f:
-		configFileBuffer = f.read()
-except FileNotFoundError:
-	configFileBuffer = b''
-
-clientConfig = ParseConfig.Parse(configFileBuffer)
-
-## testnet address version (so bitcoin testnet, but looks like this also works for litecoin testnet)
-## TODO: set this up dependant on config.useTestNet
-config.addressVersion = b'\x6f'
-
-## RPC HOST
-try:
-	RPC_HOST = clientConfig['externalip']
-except KeyError:
-	RPC_HOST = 'localhost'
-
-## RPC PORT
-try:
-	RPC_PORT = clientConfig['rpcport']
-except KeyError:
-	if config.useTestNet:
-		RPC_PORT = 19332
-	else:
-		RPC_PORT = 9332
-
-assert int(RPC_PORT) > 1 and int(RPC_PORT) < 65535
-
-## RPC USER
-try:
-	RPC_USER = clientConfig['rpcuser']
-except KeyError:
-	RPC_USER = 'rpcuser'
-
-## RPC PASSWORD
-try:
-	RPC_PASSWORD = clientConfig['rpcpassword']
-except KeyError:
-	RPC_PASSWORD = 'rpcpass'
-
-rpcHost = RPC.Host('http://' + RPC_USER + ':' + RPC_PASSWORD + '@' + RPC_HOST + ':' + str(RPC_PORT))
-
-print("current litecoind block count = {}".format(rpcHost.call('getblockcount')))
+print("current litecoind block count = {}".format(host._rpcHost.call('getblockcount')))
 
 def CheckAndReturnPubKeyHash(address):
 	try:
-		pubKeyHash = Address.ToPubKeyHash(config.addressVersion, address)
+		pubKeyHash = Address.ToPubKeyHash(host._addressVersion, address)
 	except Address.BadAddress as e:
 		print('Bad address:', address)
 		print(e)
 		exit()
 	return pubKeyHash
 
-class SigningFailed(Exception):
-	pass
-class InsufficientTransactionFees(Exception):
-	pass
-
-def CreateSignAndSend(tx, scriptPubKeyLookup):
-	unsignedData = RawTransaction.Create(tx, scriptPubKeyLookup)
-	unsignedHex = RawTransaction.ToHex(unsignedData)
-	#signingResult = rpcHost.call('signrawtransaction_simplified', unsignedHex)
-	signingResult = rpcHost.call('signrawtransaction', unsignedHex)
-	if signingResult['complete'] != True:
-		raise SigningFailed()
-	signedHex = signingResult['hex']
-	if not TransactionFee.TransactionFeeIsSufficient(rpcHost, signedHex):
-		raise InsufficientTransactionFees()
-	txID = rpcHost.call('sendrawtransaction', signedHex)
-	print('Transaction sent with transactionID:')
-	print(txID)
-
 def CheckAndSend_FromAddress(tx):
-	state = SyncAndReturnState(config, rpcHost)
+	state = SyncAndReturnState(config, host._rpcHost)
 	source = tx.source
 	if hasattr(tx, 'consumedAmount'):
 		requiredAmount = tx.consumedAmount()
@@ -144,55 +78,60 @@ def CheckAndSend_FromAddress(tx):
 	if not source in state._balances or state._balances[source] < requiredAmount:
 		print('Insufficient swapbill balance for source address.')
 		exit()
-	sourceSingleUnspent = GetUnspent.SingleForAddress(config.addressVersion, rpcHost, source)
+	sourceSingleUnspent = host.getSingleUnspentForAddress(source)
 	if sourceSingleUnspent == None:
 		print('No unspent outputs reported by litecoind for the specified from address.')
 		print("This could be because a transaction is in progress and needs to be confirmed (in which case you may just need to wait)," +
 			  " or it's also possible that all litecoin seeded to this address has been spent (in which case you will need to reseed).")
 		exit()
-	backerUnspent = GetUnspent.AllNonSwapBill(config.addressVersion, rpcHost, state._balances)
+	backerUnspent = host.getNonSwapBillUnspent(state._balances)
 	scriptPubKeyLookup = ScriptPubKeyLookup.Lookup(backerUnspent[1], sourceSingleUnspent[1])
-	change = Address.ToPubKeyHash(config.addressVersion, rpcHost.call('getnewaddress'))
+	change = host.getNewChangeAddress()
 	print('attempting to send swap bill transaction:', tx)
 	transactionFee = TransactionFee.baseFee
 	try:
 		litecoinTX = BuildHostedTransaction.Build_WithSourceAddress(TransactionFee.dustLimit, transactionFee, tx, sourceSingleUnspent, backerUnspent, change)
-		CreateSignAndSend(litecoinTX, scriptPubKeyLookup)
+		txID = host.sendTransaction(litecoinTX, scriptPubKeyLookup)
 	except InsufficientTransactionFees:
 		try:
 			transactionFee += TransactionFee.feeIncrement
 			litecoinTX = BuildHostedTransaction.Build_WithSourceAddress(TransactionFee.dustLimit, transactionFee, tx, sourceSingleUnspent, backerUnspent, change)
-			CreateSignAndSend(litecoinTX, scriptPubKeyLookup)
+			txID = host.sendTransaction(litecoinTX, scriptPubKeyLookup)
 		except InsufficientTransactionFees:
 			print("Failed: Unexpected failure to meet transaction fee requirement. (Lots of dust inputs?)")
-	except SigningFailed:
+	except Host.SigningFailed:
 		print("Failed: Transaction could not be signed (source address not in wallet?)")
-
+	else:
+		print('Transaction sent with transactionID:')
+		print(txID)
 
 if args.action == 'burn':
-	state = SyncAndReturnState(config, rpcHost)
-	unspent = GetUnspent.AllNonSwapBill(config.addressVersion, rpcHost, state._balances)
+	state = SyncAndReturnState(config, host)
+	unspent = host.getNonSwapBillUnspent(state._balances)
 	scriptPubKeyLookup = ScriptPubKeyLookup.Lookup(unspent[1])
-	target = Address.ToPubKeyHash(config.addressVersion, rpcHost.call('getnewaddress', 'SwapBill'))
+	target = host.getNewSwapBillAddress()
 	burnTX = TransactionTypes.Burn()
 	burnTX.init_FromUserRequirements(burnAmount=int(args.quantity), target=target)
-	change = Address.ToPubKeyHash(config.addressVersion, rpcHost.call('getnewaddress'))
+	change = host.getNewChangeAddress()
 	print('attempting to send swap bill transaction:', burnTX)
 	transactionFee = TransactionFee.baseFee
 	try:
 		litecoinTX = BuildHostedTransaction.Build_FundedByAccount(TransactionFee.dustLimit, transactionFee, burnTX, unspent, change)
-		CreateSignAndSend(litecoinTX, scriptPubKeyLookup)
-	except InsufficientTransactionFees:
+		txID = host.sendTransaction(litecoinTX, scriptPubKeyLookup)
+	except Host.InsufficientTransactionFees:
 		try:
 			transactionFee += TransactionFee.feeIncrement
 			litecoinTX = BuildHostedTransaction.Build_FundedByAccount(TransactionFee.dustLimit, transactionFee, burnTX, unspent, change)
-			CreateSignAndSend(litecoinTX, scriptPubKeyLookup)
-		except InsufficientTransactionFees:
+			txID = host.sendTransaction(litecoinTX, scriptPubKeyLookup)
+		except Host.InsufficientTransactionFees:
 			print("Failed: Unexpected failure to meet transaction fee requirement. (Lots of dust inputs?)")
-	except SigningFailed:
+	except Host.SigningFailed:
 		print("Failed: Transaction could not be signed")
 	except BuildHostedTransaction.ControlAddressBelowDustLimit:
 		print("Failed: Burn quantity is below configured dust limit")
+	else:
+		print('Transaction sent with transactionID:')
+		print(txID)
 
 elif args.action == 'transfer':
 	source = CheckAndReturnPubKeyHash(args.fromAddress)
@@ -204,7 +143,7 @@ elif args.action == 'transfer':
 
 elif args.action == 'post_ltc_buy':
 	source = CheckAndReturnPubKeyHash(args.fromAddress)
-	receivingDestination = Address.ToPubKeyHash(config.addressVersion, rpcHost.call('getnewaddress', 'SwapBill'))
+	receivingDestination = host.getNewSwapBillAddress()
 	exchangeRate = int(float(args.exchangeRate) * 0x100000000)
 	## TODO: add args for block validity limit and offer duration
 	tx = TransactionTypes.LTCBuyOffer()
@@ -221,41 +160,44 @@ elif args.action == 'post_ltc_sell':
 	CheckAndSend_FromAddress(tx)
 
 elif args.action == 'complete_ltc_sell':
-	state = SyncAndReturnState(config, rpcHost)
+	state = SyncAndReturnState(config, host)
 	pendingExchangeID = int(args.pending_exchange_id)
 	if not pendingExchangeID in state._pendingExchanges:
 		print('No pending exchange with the specified ID.')
 		exit()
 	exchange = state._pendingExchanges[pendingExchangeID]
-	unspent = GetUnspent.AllNonSwapBill(config.addressVersion, rpcHost, state._balances)
+	unspent = host.getNonSwapBillUnspent(state._balances)
 	scriptPubKeyLookup = ScriptPubKeyLookup.Lookup(unspent[1])
-	target = Address.ToPubKeyHash(config.addressVersion, rpcHost.call('getnewaddress', 'SwapBill'))
+	target = host.getNewSwapBillAddress()
 	tx = TransactionTypes.LTCExchangeCompletion()
 	tx.init_FromUserRequirements(ltcAmount=exchange.ltc, destination=exchange.ltcReceiveAddress, pendingExchangeIndex=pendingExchangeID)
-	change = Address.ToPubKeyHash(config.addressVersion, rpcHost.call('getnewaddress'))
+	change = host.getNewChangeAddress()
 	print('attempting to send swap bill transaction:', tx)
 	transactionFee = TransactionFee.baseFee
 	try:
 		litecoinTX = BuildHostedTransaction.Build_FundedByAccount(TransactionFee.dustLimit, transactionFee, tx, unspent, change)
-		CreateSignAndSend(litecoinTX, scriptPubKeyLookup)
-	except InsufficientTransactionFees:
+		txID = host.sendTransaction(litecoinTX, scriptPubKeyLookup)
+	except Host.InsufficientTransactionFees:
 		try:
 			transactionFee += TransactionFee.feeIncrement
 			litecoinTX = BuildHostedTransaction.Build_FundedByAccount(TransactionFee.dustLimit, transactionFee, tx, unspent, change)
-			CreateSignAndSend(litecoinTX, scriptPubKeyLookup)
+			txID = host.sendTransaction(litecoinTX, scriptPubKeyLookup)
 		except InsufficientTransactionFees:
 			print("Failed: Unexpected failure to meet transaction fee requirement. (Lots of dust inputs?)")
-	except SigningFailed:
+	except Host.SigningFailed:
 		print("Failed: Transaction could not be signed")
 	except BuildHostedTransaction.ControlAddressBelowDustLimit:
 		print("Failed: payment quantity is below configured dust limit (but then this pending exchange should not have been added!)")
+	else:
+		print('Transaction sent with transactionID:')
+		print(txID)
 
 elif args.action == 'show_balances':
-	state = SyncAndReturnState(config, rpcHost)
+	state = SyncAndReturnState(config, host)
 	print('all balances:')
 	totalSpendable = 0
 	for pubKeyHash in state._balances:
-		address = Address.FromPubKeyHash(config.addressVersion, pubKeyHash)
+		address = Address.FromPubKeyHash(host._addressVersion, pubKeyHash)
 		balance = state._balances[pubKeyHash]
 		print(address + ': ' + str(balance))
 		totalSpendable += balance
@@ -263,25 +205,20 @@ elif args.action == 'show_balances':
 	print('total swap bill satoshis created:   ' + str(state._totalCreated))
 
 elif args.action == 'show_offers':
-	state = SyncAndReturnState(config, rpcHost)
+	state = SyncAndReturnState(config, host)
 	state.printOffers()
 
 elif args.action == 'show_pending_exchanges':
-	state = SyncAndReturnState(config, rpcHost)
+	state = SyncAndReturnState(config, host)
 	state.printPendingExchanges()
 
-#elif args.action == 'show_balances_no_update':
-	#state = Sync.LoadAndReturnStateWithoutUpdate(config)
-	#print('current account balances:', state._balances)
-	#print('total swap bill satoshis created: ' + str(state._totalCreated))
-
 elif args.action == 'show_my_balances':
-	state = SyncAndReturnState(config, rpcHost)
+	state = SyncAndReturnState(config, host)
 	print('my balances:')
 	totalSpendable = 0
 	for pubKeyHash in state._balances:
-		address = Address.FromPubKeyHash(config.addressVersion, pubKeyHash)
-		validateResults = rpcHost.call('validateaddress', address)
+		address = Address.FromPubKeyHash(host._addressVersion, pubKeyHash)
+		validateResults = host._rpcHost.call('validateaddress', address)
 		if validateResults['ismine'] == True:
 			balance = state._balances[pubKeyHash]
 			print(address + ': ' + str(balance))
@@ -289,7 +226,7 @@ elif args.action == 'show_my_balances':
 	print('total spendable swap bill satoshis: ' + str(totalSpendable))
 
 elif args.action == 'show_pending_exchanges':
-	state = SyncAndReturnState(config, rpcHost)
+	state = SyncAndReturnState(config, host)
 	state.printPendingExchanges()
 
 else:
