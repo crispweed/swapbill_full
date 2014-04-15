@@ -1,5 +1,8 @@
 from __future__ import print_function
 import unittest
+import sys
+if sys.version > '3':
+	long = int
 from SwapBill import LTCTrading, State
 
 class MockObject(object):
@@ -10,7 +13,9 @@ class Test(unittest.TestCase):
 		self.assertEqual(LTCTrading.LTCWithExchangeRate(0x80000000, 122), 61)
 		self.assertEqual(LTCTrading.LTCWithExchangeRate(0x40000000, 100), 25)
 		self.assertEqual(LTCTrading.LTCWithExchangeRate(0x40000000, 101), 25)
-		## TODO: define maximum range for swapbill values, and test with these
+		## ltc calculation rounds down
+		self.assertEqual(LTCTrading.LTCWithExchangeRate(0x100000000 // 10, 100000000), 100000000 // 10 - 1)
+		## TODO: define maximum range for swapbill values, and test with these?
 
 		milliSatoshi = 100000
 		self.assertEqual(LTCTrading.minimumExchangeLTC, 10 * milliSatoshi)
