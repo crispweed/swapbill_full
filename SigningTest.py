@@ -46,7 +46,14 @@ burnTX.init_FromUserRequirements(burnAmount=100000, target=destination)
 change = destination
 transactionFee = TransactionFee.baseFee
 litecoinTX = BuildHostedTransaction.Build_FundedByAccount(TransactionFee.dustLimit, transactionFee, burnTX, unspent, change)
+print('number of inputs:', litecoinTX.numberOfInputs())
 unsignedData = RawTransaction.Create(litecoinTX, scriptPubKeyLookup)
 unsignedHex = RawTransaction.ToHex(unsignedData)
 signingResult = rpcHost.call('signrawtransaction_simplified', unsignedHex)
 print(signingResult)
+
+#********* signed hash: 5f81382bf849efeeeda8393561093926d674c8bde5a1ab5e510c2485f8443256
+#********* signed hash: 5679d217432bcbe2a8b96c4a85c47a0fa815ef7f23270eb94bbd92d0ed713326
+#********* signed hash: e96b8e9b5cda99226aea26d776d2b998079ab2f9f50663d4d34ea6c85315d37d
+#********* signed hash: f7dfff7d91e7dc8e17e019e1fa04d2f174c52694163a22d15b1afb8e3ff76614
+#********* signed hash: c2857eb8bf74b204ba0f4969b6aec648e667d699f4e8a2340c7939feea75c9fb
