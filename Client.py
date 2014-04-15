@@ -57,15 +57,15 @@ subparsers.add_parser('show_pending_exchanges', help='show current SwapBill pend
 args = parser.parse_args()
 
 ## Read custom configuration file
-if args.config_file == None:        
-        args.config_file = path.join(path.expanduser("~"), '.litecoin', 'litecoin.conf')    
+if args.config_file == None:
+	args.config_file = path.join(path.expanduser("~"), '.litecoin', 'litecoin.conf')
 
 ## Open config
-try:        
-        with open(args.config_file, mode='rb') as f:
-                configFileBuffer = f.read()
-except FileNotFoundError:        
-        configFileBuffer = b''
+try:
+	with open(args.config_file, mode='rb') as f:
+		configFileBuffer = f.read()
+except FileNotFoundError:
+	configFileBuffer = b''
 
 clientConfig = ParseConfig.Parse(configFileBuffer)
 
@@ -74,33 +74,33 @@ clientConfig = ParseConfig.Parse(configFileBuffer)
 config.addressVersion = b'\x6f'
 
 ## RPC HOST
-try:        
-        RPC_HOST = clientConfig['externalip']
+try:
+	RPC_HOST = clientConfig['externalip']
 except KeyError:
-        RPC_HOST = 'localhost'
+	RPC_HOST = 'localhost'
 
 ## RPC PORT
 try:
-        RPC_PORT = clientConfig['rpcport']
+	RPC_PORT = clientConfig['rpcport']
 except KeyError:
-        if config.useTestNet:
-                RPC_PORT = 19332
-        else:
-                RPC_PORT = 9332
+	if config.useTestNet:
+		RPC_PORT = 19332
+	else:
+		RPC_PORT = 9332
 
 assert int(RPC_PORT) > 1 and int(RPC_PORT) < 65535
 
 ## RPC USER
 try:
-        RPC_USER = clientConfig['rpcuser']
+	RPC_USER = clientConfig['rpcuser']
 except KeyError:
-        RPC_USER = 'rpcuser'
+	RPC_USER = 'rpcuser'
 
 ## RPC PASSWORD
 try:
-        RPC_PASSWORD = clientConfig['rpcpassword']
-except KeyError:        
-        RPC_PASSWORD = 'rpcpass'
+	RPC_PASSWORD = clientConfig['rpcpassword']
+except KeyError:
+	RPC_PASSWORD = 'rpcpass'
 
 rpcHost = RPC.Host('http://' + RPC_USER + ':' + RPC_PASSWORD + '@' + RPC_HOST + ':' + str(RPC_PORT))
 
@@ -126,7 +126,7 @@ def CreateSignAndSend(tx, scriptPubKeyLookup):
 	#signingResult = rpcHost.call('signrawtransaction_simplified', unsignedHex)
 	signingResult = rpcHost.call('signrawtransaction', unsignedHex)
 	if signingResult['complete'] != True:
-			raise SigningFailed()
+		raise SigningFailed()
 	signedHex = signingResult['hex']
 	if not TransactionFee.TransactionFeeIsSufficient(rpcHost, signedHex):
 		raise InsufficientTransactionFees()
@@ -148,7 +148,7 @@ def CheckAndSend_FromAddress(tx):
 	if sourceSingleUnspent == None:
 		print('No unspent outputs reported by litecoind for the specified from address.')
 		print("This could be because a transaction is in progress and needs to be confirmed (in which case you may just need to wait)," +
-		      " or it's also possible that all litecoin seeded to this address has been spent (in which case you will need to reseed).")
+			  " or it's also possible that all litecoin seeded to this address has been spent (in which case you will need to reseed).")
 		exit()
 	backerUnspent = GetUnspent.AllNonSwapBill(config.addressVersion, rpcHost, state._balances)
 	scriptPubKeyLookup = ScriptPubKeyLookup.Lookup(backerUnspent[1], sourceSingleUnspent[1])
