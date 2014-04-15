@@ -47,7 +47,7 @@ class Host(object):
 
 	def getNonSwapBillUnspent(self, swapBillBalances):
 		return GetUnspent.AllNonSwapBill(self._addressVersion, self._rpcHost, swapBillBalances)
-	def getSingleUnspentForAddress(pubKeyHash):
+	def getSingleUnspentForAddress(self, pubKeyHash):
 		return GetUnspent.SingleForAddress(self._addressVersion, self._rpcHost, pubKeyHash)
 
 	## TODO - get rid of scriptPubKeyLookup parameter here, cache unspents provided in the methods above and look up there instead

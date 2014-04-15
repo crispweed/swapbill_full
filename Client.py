@@ -4,7 +4,7 @@ from os import path
 scriptPath = path.dirname(path.abspath(__file__))
 sys.path.append(path.join(scriptPath, 'module'))
 sys.dont_write_bytecode = True
-from SwapBill import RawTransaction, Address, TransactionFee, ScriptPubKeyLookup
+from SwapBill import RawTransaction, Address, TransactionFee, ScriptPubKeyLookup, Address
 from SwapBill import TransactionTypes, BuildHostedTransaction, Sync, Host
 from SwapBill.Sync import SyncAndReturnState
 from SwapBill.Amounts import ToSatoshis, FromSatoshis
@@ -69,7 +69,7 @@ def CheckAndReturnPubKeyHash(address):
 	return pubKeyHash
 
 def CheckAndSend_FromAddress(tx):
-	state = SyncAndReturnState(config, host._rpcHost)
+	state = SyncAndReturnState(config, host)
 	source = tx.source
 	if hasattr(tx, 'consumedAmount'):
 		requiredAmount = tx.consumedAmount()
