@@ -49,6 +49,7 @@ litecoinTX = BuildHostedTransaction.Build_FundedByAccount(TransactionFee.dustLim
 print('number of inputs:', litecoinTX.numberOfInputs())
 unsignedData = RawTransaction.Create(litecoinTX, scriptPubKeyLookup)
 unsignedHex = RawTransaction.ToHex(unsignedData)
+#print(unsignedHex)
 signingResult = rpcHost.call('signrawtransaction_simplified', unsignedHex)
 print(signingResult)
 
