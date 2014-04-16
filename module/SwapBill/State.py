@@ -59,6 +59,43 @@ class State(object):
 		else:
 			self._balances[address] -= amount
 
+	def _matchLTC(self):
+		while True:
+			if self._LTCBuys.empty() or self._LTCSells.empty():
+				return
+			if self._LTCBuys.currentBestExchangeRate() > self._LTCSells.currentBestExchangeRate():
+				return
+			buyRate = self._LTCBuys.currentBestExchangeRate()
+			buyExpiry = self._LTCBuys.currentBestExpiry()
+			buyDetails = self._LTCBuys.popCurrentBest()
+			sellRate = self._LTCSells.currentBestExchangeRate()
+			sellExpiry = self._LTCSells.currentBestExpiry()
+			sellDetails = self._LTCSells.popCurrentBest()
+			exchange, buyDetails, sellDetails = LTCTrading.Match(buyRate, buyExpiry, buyDetails, sellRate, sellExpiry, sellDetails)
+			exchange.expiry = self._currentBlockIndex + 50
+			key = self._nextExchangeIndex
+			self._nextExchangeIndex += 1
+			self._pendingExchanges[key] = exchange
+			if not buyDetails is None:
+				if LTCTrading.SatisfiesMinimumExchange(buyRate, buyDetails.swapBillAmount):
+					self._LTCBuys.addOffer(buyRate, buyExpiry, buyDetails)
+					continue # may need to match against a second offer
+				else:
+					## small remaining buy offer is discarded
+					## refund swapbill amount left in this buy offer
+					_addToBalance(buyDetails.swapBillAddress, buyDetails.swapBillAmount)
+			if not sellDetails is None:
+				if LTCTrading.SatisfiesMinimumExchange(sellRate, sellDetails.swapBillAmount):
+					self._LTCSells.addOffer(sellRate, sellExpiry, sellDetails)
+					continue
+				else:
+					## small remaining sell offer is discarded
+					## refund swapbill amount left in this buy offer
+					## TODO BUG here, repeat this in unit tests then fix!
+					assert False
+					state.addToBalance(sellDetails.swapBillDeposit, sellDetails.swapBillAmount)
+			return # break out of while loop
+
 	def checkWouldApplySuccessfully_Burn(self, amount, destinationAccount):
 		assert type(amount) is int
 		assert amount > 0
@@ -110,7 +147,7 @@ class State(object):
 		buyDetails.swapBillAmount = swapBillOffered
 		buyDetails.ltcReceiveAddress = receivingAccount
 		self._LTCBuys.addOffer(exchangeRate, expiry, buyDetails)
-		LTCTrading.Match(self)
+		self._matchLTC()
 
 	def checkWouldApplySuccessfully_AddLTCSellOffer(self, sourceAccount, swapBillDesired, exchangeRate, expiry):
 		assert type(swapBillDesired) is int
@@ -138,7 +175,7 @@ class State(object):
 		sellDetails.swapBillAmount = swapBillDesired
 		sellDetails.swapBillDeposit = swapBillDeposit
 		self._LTCSells.addOffer(exchangeRate, expiry, sellDetails)
-		LTCTrading.Match(self)
+		self._matchLTC()
 
 	def checkWouldApplySuccessfully_CompleteLTCExchange(self, pendingExchangeIndex, destinationAccount, destinationAmount):
 		assert type(destinationAmount) is int
