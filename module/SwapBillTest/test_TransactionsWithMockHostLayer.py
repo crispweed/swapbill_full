@@ -101,7 +101,6 @@ class MockHostLayer(object):
 		for hostTX in decodedHostTransactions:
 			decodedTX = TransactionTypes.Decode(sourceLookup, hostTX)
 			decodedTX.apply(state)
-			LTCTrading.Match(state)
 		state.advanceToNextBlock()
 
 class SourceLookup(object):
@@ -245,11 +244,10 @@ class Test(unittest.TestCase):
 		change = b'change'
 
 		## direct calls to initialise some account balances
-		state.create(ToSatoshis(1.6))
-		state.addToBalance(b'alice', ToSatoshis(0.3))
-		state.addToBalance(b'bob', ToSatoshis(0.2))
-		state.addToBalance(b'clive', ToSatoshis(0.5))
-		state.addToBalance(b'dave', ToSatoshis(0.6))
+		state.apply_Burn(ToSatoshis(0.3), b'alice')
+		state.apply_Burn(ToSatoshis(0.2), b'bob')
+		state.apply_Burn(ToSatoshis(0.5), b'clive')
+		state.apply_Burn(ToSatoshis(0.6), b'dave')
 		self.assertEqual(state.totalAccountedFor(), state._totalCreated)
 
 		## backing ltc

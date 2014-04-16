@@ -6,18 +6,18 @@ class MockState(object):
 	def __init__(self):
 		self._log = []
 ## TODO: can the following be replaced by something automatic?
-	def create(self, amount):
-		self._log.append(('create', amount))
-	def addToBalance(self, target, amount):
-		self._log.append(('addToBalance', target, amount))
-	def subtractFromBalance(self, target, amount):
-		self._log.append(('subtractFromBalance', target, amount))
-	def requestTransfer(self, source, amount, destination):
-		self._log.append(('requestTransfer', source, amount, destination))
-	def requestAddLTCBuyOffer(self, address, amount, exchangeRate, expiry, receivingAddress):
-		self._log.append(('requestAddLTCBuyOffer', address, amount, exchangeRate, expiry, receivingAddress))
-	def requestAddLTCSellOffer(self, address, amount, depositAmount, exchangeRate, expiry):
-		self._log.append(('requestAddLTCSellOffer', address, amount, depositAmount, exchangeRate, expiry))
+	def apply_Burn(self, amount, destinationAccount):
+		self._log.append(('apply_Burn', amount, destinationAccount))
+	def apply_Transfer(self, sourceAccount, amount, destinationAccount):
+		self._log.append(('apply_Transfer', sourceAccount, amount, destinationAccount))
+	def apply_AddLTCBuyOffer(self, sourceAccount, swapBillOffered, exchangeRate, expiry, receivingAccount):
+		self._log.append(('apply_AddLTCBuyOffer', sourceAccount, swapBillOffered, exchangeRate, expiry, receivingAccount))
+	def apply_AddLTCSellOffer(self, sourceAccount, swapBillDesired, exchangeRate, expiry):
+		self._log.append(('apply_AddLTCSellOffer', sourceAccount, swapBillDesired, exchangeRate, expiry))
+	def apply_CompleteLTCExchange(self, pendingExchangeIndex, destinationAccount, destinationAmount):
+		self._log.append(('apply_CompleteLTCExchange', pendingExchangeIndex, destinationAccount, destinationAmount))
+	def apply_ForwardToFutureNetworkVersion(self, sourceAccount, amount):
+		self._log.append(('apply_ForwardToFutureNetworkVersion', sourceAccount, amount))
 
 class MockHostTX(object):
 	def __init__(self, tx):
@@ -63,7 +63,7 @@ class Test(unittest.TestCase):
 		self.assertEqual(str(burn), 'burn 10 with credit to 0a')
 		s = MockState()
 		burn.apply(s)
-		self.assertEqual(s._log, [('create', 10),('addToBalance', a, 10)])
+		self.assertEqual(s._log, [('apply_Burn', 10, a)])
 		self.assertEqual(burn.typeCode, 0)
 		self.assertEqual(burn.controlAddressAmount, 10)
 		self.assertEqual(burn.destination, a)
@@ -79,7 +79,7 @@ class Test(unittest.TestCase):
 		s = MockState()
 		transfer.apply(s)
 		#print(s._log)
-		self.assertEqual(s._log, [('requestTransfer', bob, 10, alice)])
+		self.assertEqual(s._log, [('apply_Transfer', bob, 10, alice)])
 		self.assertEqual(transfer.typeCode, 1)
 		self.assertEqual(transfer.source, bob)
 		self.assertEqual(transfer.destination, alice)
@@ -97,7 +97,7 @@ class Test(unittest.TestCase):
 		s = MockState()
 		tx.apply(s)
 		#print(s._log)
-		self.assertEqual(s._log, [('requestAddLTCBuyOffer', bob, 111, 2147483647, 4294967295, bob2)])
+		self.assertEqual(s._log, [('apply_AddLTCBuyOffer', b'\x0b\x0b', 111, 2147483647, 4294967295, b'\xb0\xb2')])
 		self.assertEqual(tx.typeCode, 2)
 		self.assertEqual(tx.source, bob)
 		self.assertEqual(tx.destination, bob2)
@@ -120,7 +120,7 @@ class Test(unittest.TestCase):
 		self.assertEqual(str(tx), 'LTC sell offer from 0b0b, for 111 swapbill, exchange rate 2147483647, maxBlock offset 0')
 		s = MockState()
 		tx.apply(s) ## capped to 1 here by mock state!
-		self.assertEqual(s._log, [('requestAddLTCSellOffer', bob, 111, 6, 2147483647, 4294967295)])
+		self.assertEqual(s._log, [('apply_AddLTCSellOffer', b'\x0b\x0b', 111, 2147483647, 4294967295)])
 		self.assertEqual(tx.typeCode, 3)
 		self.assertEqual(tx.source, bob)
 		assert not hasattr(tx, 'destination')

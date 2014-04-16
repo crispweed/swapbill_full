@@ -191,7 +191,9 @@ class Test(unittest.TestCase):
 		self.assertEqual(state._LTCSells.size(), 1)
 		self.assertEqual(len(state._pendingExchanges), 0)
 
-		## TODO - test for fail to complete due to expiry
+		state.apply_ForwardToFutureNetworkVersion('a', 1)
+		self.assertEqual(state.totalAccountedFor(), state._totalCreated)
+		self.assertEqual(state._totalForwarded, 1)
 
 
 	def test_ltc_trading(self):
@@ -370,3 +372,4 @@ class Test(unittest.TestCase):
 		self.assertEqual(state._balances, {'b': 60000000})
 
 ## TODO tests for offer matching multiple other offers
+## TODO - test for fail to complete due to expiry

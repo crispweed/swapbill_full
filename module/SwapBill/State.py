@@ -34,7 +34,7 @@ class State(object):
 			if exchange.expiry == self._currentBlockIndex:
 				#print("pending exchange expired")
 				## refund buyers funds locked up in the exchange, plus sellers deposit (as penalty for failing to make exchange)
-				self.addToBalance(exchange.buyerAddress, exchange.swapBillAmount + exchange.swapBillDeposit)
+				self._addToBalance(exchange.buyerAddress, exchange.swapBillAmount + exchange.swapBillDeposit)
 				toDelete.append(key)
 		for key in toDelete:
 			self._pendingExchanges.pop(key)
@@ -213,24 +213,23 @@ class State(object):
 		if available > 0:
 			return False, 'insufficient balance in source account (amount capped)'
 		return False, 'source account balance is 0'
-	def apply_ForwardToFutureNetworkVersion(self, pendingExchangeIndex, destinationAccount, destinationAmount):
+	def apply_ForwardToFutureNetworkVersion(self, sourceAccount, amount):
 		available = self._balances.get(sourceAccount, 0)
 		if amount > available:
 			amount = available
 		self._subtractFromBalance(sourceAccount, amount)
 		self._totalForwarded += amount
 
-
-	def create(self, amount):
-		assert amount >= 0
-		if amount == 0:
-			return
-		self._totalCreated += amount
-	def undoCreate(self, amount):
-		assert amount >= 0
-		if amount == 0:
-			return
-		self._totalCreated -= amount
+	#def create(self, amount):
+		#assert amount >= 0
+		#if amount == 0:
+			#return
+		#self._totalCreated += amount
+	#def undoCreate(self, amount):
+		#assert amount >= 0
+		#if amount == 0:
+			#return
+		#self._totalCreated -= amount
 
 
 	#def subtractFromBalance_Capped(self, address, amount):
@@ -246,15 +245,15 @@ class State(object):
 		#self._balances[address] -= amount
 		#return amount
 
-	def forwardToFutureVersion(amount):
-		self._totalForwarded += amount
+	#def forwardToFutureVersion(amount):
+		#self._totalForwarded += amount
 
 
-	def addPendingExchange(self, exchange):
-		exchange.expiry = self._currentBlockIndex + 50
-		key = self._nextExchangeIndex
-		self._nextExchangeIndex += 1
-		self._pendingExchanges[key] = exchange
+	#def addPendingExchange(self, exchange):
+		#exchange.expiry = self._currentBlockIndex + 50
+		#key = self._nextExchangeIndex
+		#self._nextExchangeIndex += 1
+		#self._pendingExchanges[key] = exchange
 
 
 	def totalAccountedFor(self):
@@ -275,6 +274,7 @@ class State(object):
 			result += exchange.swapBillAmount
 			result += exchange.swapBillDeposit
 		#print('+exchanges:', result)
+		result += self._totalForwarded
 		return result
 
 	def printOffers(self):
