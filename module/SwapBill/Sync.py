@@ -7,7 +7,7 @@ else:
 	import cPickle as pickle
 from os import path
 from collections import deque
-from SwapBill import State, DecodeTransaction, TransactionTypes, LTCTrading, SourceLookup, ControlAddressEncoding
+from SwapBill import State, DecodeTransaction, TransactionTypes, SourceLookup, ControlAddressEncoding
 
 class ReindexingRequiredException(Exception):
 	pass
@@ -60,7 +60,6 @@ def _processBlock(host, state, blockHash):
 			continue
 		decodedTX.apply(state)
 		print('applied transaction:', decodedTX)
-		LTCTrading.Match(state)
 
 def SyncAndReturnState(config, host):
 	try:

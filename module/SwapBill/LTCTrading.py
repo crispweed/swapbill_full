@@ -4,6 +4,7 @@ class Exchange(object):
 	pass
 
 minimumExchangeLTC = 1000000
+depositDivisor = 16
 
 def LTCWithExchangeRate(exchangeRate, swapBillAmount):
 	return swapBillAmount * exchangeRate // 0x100000000
