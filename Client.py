@@ -70,14 +70,11 @@ def CheckAndReturnPubKeyHash(address):
 
 def CheckAndSend_FromAddress(tx):
 	state = SyncAndReturnState(config, host)
-	source = tx.source
-	if hasattr(tx, 'consumedAmount'):
-		requiredAmount = tx.consumedAmount()
-	else:
-		requiredAmount = tx.amount
-	if not source in state._balances or state._balances[source] < requiredAmount:
-		print('Insufficient swapbill balance for source address.')
+	wouldSucceed, failReason = tx.checkWouldApplySuccessfully(state)
+	if not wouldSucceed:
+		print('Transaction would not complete successfully against current state:', failReason)
 		exit()
+	source = tx.source
 	sourceSingleUnspent = host.getSingleUnspentForAddress(source)
 	if sourceSingleUnspent == None:
 		print('No unspent outputs reported by litecoind for the specified from address.')
@@ -107,11 +104,15 @@ def CheckAndSend_FromAddress(tx):
 
 if args.action == 'burn':
 	state = SyncAndReturnState(config, host)
-	unspent = host.getNonSwapBillUnspent(state._balances)
-	scriptPubKeyLookup = ScriptPubKeyLookup.Lookup(unspent[1])
 	target = host.getNewSwapBillAddress()
 	burnTX = TransactionTypes.Burn()
 	burnTX.init_FromUserRequirements(burnAmount=int(args.quantity), target=target)
+	wouldSucceed, failReason = burnTX.checkWouldApplySuccessfully(state)
+	if not wouldSucceed:
+		print('Transaction would not complete successfully against current state:', failReason)
+		exit()
+	unspent = host.getNonSwapBillUnspent(state._balances)
+	scriptPubKeyLookup = ScriptPubKeyLookup.Lookup(unspent[1])
 	change = host.getNewChangeAddress()
 	print('attempting to send swap bill transaction:', burnTX)
 	transactionFee = TransactionFee.baseFee
@@ -166,11 +167,14 @@ elif args.action == 'complete_ltc_sell':
 		print('No pending exchange with the specified ID.')
 		exit()
 	exchange = state._pendingExchanges[pendingExchangeID]
-	unspent = host.getNonSwapBillUnspent(state._balances)
-	scriptPubKeyLookup = ScriptPubKeyLookup.Lookup(unspent[1])
-	target = host.getNewSwapBillAddress()
 	tx = TransactionTypes.LTCExchangeCompletion()
 	tx.init_FromUserRequirements(ltcAmount=exchange.ltc, destination=exchange.ltcReceiveAddress, pendingExchangeIndex=pendingExchangeID)
+	wouldSucceed, failReason = tx.checkWouldApplySuccessfully(state)
+	if not wouldSucceed:
+		print('Transaction would not complete successfully against current state:', failReason)
+		exit()
+	unspent = host.getNonSwapBillUnspent(state._balances)
+	scriptPubKeyLookup = ScriptPubKeyLookup.Lookup(unspent[1])
 	change = host.getNewChangeAddress()
 	print('attempting to send swap bill transaction:', tx)
 	transactionFee = TransactionFee.baseFee
@@ -214,6 +218,7 @@ elif args.action == 'show_pending_exchanges':
 
 elif args.action == 'show_my_balances':
 	state = SyncAndReturnState(config, host)
+	addressesWithUnspent = host.getAddressesWithUnspent(state._balances)
 	print('my balances:')
 	totalSpendable = 0
 	for pubKeyHash in state._balances:
@@ -221,7 +226,10 @@ elif args.action == 'show_my_balances':
 		validateResults = host._rpcHost.call('validateaddress', address)
 		if validateResults['ismine'] == True:
 			balance = state._balances[pubKeyHash]
-			print(address + ': ' + str(balance))
+			line = address + ': ' + str(balance)
+			if not pubKeyHash in addressesWithUnspent:
+				line += ' (needs seeding)'
+			print(line)
 			totalSpendable += balance
 	print('total spendable swap bill satoshis: ' + str(totalSpendable))
 

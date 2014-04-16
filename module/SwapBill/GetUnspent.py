@@ -27,3 +27,15 @@ def SingleForAddress(addressVersion, rpcHost, pubKeyHash):
 			asInput = (output['txid'], output['vout'], output['scriptPubKey'])
 			return amount, asInput
 	return None
+
+def AddressesWithUnspent(addressVersion, rpcHost, swapBillBalances):
+	result = set()
+	allUnspent = rpcHost.call('listunspent')
+	for output in allUnspent:
+		if not 'address' in output: ## is this check required?
+			continue
+		address = output['address']
+		pubKeyHash = Address.ToPubKeyHash(addressVersion, address)
+		if pubKeyHash in swapBillBalances:
+			result.add(pubKeyHash)
+	return result
