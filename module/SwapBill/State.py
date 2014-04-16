@@ -83,7 +83,7 @@ class State(object):
 				else:
 					## small remaining buy offer is discarded
 					## refund swapbill amount left in this buy offer
-					_addToBalance(buyDetails.swapBillAddress, buyDetails.swapBillAmount)
+					self._addToBalance(buyDetails.swapBillAddress, buyDetails.swapBillAmount)
 			if not sellDetails is None:
 				if LTCTrading.SatisfiesMinimumExchange(sellRate, sellDetails.swapBillAmount):
 					self._LTCSells.addOffer(sellRate, sellExpiry, sellDetails)
@@ -91,9 +91,7 @@ class State(object):
 				else:
 					## small remaining sell offer is discarded
 					## refund swapbill amount left in this buy offer
-					## TODO BUG here, repeat this in unit tests then fix!
-					assert False
-					state.addToBalance(sellDetails.swapBillDeposit, sellDetails.swapBillAmount)
+					self._addToBalance(sellDetails.swapBillAddress, sellDetails.swapBillDeposit)
 			return # break out of while loop
 
 	def checkWouldApplySuccessfully_Burn(self, amount, destinationAccount):
