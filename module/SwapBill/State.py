@@ -277,39 +277,3 @@ class State(object):
 		result += self._totalForwarded
 		return result
 
-	def printOffers(self):
-		print('Buy offers:')
-		offers = self._LTCBuys.getSortedExchangeRateAndDetails()
-		if len(offers) == 0:
-			print('  (no buy offers)')
-		for exchangeRate, buyDetails in offers:
-			address = buyDetails.swapBillAddress
-			exchangeAmount = buyDetails.swapBillAmount
-			rate_Double = float(exchangeRate) / 0x100000000
-			ltc = int(exchangeAmount * rate_Double)
-			print('  rate:{:.7f}, swapbill offered:{}, ltc equivalent:{}'.format(rate_Double, exchangeAmount, ltc))
-		print('Sell offers:')
-		offers = self._LTCSells.getSortedExchangeRateAndDetails()
-		if len(offers) == 0:
-			print('  (no sell offers)')
-		for exchangeRate, sellDetails in offers:
-			address = sellDetails.swapBillAddress
-			exchangeAmount = sellDetails.swapBillAmount
-			depositAmount = sellDetails.swapBillDeposit
-			rate_Double = float(exchangeRate) / 0x100000000
-			ltc = int(exchangeAmount * rate_Double)
-			print('  rate:{:.7f}, swapbill desired:{}, ltc equivalent:{}'.format(rate_Double, exchangeAmount, ltc))
-
-	def printPendingExchanges(self):
-		print('Pending exchange completion payments:')
-		if len(self._pendingExchanges) == 0:
-			print('  (no pending completion payments)')
-		for key in self._pendingExchanges:
-			exchange = self._pendingExchanges[key]
-			print(' key =', key, ':')
-			print('  buyer =', binascii.hexlify(exchange.buyerAddress).decode('ascii'))
-			print('  seller =', binascii.hexlify(exchange.sellerAddress).decode('ascii'))
-			print('  swapBillAmount =', exchange.swapBillAmount)
-			print('  swapBillDeposit =', exchange.swapBillDeposit)
-			print('  ltc amount to pay =', exchange.ltc)
-			print('  pay ltc to =', binascii.hexlify(exchange.ltcReceiveAddress))
