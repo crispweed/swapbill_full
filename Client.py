@@ -232,22 +232,32 @@ elif args.action == 'show_offers':
 	if len(offers) == 0:
 		print('  (no buy offers)')
 	for exchangeRate, buyDetails in offers:
-		address = buyDetails.swapBillAddress
+		pubKeyHash = buyDetails.swapBillAddress
 		exchangeAmount = buyDetails.swapBillAmount
 		rate_Double = float(exchangeRate) / 0x100000000
 		ltc = int(exchangeAmount * rate_Double)
-		print('  rate:{:.7f}, swapbill offered:{}, ltc equivalent:{}'.format(rate_Double, exchangeAmount, ltc))
+		line = '  rate:{:.7f}, swapbill offered:{}, ltc equivalent:{}'.format(rate_Double, exchangeAmount, ltc)
+		address = Address.FromPubKeyHash(host._addressVersion, pubKeyHash)
+		validateResults = host._rpcHost.call('validateaddress', address)
+		if validateResults['ismine'] == True:
+			line += ' (mine)'
+		print(line)
 	print('Sell offers:')
 	offers = state._LTCSells.getSortedExchangeRateAndDetails()
 	if len(offers) == 0:
 		print('  (no sell offers)')
 	for exchangeRate, sellDetails in offers:
-		address = sellDetails.swapBillAddress
+		pubKeyHash = sellDetails.swapBillAddress
 		exchangeAmount = sellDetails.swapBillAmount
 		depositAmount = sellDetails.swapBillDeposit
 		rate_Double = float(exchangeRate) / 0x100000000
 		ltc = int(exchangeAmount * rate_Double)
-		print('  rate:{:.7f}, swapbill desired:{}, ltc equivalent:{}'.format(rate_Double, exchangeAmount, ltc))
+		line = '  rate:{:.7f}, swapbill desired:{}, ltc equivalent:{}'.format(rate_Double, exchangeAmount, ltc)
+		address = Address.FromPubKeyHash(host._addressVersion, pubKeyHash)
+		validateResults = host._rpcHost.call('validateaddress', address)
+		if validateResults['ismine'] == True:
+			line += ' (mine)'
+		print(line)
 
 elif args.action == 'show_pending_exchanges':
 	state = SyncAndReturnState(config, host)
@@ -257,8 +267,18 @@ elif args.action == 'show_pending_exchanges':
 	for key in state._pendingExchanges:
 		exchange = state._pendingExchanges[key]
 		print(' key =', key, ':')
-		print('  buyer =', binascii.hexlify(exchange.buyerAddress).decode('ascii'))
-		print('  seller =', binascii.hexlify(exchange.sellerAddress).decode('ascii'))
+		address = Address.FromPubKeyHash(host._addressVersion, exchange.buyerAddress)
+		line = '  buyer = ' + address
+		validateResults = host._rpcHost.call('validateaddress', address)
+		if validateResults['ismine'] == True:
+			line += ' (me)'
+		print(line)
+		address = Address.FromPubKeyHash(host._addressVersion, exchange.sellerAddress)
+		line = '  seller = ' + address
+		validateResults = host._rpcHost.call('validateaddress', address)
+		if validateResults['ismine'] == True:
+			line += ' (me)'
+		print(line)
 		print('  swapBillAmount =', exchange.swapBillAmount)
 		print('  swapBillDeposit =', exchange.swapBillDeposit)
 		print('  ltc amount to pay =', exchange.ltc)
