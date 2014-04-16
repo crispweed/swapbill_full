@@ -16,7 +16,7 @@ if sys.version_info > (3, 0):
 	cacheFileName = 'SwapBill.py3.cache'
 else:
 	cacheFileName = 'SwapBill.cache'
-cacheVersion = 0.5
+cacheVersion = 0.6
 
 def _load():
 	if not path.exists(cacheFileName):
@@ -60,6 +60,7 @@ def _processBlock(host, state, blockHash):
 			continue
 		decodedTX.apply(state)
 		print('applied transaction:', decodedTX)
+	state.advanceToNextBlock()
 
 def SyncAndReturnState(config, host):
 	try:
@@ -105,7 +106,6 @@ def SyncAndReturnState(config, host):
 	while len(toProcess) > 0:
 		## advance in memory state
 		_processBlock(host, state, blockHash)
-		state.advanceToNextBlock()
 		popped = toProcess.popleft()
 		blockIndex += 1
 		blockHash = popped

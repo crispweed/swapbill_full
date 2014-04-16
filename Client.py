@@ -58,6 +58,8 @@ args = parser.parse_args()
 host = Host.Host(useTestNet=True, configFile=args.config_file)
 
 print("current litecoind block count = {}".format(host._rpcHost.call('getblockcount')))
+state = SyncAndReturnState(config, host)
+print("state updated to end of block {}".format(state._currentBlockIndex - 1))
 
 def CheckAndReturnPubKeyHash(address):
 	try:
@@ -69,7 +71,6 @@ def CheckAndReturnPubKeyHash(address):
 	return pubKeyHash
 
 def CheckAndSend_FromAddress(tx):
-	state = SyncAndReturnState(config, host)
 	wouldSucceed, failReason = tx.checkWouldApplySuccessfully(state)
 	if not wouldSucceed:
 		print('Transaction would not complete successfully against current state:', failReason)
@@ -103,7 +104,6 @@ def CheckAndSend_FromAddress(tx):
 		print(txID)
 
 if args.action == 'burn':
-	state = SyncAndReturnState(config, host)
 	target = host.getNewSwapBillAddress()
 	burnTX = TransactionTypes.Burn()
 	burnTX.init_FromUserRequirements(burnAmount=int(args.quantity), target=target)
@@ -161,7 +161,6 @@ elif args.action == 'post_ltc_sell':
 	CheckAndSend_FromAddress(tx)
 
 elif args.action == 'complete_ltc_sell':
-	state = SyncAndReturnState(config, host)
 	pendingExchangeID = int(args.pending_exchange_id)
 	if not pendingExchangeID in state._pendingExchanges:
 		print('No pending exchange with the specified ID.')
@@ -197,7 +196,6 @@ elif args.action == 'complete_ltc_sell':
 		print(txID)
 
 elif args.action == 'show_balances':
-	state = SyncAndReturnState(config, host)
 	print('all balances:')
 	totalSpendable = 0
 	for pubKeyHash in state._balances:
@@ -209,7 +207,6 @@ elif args.action == 'show_balances':
 	print('total swap bill satoshis created:   ' + str(state._totalCreated))
 
 elif args.action == 'show_my_balances':
-	state = SyncAndReturnState(config, host)
 	addressesWithUnspent = host.getAddressesWithUnspent(state._balances)
 	print('my balances:')
 	totalSpendable = 0
@@ -226,7 +223,6 @@ elif args.action == 'show_my_balances':
 	print('total spendable swap bill satoshis: ' + str(totalSpendable))
 
 elif args.action == 'show_offers':
-	state = SyncAndReturnState(config, host)
 	print('Buy offers:')
 	offers = state._LTCBuys.getSortedExchangeRateAndDetails()
 	if len(offers) == 0:
@@ -260,7 +256,6 @@ elif args.action == 'show_offers':
 		print(line)
 
 elif args.action == 'show_pending_exchanges':
-	state = SyncAndReturnState(config, host)
 	print('Pending exchange completion payments:')
 	if len(state._pendingExchanges) == 0:
 		print('  (no pending completion payments)')
@@ -282,7 +277,13 @@ elif args.action == 'show_pending_exchanges':
 		print('  swapBillAmount =', exchange.swapBillAmount)
 		print('  swapBillDeposit =', exchange.swapBillDeposit)
 		print('  ltc amount to pay =', exchange.ltc)
-		print('  pay ltc to =', binascii.hexlify(exchange.ltcReceiveAddress))
+		address = Address.FromPubKeyHash(host._addressVersion, exchange.ltcReceiveAddress)
+		line = '  pay ltc to = ' + address
+		validateResults = host._rpcHost.call('validateaddress', address)
+		if validateResults['ismine'] == True:
+			line += ' (me)'
+		print(line)
+		print('  expires on block =', exchange.expiry)
 
 else:
 	parser.print_help()

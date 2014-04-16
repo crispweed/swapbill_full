@@ -32,7 +32,7 @@ class State(object):
 		for key in self._pendingExchanges:
 			exchange = self._pendingExchanges[key]
 			if exchange.expiry == self._currentBlockIndex:
-				#print("pending exchange expired")
+				print("pending exchange expired")
 				## refund buyers funds locked up in the exchange, plus sellers deposit (as penalty for failing to make exchange)
 				self._addToBalance(exchange.buyerAddress, exchange.swapBillAmount + exchange.swapBillDeposit)
 				toDelete.append(key)
