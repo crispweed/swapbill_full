@@ -193,10 +193,6 @@ class Test(unittest.TestCase):
 
 		## TODO - test for fail to complete due to expiry
 
-		## TODO **** test exact match
-		## TODO **** test outstanding buy remainder
-		## TODO **** test discarded buy remainder
-		## TODO **** test discarded sell remainder
 
 	def test_ltc_trading(self):
 		state = State.State(100, 'starthash')
@@ -297,3 +293,80 @@ class Test(unittest.TestCase):
 		self.assertEqual(state.totalAccountedFor(), state._totalCreated)
 		self.assertEqual(len(state._pendingExchanges), 0)
 		self.assertEqual(state._balances, {'a': 100000, 'b': 20000000})
+
+	def test_exact_match(self):
+		state = State.State(100, 'starthash')
+		state.apply_Burn(10000000, 'b')
+		state.apply_AddLTCSellOffer('b', 10000000, 0x80000000, 150)
+		self.assertEqual(state.totalAccountedFor(), state._totalCreated)
+		# deposit is 10000000 // 16 = 625000
+		self.assertEqual(state._balances, {'b': 9375000})
+		state.apply_Burn(10000000, 'a')
+		state.apply_AddLTCBuyOffer('a', 10000000, 0x80000000, 150, 'a_receive_ltc')
+		self.assertEqual(state.totalAccountedFor(), state._totalCreated)
+		# nothing refunded, no change to balances
+		self.assertEqual(state._balances, {'b': 9375000})
+		self.assertEqual(len(state._pendingExchanges), 1)
+		state.apply_CompleteLTCExchange(0, 'a_receive_ltc', 5000000)
+		self.assertEqual(state.totalAccountedFor(), state._totalCreated)
+		self.assertEqual(len(state._pendingExchanges), 0)
+		self.assertEqual(state._balances, {'b': 20000000})
+
+	def test_sell_remainder_outstanding(self):
+		state = State.State(100, 'starthash')
+		state.apply_Burn(20000000, 'b')
+		state.apply_AddLTCSellOffer('b', 20000000, 0x80000000, 150)
+		self.assertEqual(state.totalAccountedFor(), state._totalCreated)
+		# deposit is 20000000 // 16 = 1250000
+		self.assertEqual(state._balances, {'b': 18750000})
+		state.apply_Burn(10000000, 'a')
+		state.apply_AddLTCBuyOffer('a', 10000000, 0x80000000, 150, 'a_receive_ltc')
+		self.assertEqual(state.totalAccountedFor(), state._totalCreated)
+		# nothing refunded, no change to balances
+		self.assertEqual(state._balances, {'b': 18750000})
+		self.assertEqual(len(state._pendingExchanges), 1)
+		self.assertEqual(state._LTCBuys.size(), 0)
+		self.assertEqual(state._LTCSells.size(), 1) ## half of sell offer is left outstanding
+		state.apply_CompleteLTCExchange(0, 'a_receive_ltc', 5000000)
+		self.assertEqual(state.totalAccountedFor(), state._totalCreated)
+		self.assertEqual(len(state._pendingExchanges), 0)
+		# b should be refunded half his deposit, remaining deposit = 625000
+		# and b now has all swapbill except deposit for outstanding sell offer
+		self.assertEqual(state._balances, {'b': 29375000})
+		# a goes on to buy the rest
+		state.apply_Burn(10000000, 'a')
+		state.apply_AddLTCBuyOffer('a', 10000000, 0x80000000, 150, 'a_receive_ltc')
+		self.assertEqual(state.totalAccountedFor(), state._totalCreated)
+		state.apply_CompleteLTCExchange(1, 'a_receive_ltc', 5000000)
+		self.assertEqual(state.totalAccountedFor(), state._totalCreated)
+		self.assertEqual(state._balances, {'b': 40000000})
+
+	def test_buy_remainder_outstanding(self):
+		state = State.State(100, 'starthash')
+		state.apply_Burn(20000000, 'b')
+		state.apply_AddLTCSellOffer('b', 20000000, 0x80000000, 150)
+		self.assertEqual(state.totalAccountedFor(), state._totalCreated)
+		# deposit is 20000000 // 16 = 1250000
+		self.assertEqual(state._balances, {'b': 18750000})
+		state.apply_Burn(30000000, 'a')
+		state.apply_AddLTCBuyOffer('a', 30000000, 0x80000000, 150, 'a_receive_ltc')
+		self.assertEqual(state.totalAccountedFor(), state._totalCreated)
+		# nothing refunded, no change to balances
+		self.assertEqual(state._balances, {'b': 18750000})
+		self.assertEqual(len(state._pendingExchanges), 1)
+		self.assertEqual(state._LTCBuys.size(), 1) ## half of buy offer is left outstanding
+		self.assertEqual(state._LTCSells.size(), 0)
+		state.apply_CompleteLTCExchange(0, 'a_receive_ltc', 10000000)
+		self.assertEqual(state.totalAccountedFor(), state._totalCreated)
+		self.assertEqual(len(state._pendingExchanges), 0)
+		# b should be refunded all his deposit, and receives payment in swapbill
+		self.assertEqual(state._balances, {'b': 40000000})
+		# b goes on to sell the rest
+		state.apply_Burn(10000000, 'b')
+		state.apply_AddLTCSellOffer('b', 10000000, 0x80000000, 150)
+		self.assertEqual(state.totalAccountedFor(), state._totalCreated)
+		state.apply_CompleteLTCExchange(1, 'a_receive_ltc', 10000000)
+		self.assertEqual(state.totalAccountedFor(), state._totalCreated)
+		self.assertEqual(state._balances, {'b': 60000000})
+
+## TODO tests for offer matching multiple other offers
