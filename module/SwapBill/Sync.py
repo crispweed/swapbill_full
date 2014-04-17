@@ -70,7 +70,7 @@ def SyncAndReturnState(config, host):
 		loaded = False
 	else:
 		loaded = True
-	if loaded and host._rpcHost.call('getblockhash', blockIndex) != blockHash:
+	if loaded and host.getBlockHash(blockIndex) != blockHash:
 		print('The block corresponding with cached state has been orphaned, full index generation required.')
 		loaded = False
 	if loaded and not state.startBlockMatches(config.startBlockHash):
@@ -81,7 +81,7 @@ def SyncAndReturnState(config, host):
 	else:
 		blockIndex = config.startBlockIndex
 		blockHash = config.startBlockHash
-		assert host._rpcHost.call('getblockhash', blockIndex) == blockHash
+		assert host.getBlockHash(blockIndex) == blockHash
 		state = State.State(blockIndex, blockHash)
 
 	print('Starting from block', blockIndex)
@@ -89,8 +89,8 @@ def SyncAndReturnState(config, host):
 	toProcess = deque()
 	mostRecentHash = blockHash
 	while True:
-		block = host._rpcHost.call('getblock', mostRecentHash)
-		if not 'nextblockhash' in block:
+		nextBlockHash = host.getNextBlockHash(mostRecentHash)
+		if nextBlockHash is None:
 			break
 		if len(toProcess) == config.blocksBehindForCachedState:
 			## advance cached state
@@ -98,7 +98,7 @@ def SyncAndReturnState(config, host):
 			popped = toProcess.popleft()
 			blockIndex += 1
 			blockHash = popped
-		mostRecentHash = block['nextblockhash']
+		mostRecentHash = nextBlockHash
 		toProcess.append(mostRecentHash)
 
 	_save(blockIndex, blockHash, state)

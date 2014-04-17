@@ -53,6 +53,12 @@ class Host(object):
 	def getAddressesWithUnspent(self, swapBillBalances):
 		return GetUnspent.AddressesWithUnspent(self._addressVersion, self._rpcHost, swapBillBalances)
 
+	def getBlockHash(self, blockIndex):
+		return self._rpcHost.call('getblockhash', blockIndex)
+	def getNextBlockHash(self, blockHash):
+		block = self._rpcHost.call('getblock', blockHash)
+		return block.get('nextblockhash', None)
+
 	## TODO - get rid of scriptPubKeyLookup parameter here, cache unspents provided in the methods above and look up there instead
 	def sendTransaction(self, tx, scriptPubKeyLookup):
 		unsignedData = RawTransaction.Create(tx, scriptPubKeyLookup)
