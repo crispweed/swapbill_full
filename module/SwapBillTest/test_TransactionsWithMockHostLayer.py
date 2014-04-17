@@ -82,10 +82,10 @@ class MockHostLayer(object):
 			assert amount >= TransactionFee.dustLimit
 			self.addUnspent(amount, hostTX.outputPubKeyHash(i))
 			sumOfOutputs += amount
-		TransactionFee.baseFee = sumOfInputs - sumOfOutputs
+		transactionFee = sumOfInputs - sumOfOutputs
 		## note that the following is just a sanity check
 		## can't test here that transaction fee is actually sufficient, because we don't have the transaction byte size
-		assert TransactionFee.baseFee >= TransactionFee.baseFee
+		assert transactionFee >= TransactionFee.baseFee
 		## TODO go through create raw transaction, decode raw transaction, at this point?
 		## (if decode raw transaction is changed to not require RPC)
 		self._transactionsToBeDecoded.append(hostTX)
