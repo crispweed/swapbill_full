@@ -2,12 +2,17 @@ import binascii
 from SwapBill import RawTransaction
 from SwapBill.Amounts import ToSatoshis
 
+def CalculateRequired_FromSizeAndOutputs(byteSize, outputAmounts):
+	multiplier = (1 + int(byteSize / 1000))
+	for amount in outputAmounts:
+		if amount < 100000: ## soft dust limit
+			multiplier += 1
+	return multiplier * 100000
+
 def CalculateRequired(rpcHost, rawTransactionHex):
 	## calculates fee requirement based on code in litecoind at time of writing
 	## assuming we want the transaction relayed independantly of litecoind priority calculations
-	#assert type(rawTransactionHex) == str
-	rawTransactionBytes = RawTransaction.FromHex(rawTransactionHex) ## note that we can count bytes more efficiently, and without dependency on RawTransaction, but this also checks input data validity
-	byteSize = len(rawTransactionBytes)
+	byteSize = len(rawTransactionHex) / 2
 	multiplier = (1 + int(byteSize / 1000))
 	decodedTX = rpcHost.call('decoderawtransaction', rawTransactionHex)
 	for out in decodedTX['vout']:

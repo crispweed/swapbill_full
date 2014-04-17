@@ -1,8 +1,9 @@
 from __future__ import print_function
 from os import path
-from SwapBill import ParseConfig, RPC, GetUnspent, RawTransaction, Address, TransactionFee
+from SwapBill import ParseConfig, RPC, RawTransaction, Address, TransactionFee, ScriptPubKeyLookup, Amounts
+from SwapBill.ExceptionReportedToUser import ExceptionReportedToUser
 
-class SigningFailed(Exception):
+class SigningFailed(ExceptionReportedToUser):
 	pass
 class InsufficientTransactionFees(Exception):
 	pass
@@ -39,39 +40,83 @@ class Host(object):
 			exit()
 
 		self._rpcHost = RPC.Host('http://' + RPC_USER + ':' + RPC_PASSWORD + '@' + RPC_HOST + ':' + str(RPC_PORT))
+		self._cachedBlockHash = None
+
+# unspents, addresses, transaction encode and send
+
+	def getUnspent(self):
+		## lowest level getUnspent interface
+		result = []
+		allUnspent = self._rpcHost.call('listunspent')
+		for output in allUnspent:
+			if not 'address' in output: ## is this check required?
+				continue
+			filtered = {}
+			for key in ('txid', 'vout', 'scriptPubKey'):
+				filtered[key] = output[key]
+			filtered['address'] = Address.ToPubKeyHash(self._addressVersion, output['address'])
+			filtered['amount'] = Amounts.ToSatoshis(output['amount'])
+			result.append(filtered)
+		return result
 
 	def getNewChangeAddress(self):
 		return Address.ToPubKeyHash(self._addressVersion, self._rpcHost.call('getnewaddress'))
 	def getNewSwapBillAddress(self):
 		return Address.ToPubKeyHash(self._addressVersion, self._rpcHost.call('getnewaddress', 'SwapBill'))
 
-	def getNonSwapBillUnspent(self, swapBillBalances):
-		return GetUnspent.AllNonSwapBill(self._addressVersion, self._rpcHost, swapBillBalances)
-	def getSingleUnspentForAddress(self, pubKeyHash):
-		return GetUnspent.SingleForAddress(self._addressVersion, self._rpcHost, pubKeyHash)
-
-	def getAddressesWithUnspent(self, swapBillBalances):
-		return GetUnspent.AddressesWithUnspent(self._addressVersion, self._rpcHost, swapBillBalances)
-
-	def getBlockHash(self, blockIndex):
-		return self._rpcHost.call('getblockhash', blockIndex)
-	def getNextBlockHash(self, blockHash):
-		block = self._rpcHost.call('getblock', blockHash)
-		return block.get('nextblockhash', None)
-
-	## TODO - get rid of scriptPubKeyLookup parameter here, cache unspents provided in the methods above and look up there instead
-	def sendTransaction(self, tx, scriptPubKeyLookup):
-		unsignedData = RawTransaction.Create(tx, scriptPubKeyLookup)
-		unsignedHex = RawTransaction.ToHex(unsignedData)
-		#signingResult = rpcHost.call('signrawtransaction_simplified', unsignedHex)
-		signingResult = self._rpcHost.call('signrawtransaction', unsignedHex)
+	def signAndSend(self, unsignedTransactionHex):
+		## lowest level transaction send interface
+		signingResult = self._rpcHost.call('signrawtransaction', unsignedTransactionHex)
 		if signingResult['complete'] != True:
-			raise SigningFailed()
+			raise SigningFailed("RPC call to signrawtransaction did not set 'complete' to True")
 		signedHex = signingResult['hex']
+		# move out of lowest level send interface?
+		# (or repeat in higher level code?)
 		if not TransactionFee.TransactionFeeIsSufficient(self._rpcHost, signedHex):
 			raise InsufficientTransactionFees()
 		txID = self._rpcHost.call('sendrawtransaction', signedHex)
 		return txID
-		#print('Transaction sent with transactionID:')
-		#print(txID)
 
+# block chain tracking, transaction stream and decoding
+
+	def getBlockHash(self, blockIndex):
+		return self._rpcHost.call('getblockhash', blockIndex)
+
+	def _getBlock_Cached(self, blockHash):
+		if self._cachedBlockHash != blockHash:
+			self._cachedBlock = self._rpcHost.call('getblock', blockHash)
+			self._cachedBlockHash = blockHash
+		return self._cachedBlock
+
+	def getNextBlockHash(self, blockHash):
+		block = self._getBlock_Cached(blockHash)
+		return block.get('nextblockhash', None)
+	def getBlockTransactions(self, blockHash):
+		block = self._getBlock_Cached(blockHash)
+		transactions = block['tx']
+		assert len(transactions) >= 1
+		result = []
+		for txHash in transactions[1:]:
+			txHex = self._rpcHost.call('getrawtransaction', txHash)
+			result.append(txHex)
+		return result
+
+	def getSourceFor(self, txID, vOut):
+		redeemedTX = self._rpcHost.call('getrawtransaction', txID, 1)
+		output = redeemedTX['vout'][vOut]
+		if not 'scriptPubKey' in output:
+			return None
+		scriptPubKey = output['scriptPubKey']
+		if not 'addresses' in scriptPubKey:
+			return None
+		addresses = scriptPubKey['addresses']
+		if len(addresses) != 1:
+			return None
+		return Address.ToPubKeyHash(self._addressVersion, addresses[0])
+
+# convenience
+
+	def formatAddressForEndUser(self,  pubKeyHash):
+		return Address.FromPubKeyHash(self._addressVersion, pubKeyHash)
+	def addressFromEndUserFormat(self,  address):
+		return Address.ToPubKeyHash(self._addressVersion, address)

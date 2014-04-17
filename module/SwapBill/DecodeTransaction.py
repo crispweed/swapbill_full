@@ -1,5 +1,6 @@
 from __future__ import print_function
-from SwapBill import RawTransaction
+import binascii
+from SwapBill import RawTransaction, HostTransaction
 from SwapBill.Amounts import ToSatoshis
 
 class NotValidSwapBillTransaction(Exception):
@@ -37,3 +38,16 @@ class Transaction(object):
 		self._decodeIfNotDecoded()
 		return ToSatoshis(float(self._decoded['vout'][i]['value']))
 
+def Decode(txHex):
+	txBytes = RawTransaction.FromHex(txHex)
+	if RawTransaction.UnexpectedFormat_Fast(txBytes, b'SWB'):
+		return None
+	decoded = RawTransaction.Decode(txBytes)
+	result = HostTransaction.InMemoryTransaction()
+	for i in decoded['vin']:
+		result.addInput(i['txid'], i['vout'])
+	for o in decoded['vout']:
+		pubKeyHashHex = o['pubKeyHash']
+		pubKeyHash = binascii.unhexlify(pubKeyHashHex.encode('ascii'))
+		result.addOutput(pubKeyHash, o['value'])
+	return result

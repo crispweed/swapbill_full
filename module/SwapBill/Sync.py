@@ -13,15 +13,17 @@ class ReindexingRequiredException(Exception):
 	pass
 
 if sys.version_info > (3, 0):
-	cacheFileName = 'SwapBill.py3.cache'
+	defaultCacheFile = 'SwapBill.py3.cache'
 else:
-	cacheFileName = 'SwapBill.cache'
+	defaultCacheFile = 'SwapBill.cache'
 cacheVersion = 0.6
 
-def _load():
-	if not path.exists(cacheFileName):
+def _load(cacheFile):
+	if cacheFile is None:
+		cacheFile = defaultCacheFile
+	if not path.exists(cacheFile):
 		raise ReindexingRequiredException('no cache file found')
-	f = open(cacheFileName, 'rb')
+	f = open(cacheFile, 'rb')
 	savedCacheVersion = pickle.load(f)
 	if savedCacheVersion != cacheVersion:
 		raise ReindexingRequiredException('cached data is from old version')
@@ -31,9 +33,11 @@ def _load():
 	f.close()
 	return blockIndex, blockHash, state
 
-def _save(blockIndex, blockHash, state):
+def _save(blockIndex, blockHash, state, cacheFile):
+	if cacheFile is None:
+		cacheFile = defaultCacheFile
 	try:
-		f = open(cacheFileName, 'wb')
+		f = open(cacheFile, 'wb')
 		pickle.dump(cacheVersion, f, 2)
 		pickle.dump(blockIndex, f, 2)
 		pickle.dump(blockHash, f, 2)
@@ -42,16 +46,15 @@ def _save(blockIndex, blockHash, state):
 	except:
 		print("Error, failed to write cache:", sys.exc_info()[0])
 
-def _processBlock(host, state, blockHash):
-	block = host._rpcHost.call('getblock', blockHash)
-	sourceLookup = SourceLookup.Lookup(host._addressVersion, host._rpcHost)
-	transactions = block['tx']
-	assert len(transactions) >= 1
-	for txHash in transactions[1:]:
-		litecoinTXHex = host._rpcHost.call('getrawtransaction', txHash)
-		hostTX = DecodeTransaction.Transaction(litecoinTXHex, host._rpcHost)
+def _processBlock(host, state, blockHash, out):
+	transactions = host.getBlockTransactions(blockHash)
+	for litecoinTXHex in transactions:
+		#hostTX = DecodeTransaction.Transaction(litecoinTXHex, host._rpcHost)
+		hostTX = DecodeTransaction.Decode(litecoinTXHex)
+		if hostTX == None:
+			continue
 		try:
-			decodedTX = TransactionTypes.Decode(sourceLookup, hostTX)
+			decodedTX = TransactionTypes.Decode(host, hostTX)
 		except ControlAddressEncoding.NotSwapBillControlAddress:
 			continue
 		except TransactionTypes.NotValidSwapBillTransaction:
@@ -59,32 +62,32 @@ def _processBlock(host, state, blockHash):
 		except TransactionTypes.UnsupportedTransaction:
 			continue
 		decodedTX.apply(state)
-		print('applied transaction:', decodedTX)
+		print('applied transaction:', decodedTX, file=out)
 	state.advanceToNextBlock()
 
-def SyncAndReturnState(config, host):
+def SyncAndReturnState(cacheFile, startBlockIndex, startBlockHash, host, out):
 	try:
-		blockIndex, blockHash, state = _load()
+		blockIndex, blockHash, state = _load(cacheFile)
 	except ReindexingRequiredException as e:
-		print('Failed to load from cache, full index generation required (' + str(e) + ')')
+		print('Failed to load from cache, full index generation required (' + str(e) + ')', file=out)
 		loaded = False
 	else:
 		loaded = True
 	if loaded and host.getBlockHash(blockIndex) != blockHash:
-		print('The block corresponding with cached state has been orphaned, full index generation required.')
+		print('The block corresponding with cached state has been orphaned, full index generation required.', file=out)
 		loaded = False
-	if loaded and not state.startBlockMatches(config.startBlockHash):
-		print('Start config does not match config from loaded state, , full index generation required.')
+	if loaded and not state.startBlockMatches(startBlockHash):
+		print('Start config does not match config from loaded state, , full index generation required.', file=out)
 		loaded = False
 	if loaded:
-		print('Loaded cached state data successfully')
+		print('Loaded cached state data successfully', file=out)
 	else:
-		blockIndex = config.startBlockIndex
-		blockHash = config.startBlockHash
+		blockIndex = startBlockIndex
+		blockHash = startBlockHash
 		assert host.getBlockHash(blockIndex) == blockHash
 		state = State.State(blockIndex, blockHash)
 
-	print('Starting from block', blockIndex)
+	print('Starting from block', blockIndex, file=out)
 
 	toProcess = deque()
 	mostRecentHash = blockHash
@@ -92,25 +95,26 @@ def SyncAndReturnState(config, host):
 		nextBlockHash = host.getNextBlockHash(mostRecentHash)
 		if nextBlockHash is None:
 			break
-		if len(toProcess) == config.blocksBehindForCachedState:
+		## hard coded value used here for number of blocks to lag behind with persistent state
+		if len(toProcess) == 20:
 			## advance cached state
-			_processBlock(host, state, blockHash)
+			_processBlock(host, state, blockHash, out=out)
 			popped = toProcess.popleft()
 			blockIndex += 1
 			blockHash = popped
 		mostRecentHash = nextBlockHash
 		toProcess.append(mostRecentHash)
 
-	_save(blockIndex, blockHash, state)
+	_save(blockIndex, blockHash, state, cacheFile)
 
 	while len(toProcess) > 0:
 		## advance in memory state
-		_processBlock(host, state, blockHash)
+		_processBlock(host, state, blockHash, out=out)
 		popped = toProcess.popleft()
 		blockIndex += 1
 		blockHash = popped
 
-	_processBlock(host, state, blockHash)
+	_processBlock(host, state, blockHash, out=out)
 
 	return state
 

@@ -2,12 +2,11 @@ from __future__ import print_function
 import struct
 from SwapBill import ControlAddressEncoding, HostTransaction
 from SwapBill.ChooseInputs import ChooseInputs
+from SwapBill.ExceptionReportedToUser import ExceptionReportedToUser
 
-class InsufficientFunds(Exception):
+class InsufficientFunds(ExceptionReportedToUser):
 	pass
 class ControlAddressBelowDustLimit(Exception):
-	pass
-class PubKeyHashNotExplicitlySpecified(Exception):
 	pass
 
 def _build_Common(dustLimit, transactionFee, swapBillTransaction, unspent, forceIncludeLast, reSeedPubKeyHash, changePubKeyHash):
@@ -37,7 +36,7 @@ def _build_Common(dustLimit, transactionFee, swapBillTransaction, unspent, force
 
 	totalRequired = sum(outAmounts) + transactionFee
 	if sum(unspentAmounts) < totalRequired:
-		raise InsufficientFunds('total required', totalRequired, 'transaction fee', transactionFee, 'sum of unspent', sum(unspentAmounts))
+		raise InsufficientFunds('Not enough funds available for the transaction, total required:', totalRequired, 'transaction fee:', transactionFee, 'sum of unspent:', sum(unspentAmounts))
 
 	if forceIncludeLast:
 		#assert config.maxInputs > 0

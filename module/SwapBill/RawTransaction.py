@@ -58,6 +58,28 @@ def _opPush(i):
 	else:
 		return b'\x4e' + struct.pack("<L", i)
 
+def ScriptPubKeyForPubKeyHash(pubKeyHash):
+	assert type(pubKeyHash) == type(b'')
+	assert len(pubKeyHash) == 20
+	expectedScriptStart = OP_DUP
+	expectedScriptStart += OP_HASH160
+	expectedScriptStart += _opPush(20)
+	expectedScriptEnd = OP_EQUALVERIFY
+	expectedScriptEnd += OP_CHECKSIG
+	return binascii.hexlify(expectedScriptStart + pubKeyHash + expectedScriptEnd).decode('ascii')
+def PubKeyHashForScriptPubKey(scriptPubKey):
+	scriptPubKeyBytes = binascii.unhexlify(scriptPubKey.encode('ascii'))
+	expectedScriptStart = OP_DUP
+	expectedScriptStart += OP_HASH160
+	expectedScriptStart += _opPush(20)
+	expectedScriptEnd = OP_EQUALVERIFY
+	expectedScriptEnd += OP_CHECKSIG
+	assert scriptPubKeyBytes.startswith(expectedScriptStart)
+	assert scriptPubKeyBytes.endswith(expectedScriptEnd)
+	pubKeyHash = scriptPubKeyBytes[len(expectedScriptStart):-len(expectedScriptEnd)]
+	assert len(pubKeyHash) == 20
+	return pubKeyHash
+
 def Create(tx, scriptPubKeyLookup):
 	data = struct.pack("<L", 1) # version, 4 byte little endian
 
@@ -69,7 +91,7 @@ def Create(tx, scriptPubKeyLookup):
 	for i in range(tx.numberOfInputs()):
 		txid = tx.inputTXID(i)
 		vout = tx.inputVOut(i)
-		scriptPubKey = scriptPubKeyLookup.lookupScriptPubKey((txid, vout))
+		scriptPubKey = scriptPubKeyLookup[(txid, vout)]
 		#assert type(txid) == str
 		#assert type(scriptPubKey) == str
 		txIDBytes = binascii.unhexlify(txid.encode('ascii'))[::-1]
@@ -187,6 +209,7 @@ def ExtractOutputPubKeyHash(txBytes, outputIndex):
 	assert len(txBytes) > pos + 20
 	return txBytes[pos:pos + 20]
 
+## TODO change this to decode to in memory transaction
 def Decode(txBytes):
 	assert type(txBytes) is type(b'')
 	assert not UnexpectedFormat_Fast(txBytes, b'')
@@ -201,7 +224,7 @@ def Decode(txBytes):
 		thisInput = {}
 		txIDBytes = txBytes[pos:pos + 32]
 		pos += 32
-		thisInput['txID'] = binascii.hexlify(txIDBytes[::-1]).decode('ascii')
+		thisInput['txid'] = binascii.hexlify(txIDBytes[::-1]).decode('ascii')
 		#thisInput['txID'] = txIDBytes[::-1]
 		thisInput['vout'] = struct.unpack("<L", txBytes[pos:pos + 4])[0]
 		pos += 4
@@ -241,3 +264,4 @@ def FromHex(hexStr):
 	return binascii.unhexlify(hexStr.encode('ascii'))
 def ToHex(data):
 	return binascii.hexlify(data).decode('ascii')
+

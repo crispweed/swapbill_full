@@ -3,12 +3,6 @@ import unittest
 from SwapBill import RawTransaction, HostTransaction
 from SwapBill.RawTransaction import NotSwapBillTransaction, ExtractOutputPubKeyHash
 
-class ScriptPubKeyLookup(object):
-	def __init__(self):
-		self._d = {}
-	def lookupScriptPubKey(self, key):
-		return self._d[key]
-
 class Test(unittest.TestCase):
 	def test_unit_internal(self):
 		encoded = RawTransaction._encodeVarInt(298)
@@ -21,8 +15,8 @@ class Test(unittest.TestCase):
 		outputs = [(b'Ke\x12\xd1(\t\x12\x8de2\x92%\xb60\xb7\xf5\x08\xd2\xc5\x8b', 100000000), (b'8#\xd6}\xb1\xca g\xd1A\xae/\xfc\xe6\xcb\xa8\x8e(o"', 200000000)]
 		tx = HostTransaction.FromData((inputs, outputs))
 
-		lookup = ScriptPubKeyLookup()
-		lookup._d[inputs[0]] = "2102066feb3b543146fec6afcb89a2e92e18e3fbbee43ff5c1175cb01897594ab8acac"
+		lookup = {}
+		lookup[inputs[0]] = "2102066feb3b543146fec6afcb89a2e92e18e3fbbee43ff5c1175cb01897594ab8acac"
 
 		rawTX = RawTransaction.Create(tx, lookup)
 
@@ -40,7 +34,7 @@ class Test(unittest.TestCase):
 		self.assertEqual(pubKeyHash, b"\xae\x89\x91\xa4\x19\x9a6Y1k-\x18Mh\x91\xb8'\xea`b")
 
 		decoded = RawTransaction.Decode(rawTX)
-		self.assertListEqual(decoded['vin'], [{'vout': 0, 'txID': 'b46c0b9cab086fd3ffbe69796e0c0416c14e4b5f416fe7ec349848b08ded7986', 'scriptPubKey': '2102066feb3b543146fec6afcb89a2e92e18e3fbbee43ff5c1175cb01897594ab8acac'}])
+		self.assertListEqual(decoded['vin'], [{'vout': 0, 'txid': 'b46c0b9cab086fd3ffbe69796e0c0416c14e4b5f416fe7ec349848b08ded7986', 'scriptPubKey': '2102066feb3b543146fec6afcb89a2e92e18e3fbbee43ff5c1175cb01897594ab8acac'}])
 		self.assertListEqual(decoded['vout'], [{'pubKeyHash': '4b6512d12809128d65329225b630b7f508d2c58b', 'value': 100000000, 'scriptPubKey': '76a9144b6512d12809128d65329225b630b7f508d2c58b88ac'}, {'pubKeyHash': '3823d67db1ca2067d141ae2ffce6cba88e286f22', 'value': 200000000, 'scriptPubKey': '76a9143823d67db1ca2067d141ae2ffce6cba88e286f2288ac'}])
 		self.assertEqual(len(decoded), 2)
 

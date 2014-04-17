@@ -1,41 +1,33 @@
-from SwapBill.Amounts import ToSatoshis
-from SwapBill import Address
 
-def AllNonSwapBill(addressVersion, rpcHost, swapBillBalances):
-	allUnspent = rpcHost.call('listunspent')
-	amounts = []
-	asInputs = []
-	for output in allUnspent:
-		if not 'address' in output: ## is this check required?
-			continue
-		address = output['address']
-		pubKeyHash = Address.ToPubKeyHash(addressVersion, address)
-		if not pubKeyHash in swapBillBalances:
-			amounts.append(ToSatoshis(output['amount']))
-			asInputs.append((output['txid'], output['vout'], output['scriptPubKey']))
-	return amounts, asInputs
 
-def SingleForAddress(addressVersion, rpcHost, pubKeyHash):
-	allUnspent = rpcHost.call('listunspent')
-	for output in allUnspent:
-		if not 'address' in output: ## is this check required?
-			continue
-		address = output['address']
-		outputPubKeyHash = Address.ToPubKeyHash(addressVersion, address)
-		if outputPubKeyHash == pubKeyHash:
-			amount = ToSatoshis(output['amount'])
-			asInput = (output['txid'], output['vout'], output['scriptPubKey'])
-			return amount, asInput
-	return None
+def GetUnspent(buildLayer, swapBillBalances):
+	addresses, amounts, asInputs = buildLayer.getUnspent()
+	amountsResult = []
+	asInputsResult = []
+	for i in range(len(addresses)):
+		if not addresses[i] in swapBillBalances:
+			amountsResult.append(amounts[i])
+			asInputsResult.append(asInputs[i])
+	return amountsResult,asInputsResult
 
-def AddressesWithUnspent(addressVersion, rpcHost, swapBillBalances):
+def GetUnspent_WithSingleSource(buildLayer, swapBillBalances, sourceAddress):
+	assert sourceAddress in swapBillBalances
+	addresses, amounts, asInputs = buildLayer.getUnspent()
+	amountsResult = []
+	asInputsResult = []
+	singleSourceResult = None
+	for i in range(len(addresses)):
+		if not addresses[i] in swapBillBalances:
+			amountsResult.append(amounts[i])
+			asInputsResult.append(asInputs[i])
+		elif addresses[i] == sourceAddress:
+			singleSourceResult = (amounts[i], asInputs[i])
+	return (amountsResult, asInputsResult), singleSourceResult
+
+def AddressesWithUnspent(buildLayer, swapBillBalances):
+	addresses, amounts, asInputs = buildLayer.getUnspent()
 	result = set()
-	allUnspent = rpcHost.call('listunspent')
-	for output in allUnspent:
-		if not 'address' in output: ## is this check required?
-			continue
-		address = output['address']
-		pubKeyHash = Address.ToPubKeyHash(addressVersion, address)
-		if pubKeyHash in swapBillBalances:
-			result.add(pubKeyHash)
+	for i in range(len(addresses)):
+		if addresses[i] in swapBillBalances:
+			result.add(addresses[i])
 	return result
