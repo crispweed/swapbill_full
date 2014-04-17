@@ -41,7 +41,7 @@ class Test(unittest.TestCase):
 
 		decoded = RawTransaction.Decode(rawTX)
 		self.assertListEqual(decoded['vin'], [{'vout': 0, 'txID': 'b46c0b9cab086fd3ffbe69796e0c0416c14e4b5f416fe7ec349848b08ded7986', 'scriptPubKey': '2102066feb3b543146fec6afcb89a2e92e18e3fbbee43ff5c1175cb01897594ab8acac'}])
-		self.assertListEqual(decoded['vout'], [{'pubKeyHash': '4b6512d12809128d65329225b630b7f508d2c58b', 'value': 100000000}, {'pubKeyHash': '3823d67db1ca2067d141ae2ffce6cba88e286f22', 'value': 200000000}])
+		self.assertListEqual(decoded['vout'], [{'pubKeyHash': '4b6512d12809128d65329225b630b7f508d2c58b', 'value': 100000000, 'scriptPubKey': '76a9144b6512d12809128d65329225b630b7f508d2c58b88ac'}, {'pubKeyHash': '3823d67db1ca2067d141ae2ffce6cba88e286f22', 'value': 200000000, 'scriptPubKey': '76a9143823d67db1ca2067d141ae2ffce6cba88e286f2288ac'}])
 		self.assertEqual(len(decoded), 2)
 
 	def test_bad_transaction_detection(self):

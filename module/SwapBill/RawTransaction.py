@@ -224,6 +224,7 @@ def Decode(txBytes):
 		pos, scriptLen = _decodeVarInt(txBytes, pos)
 		scriptSigBytes = txBytes[pos:pos + scriptLen]
 		pos += scriptLen
+		thisOutput['scriptPubKey'] = binascii.hexlify(scriptSigBytes).decode('ascii')
 		expectedScriptStart = OP_DUP
 		expectedScriptStart += OP_HASH160
 		expectedScriptStart += _opPush(20)
