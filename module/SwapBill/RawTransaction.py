@@ -187,6 +187,55 @@ def ExtractOutputPubKeyHash(txBytes, outputIndex):
 	assert len(txBytes) > pos + 20
 	return txBytes[pos:pos + 20]
 
+def Decode(txBytes):
+	assert type(txBytes) is type(b'')
+	assert not UnexpectedFormat_Fast(txBytes, b'')
+
+	result = {}
+
+	pos = 4
+	pos, numberOfInputs = _decodeVarInt(txBytes, pos)
+
+	inputs = []
+	for i in range(numberOfInputs):
+		thisInput = {}
+		txIDBytes = txBytes[pos:pos + 32]
+		pos += 32
+		thisInput['txID'] = binascii.hexlify(txIDBytes[::-1]).decode('ascii')
+		#thisInput['txID'] = txIDBytes[::-1]
+		thisInput['vout'] = struct.unpack("<L", txBytes[pos:pos + 4])[0]
+		pos += 4
+		pos, scriptLen = _decodeVarInt(txBytes, pos)
+		scriptPubKeyBytes = txBytes[pos:pos + scriptLen]
+		pos += scriptLen
+		thisInput['scriptPubKey'] = binascii.hexlify(scriptPubKeyBytes).decode('ascii')
+		#thisInput['scriptPubKey'] = scriptPubKeyBytes
+		pos += 4 # sequence
+		inputs.append(thisInput)
+	result['vin'] = inputs
+
+	pos, numberOfOutputs = _decodeVarInt(txBytes, pos)
+
+	outputs = []
+	for i in range(numberOfOutputs):
+		thisOutput = {}
+		thisOutput['value'] = struct.unpack("<Q", txBytes[pos:pos + 8])[0]
+		pos += 8
+		pos, scriptLen = _decodeVarInt(txBytes, pos)
+		scriptSigBytes = txBytes[pos:pos + scriptLen]
+		pos += scriptLen
+		expectedScriptStart = OP_DUP
+		expectedScriptStart += OP_HASH160
+		expectedScriptStart += _opPush(20)
+		pubKeyHash = scriptSigBytes[len(expectedScriptStart):len(expectedScriptStart)+20]
+		assert len(pubKeyHash) == 20
+		#thisOutput['pubKeyHash'] = pubKeyHash
+		thisOutput['pubKeyHash'] = binascii.hexlify(pubKeyHash).decode('ascii')
+		outputs.append(thisOutput)
+	result['vout'] = outputs
+
+	return result
+
 def FromHex(hexStr):
 	return binascii.unhexlify(hexStr.encode('ascii'))
 def ToHex(data):
