@@ -1,66 +1,105 @@
 from __future__ import print_function
-import unittest, struct, binascii
+import unittest, binascii
 from SwapBill import TransactionTypes
 
-class MockHostTX(object):
-	def __init__(self, tx):
-		self._inputIDs = []
-		self._inputVOuts = []
-		self._outputHashes = []
-		self._outputAmounts = []
-		if hasattr(tx, 'source'):
-			self._inputIDs.append('TXID')
-			self._inputVOuts.append(0)
-			self._source = tx.source
-		self._outputHashes.append(b'controlAddressData')
-		if hasattr(tx, 'controlAddressAmount'):
-			self._outputAmounts.append(tx.controlAddressAmount)
-		else:
-			self._outputAmounts.append(0)
-		if hasattr(tx, 'destinations'):
-			if hasattr(tx, 'destinationAmounts'):
-				assert(len(tx.destinationAmounts) == len(tx.destinations))
-			for i in range(len(tx.destinations)):
-				self._outputHashes.append(tx.destinations[i])
-				if hasattr(tx, 'destinationAmounts'):
-					self._outputAmounts.append(tx.destinationAmounts[i])
-				else:
-					self._outputAmounts.append(0);
-	def numberOfInputs(self):
-		return len(self._inputIDs)
-	def inputTXID(self, i):
-		return self._inputIDs[i]
-	def inputVOut(self, i):
-		return self._inputVOuts[i]
-	def numberOfOutputs(self):
-		return len(self._outputHashes)
-	def outputPubKeyHash(self, i):
-		return self._outputHashes[i]
-	def outputAmount(self, i):
-		return self._outputAmounts[i]
-	## and this also serves as a 'source lookup'
-	def getSourceFor(self, txID, vOut):
-		assert txID == 'TXID'
-		assert vOut == 0
-		return self._source
+class MockInputProvider(object):
+	def __init__(self):
+		self._count = 0
+	def lookupUnspentFor(self, sourceAccount):
+		sourceAccountAscii = binascii.hexlify(sourceAccount).decode('ascii')
+		self._count += 1
+		txID = 'txID_' + str(self._count) + '_' + sourceAccountAscii
+		vOut = self._count
+		return txID, vOut
+
+class MockSourceLookup(object):
+	def first(self, tx):
+		txID = tx.inputTXID(0)
+		vOut = tx.inputVOut(0)
+		prefix = 'txID_' + str(vOut) + '_'
+		assert txID.startswith(prefix)
+		sourceAccountAscii = txID[len(prefix):]
+		sourceAccount = binascii.unhexlify(sourceAccountAscii.encode('ascii'))
+		return sourceAccount
 
 class Test(unittest.TestCase):
 
-	def CheckDecode(self, tx, suppliedExtraData=None):
-		typeCode, amount, maxBlock, extraData = tx.encode()
-		if suppliedExtraData is not None:
-			extraData = suppliedExtraData
-		hostTX = MockHostTX(tx)
-		sourceLookup = hostTX
-		decodedTX = TransactionTypes._decode(typeCode, amount, maxBlock, extraData, sourceLookup, hostTX)
-		self.assertDictEqual(decodedTX.details(), tx.details())
-		self.assertDictEqual(decodedTX.__dict__, tx.__dict__)
+	def EncodeAndCheck(self, transactionType, details):
+		inputProvider = MockInputProvider()
+		tx = TransactionTypes.FromStateTransaction(transactionType, details, inputProvider)
+		sourceLookup = MockSourceLookup()
+		decodedType, decodedDetails = TransactionTypes.ToStateTransaction(sourceLookup, tx)
+		self.assertEqual(transactionType, decodedType)
+		self.assertDictEqual(details, decodedDetails)
+		return tx
 
 	def test(self):
-		a = binascii.unhexlify(b'0a')
 		bob = binascii.unhexlify(b'0b0b')
 		bob2 = binascii.unhexlify(b'b0b2')
+		bob3 = binascii.unhexlify(b'b0b3')
+		bob4 = binascii.unhexlify(b'b0b4')
 		alice = binascii.unhexlify(b'0a11ce')
+
+		tx = self.EncodeAndCheck('Burn', {'amount':10, 'destinationAccount': bob})
+		self.assertEqual(tx.numberOfInputs(), 0)
+		self.assertEqual(tx.numberOfOutputs(), 2)
+		self.assertDictEqual(tx.__dict__, {'_inputs': [], '_outputs': [(b'SWB\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00', 10), (b'\x0b\x0b', 100000)]})
+
+		tx = self.EncodeAndCheck('Pay', {'sourceAccount':bob, 'amount':10, 'destinationAccount':alice, 'changeAccount':bob2, 'maxBlock':100})
+		self.assertEqual(tx.numberOfInputs(), 1)
+		self.assertEqual(tx.numberOfOutputs(), 3)
+		self.assertDictEqual(tx.__dict__, {'_outputs': [(b'SWB\x01\n\x00\x00\x00\x00\x00d\x00\x00\x00\x00\x00\x00\x00\x00\x00', 100000), (b'\n\x11\xce', 100000), (b'\xb0\xb2', 100000)], '_inputs': [('txID_1_0b0b', 1)]})
+		# and then reusing source address
+		tx = self.EncodeAndCheck('Pay', {'sourceAccount':bob, 'amount':10, 'destinationAccount':alice, 'changeAccount':bob, 'maxBlock':100})
+		self.assertEqual(tx.numberOfInputs(), 1)
+		self.assertEqual(tx.numberOfOutputs(), 2)
+		self.assertDictEqual(tx.__dict__, {'_inputs': [('txID_1_0b0b', 1)], '_outputs': [(b'SWB\x02\n\x00\x00\x00\x00\x00d\x00\x00\x00\x00\x00\x00\x00\x00\x00', 100000), (b'\n\x11\xce', 100000)]})
+
+		tx = self.EncodeAndCheck('LTCBuyOffer', {
+		    'sourceAccount':bob, 'changeAccount':bob2, 'refundAccount':bob3, 'receivingAccount':bob4,
+		    'swapBillOffered':100, 'exchangeRate':1234,
+		    'maxBlock':100, 'maxBlockOffset':10
+			})
+		self.assertEqual(tx.numberOfInputs(), 1)
+		self.assertEqual(tx.numberOfOutputs(), 4)
+		self.assertDictEqual(tx.__dict__, {'_inputs': [('txID_1_0b0b', 1)], '_outputs': [(b'SWB\x03d\x00\x00\x00\x00\x00d\x00\x00\x00\xd2\x04\x00\x00\n\x00', 100000), (b'\xb0\xb4', 100000), (b'\xb0\xb2', 100000), (b'\xb0\xb3', 100000)]})
+		# and then reusing source address
+		tx = self.EncodeAndCheck('LTCBuyOffer', {
+		    'sourceAccount':bob, 'changeAccount':bob, 'refundAccount':bob, 'receivingAccount':bob2,
+		    'swapBillOffered':100, 'exchangeRate':1234,
+		    'maxBlock':100, 'maxBlockOffset':10
+			})
+		self.assertEqual(tx.numberOfInputs(), 1)
+		self.assertEqual(tx.numberOfOutputs(), 2)
+		self.assertDictEqual(tx.__dict__, {'_inputs': [('txID_1_0b0b', 1)], '_outputs': [(b'SWB\x04d\x00\x00\x00\x00\x00d\x00\x00\x00\xd2\x04\x00\x00\n\x00', 100000), (b'\xb0\xb2', 100000)]})
+
+
+				#'sourceAccount':sourceLookup.first(tx), 'swapBillDesired':amount,
+				#'receivingAccount':tx.outputPubKeyHash(1), 'changeAccount':tx.outputPubKeyHash(2),
+				#'exchangeRate':exchangeRate, 'maxBlockOffset':maxBlockOffset, 'maxBlock':maxBlock
+
+
+		tx = self.EncodeAndCheck('LTCSellOffer', {
+		    'sourceAccount':bob, 'changeAccount':bob2, 'receivingAccount':bob3,
+		    'swapBillDesired':100, 'exchangeRate':1234,
+		    'maxBlock':100, 'maxBlockOffset':10
+			})
+		self.assertEqual(tx.numberOfInputs(), 1)
+		self.assertEqual(tx.numberOfOutputs(), 3)
+		self.assertDictEqual(tx.__dict__, {'_inputs': [('txID_1_0b0b', 1)], '_outputs': [(b'SWB\x05d\x00\x00\x00\x00\x00d\x00\x00\x00\xd2\x04\x00\x00\n\x00', 100000), (b'\xb0\xb3', 100000), (b'\xb0\xb2', 100000)]})
+		# and then reusing source address
+		tx = self.EncodeAndCheck('LTCSellOffer', {
+		    'sourceAccount':bob, 'changeAccount':bob, 'receivingAccount':bob,
+		    'swapBillDesired':100, 'exchangeRate':1234,
+		    'maxBlock':100, 'maxBlockOffset':10
+			})
+		self.assertEqual(tx.numberOfInputs(), 1)
+		self.assertEqual(tx.numberOfOutputs(), 2)
+		#print(tx.__dict__)
+		self.assertDictEqual(tx.__dict__, {'_outputs': [(b'SWB\x06d\x00\x00\x00\x00\x00d\x00\x00\x00\xd2\x04\x00\x00\n\x00', 100000), (b'\x0b\x0b', 100000)], '_inputs': [('txID_1_0b0b', 1)]})
+
+
+		return
 
 		burn = TransactionTypes.Burn()
 		burn.init_FromUserRequirements(burnAmount=10, target=a)

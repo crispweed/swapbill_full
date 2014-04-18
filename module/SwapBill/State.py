@@ -150,20 +150,22 @@ class State(object):
 		if available > amount:
 			self._addToBalance(changeAccount, available - amount)
 
-	def checkWouldApplySuccessfully_LTCBuyOffer(self, sourceAccount, changeAccount, swapBillOffered, exchangeRate, expiry, receivingAccount, refundAccount, maxBlock):
+	def checkWouldApplySuccessfully_LTCBuyOffer(self, sourceAccount, changeAccount, swapBillOffered, exchangeRate, maxBlockOffset, receivingAccount, refundAccount, maxBlock):
 		assert type(swapBillOffered) is int
 		assert swapBillOffered > 0
 		assert type(exchangeRate) is int
 		assert exchangeRate > 0
 		assert exchangeRate < 0x100000000
-		assert type(expiry) is int
-		assert expiry > 0
+		assert type(maxBlockOffset) is int
+		assert maxBlockOffset > 0
+		if maxBlock < self._currentBlockIndex:
+			return False, 'max block for transaction has been exceeded'
 		if self._balances.get(sourceAccount, 0) < swapBillOffered:
 			return False, 'insufficient balance in source account (offer not posted)'
 		if not LTCTrading.SatisfiesMinimumExchange(exchangeRate, swapBillOffered):
 			return False, 'does not satisfy minimum exchange amount (offer not posted)'
 		return True, ''
-	def apply_LTCBuyOffer(self, sourceAccount, changeAccount, swapBillOffered, exchangeRate, expiry, receivingAccount, refundAccount, maxBlock):
+	def apply_LTCBuyOffer(self, sourceAccount, changeAccount, swapBillOffered, exchangeRate, maxBlockOffset, receivingAccount, refundAccount, maxBlock):
 		if maxBlock < self._currentBlockIndex:
 			return
 		available = self._balances.get(sourceAccount, 0)
@@ -179,17 +181,20 @@ class State(object):
 		buyDetails.swapBillAmount = swapBillOffered
 		buyDetails.ltcReceiveAddress = receivingAccount
 		buyDetails.refundAccount = refundAccount
+		expiry = maxBlock + maxBlockOffset
+		if expiry > 0xffffffff:
+			expiry = 0xffffffff
 		self._LTCBuys.addOffer(exchangeRate, expiry, buyDetails)
 		self._matchLTC()
 
-	def checkWouldApplySuccessfully_LTCSellOffer(self, sourceAccount, changeAccount, swapBillDesired, exchangeRate, expiry, receivingAccount, maxBlock):
+	def checkWouldApplySuccessfully_LTCSellOffer(self, sourceAccount, changeAccount, swapBillDesired, exchangeRate, maxBlockOffset, receivingAccount, maxBlock):
 		assert type(swapBillDesired) is int
 		assert swapBillDesired > 0
 		assert type(exchangeRate) is int
 		assert exchangeRate > 0
 		assert exchangeRate < 0x100000000
-		assert type(expiry) is int
-		assert expiry > 0
+		assert type(maxBlockOffset) is int
+		assert maxBlockOffset > 0
 		if maxBlock < self._currentBlockIndex:
 			return False, 'max block for transaction has been exceeded'
 		swapBillDeposit = swapBillDesired // LTCTrading.depositDivisor
@@ -198,7 +203,7 @@ class State(object):
 		if not LTCTrading.SatisfiesMinimumExchange(exchangeRate, swapBillDesired):
 			return False, 'does not satisfy minimum exchange amount (offer not posted)'
 		return True, ''
-	def apply_LTCSellOffer(self, sourceAccount, changeAccount, swapBillDesired, exchangeRate, expiry, receivingAccount, maxBlock):
+	def apply_LTCSellOffer(self, sourceAccount, changeAccount, swapBillDesired, exchangeRate, maxBlockOffset, receivingAccount, maxBlock):
 		if maxBlock < self._currentBlockIndex:
 			return
 		swapBillDeposit = swapBillDesired // LTCTrading.depositDivisor
@@ -215,6 +220,9 @@ class State(object):
 		sellDetails.swapBillAmount = swapBillDesired
 		sellDetails.swapBillDeposit = swapBillDeposit
 		sellDetails.refundAccount = receivingAccount
+		expiry = maxBlock + maxBlockOffset
+		if expiry > 0xffffffff:
+			expiry = 0xffffffff
 		self._LTCSells.addOffer(exchangeRate, expiry, sellDetails)
 		self._matchLTC()
 

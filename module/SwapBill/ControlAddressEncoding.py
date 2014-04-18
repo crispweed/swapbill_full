@@ -6,8 +6,9 @@ class NotSwapBillControlAddress(Exception):
 prefix = b'SWB'
 formatStruct = struct.Struct('<BHLL')
 
-def Encode(transaction):
-	typeCode, amount, maxBlock, extraData = transaction.encode()
+#def Encode(transaction):
+	#typeCode, amount, maxBlock, extraData = transaction.encode()
+def Encode(typeCode, amount, maxBlock, extraData):
 	assert type(typeCode) is int
 	assert typeCode >= 0 and typeCode <= 0xff
 	assert type(amount) is int

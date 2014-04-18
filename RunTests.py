@@ -10,5 +10,11 @@ class RaisingOutputStream(object):
 		raise Exception('RaisingOutputStream.write() called!')
 #sys.stdout = RaisingOutputStream()
 
-suite = unittest.defaultTestLoader.discover(path.join(scriptPath, 'module', 'SwapBillTest'))
+basePath = path.join(scriptPath, 'module', 'SwapBillTest')
+
+if len(sys.argv) > 1:
+	suite = unittest.defaultTestLoader.discover(basePath, pattern=sys.argv[1])
+else:
+	suite = unittest.defaultTestLoader.discover(basePath)
+
 unittest.TextTestRunner().run(suite)
