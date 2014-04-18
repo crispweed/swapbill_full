@@ -7,6 +7,7 @@ else:
 	import StringIO as io
 from SwapBill import RawTransaction, Address, TransactionFee, GetUnspent
 from SwapBill import TransactionTypes, BuildHostedTransaction, Sync, Host, TransactionBuildLayer
+from SwapBill import FormatTransactionForUserDisplay
 from SwapBill.Sync import SyncAndReturnState
 from SwapBill.Amounts import ToSatoshis, FromSatoshis
 from SwapBill.ExceptionReportedToUser import ExceptionReportedToUser
@@ -112,7 +113,8 @@ def Main(startBlockIndex, startBlockHash, commandLineArgs=sys.argv[1:], host=Non
 				"This could be because a transaction is in progress and needs to be confirmed (in which case you may just need to wait),",
 			    "or it's also possible that all litecoin seeded to this address has been spent (in which case you will need to reseed).")
 		change = host.getNewChangeAddress()
-		print('attempting to send swap bill transaction:', tx, file=out)
+		print('attempting to send swap bill transaction:', file=out)
+		print(FormatTransactionForUserDisplay.Format(host, tx), file=out)
 		transactionFee = TransactionFee.baseFee
 		try:
 			litecoinTX = BuildHostedTransaction.Build_WithSourceAddress(TransactionFee.dustLimit, transactionFee, tx, sourceSingleUnspent, backerUnspent, change)
@@ -138,7 +140,8 @@ def Main(startBlockIndex, startBlockHash, commandLineArgs=sys.argv[1:], host=Non
 			raise TransactionNotSuccessfulAgainstCurrentState('Transaction would not complete successfully against current state:', failReason)
 		unspent = GetUnspent.GetUnspent(transactionBuildLayer, state._balances)
 		change = host.getNewChangeAddress()
-		print('attempting to send swap bill transaction:', tx, file=out)
+		print('attempting to send swap bill transaction:', file=out)
+		print(FormatTransactionForUserDisplay.Format(host, tx), file=out)
 		transactionFee = TransactionFee.baseFee
 		try:
 			litecoinTX = BuildHostedTransaction.Build_FundedByAccount(TransactionFee.dustLimit, transactionFee, tx, unspent, change)
@@ -195,7 +198,8 @@ def Main(startBlockIndex, startBlockHash, commandLineArgs=sys.argv[1:], host=Non
 			raise TransactionNotSuccessfulAgainstCurrentState('Transaction would not complete successfully against current state:', failReason)
 		unspent = GetUnspent.GetUnspent(transactionBuildLayer, state._balances)
 		change = host.getNewChangeAddress()
-		print('attempting to send swap bill transaction:', tx, file=out)
+		print('attempting to send swap bill transaction:', file=out)
+		print(FormatTransactionForUserDisplay.Format(host, tx), file=out)
 		transactionFee = TransactionFee.baseFee
 		try:
 			litecoinTX = BuildHostedTransaction.Build_FundedByAccount(TransactionFee.dustLimit, transactionFee, tx, unspent, change)

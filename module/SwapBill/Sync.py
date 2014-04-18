@@ -8,6 +8,7 @@ else:
 from os import path
 from collections import deque
 from SwapBill import State, DecodeTransaction, TransactionTypes, SourceLookup, ControlAddressEncoding
+from SwapBill import FormatTransactionForUserDisplay
 
 class ReindexingRequiredException(Exception):
 	pass
@@ -62,8 +63,10 @@ def _processBlock(host, state, blockHash, out):
 		except TransactionTypes.UnsupportedTransaction:
 			continue
 		#decodedTX.apply(state)
-		state.applyTransaction(decodedTX.__class__.__name__, decodedTX.details())
-		print('applied transaction:', decodedTX, file=out)
+		transactionType = decodedTX.__class__.__name__
+		details = decodedTX.details()
+		state.applyTransaction(transactionType, details)
+		print('applied ' + FormatTransactionForUserDisplay.Format(host, decodedTX), file=out)
 	state.advanceToNextBlock()
 
 def SyncAndReturnState(cacheFile, startBlockIndex, startBlockHash, host, out):

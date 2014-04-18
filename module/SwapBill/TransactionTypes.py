@@ -25,8 +25,6 @@ class Burn(object):
 		return 0, 0, struct.pack("<B", 0) * 6
 	def details(self):
 		return {'amount':self.controlAddressAmount, 'destinationAccount':self.destination}
-	def __str__(self):
-		return 'burn {} with credit to {}'.format(self.controlAddressAmount, binascii.hexlify(self.destination).decode())
 
 class Transfer(object):
 	typeCode = 1
@@ -49,9 +47,6 @@ class Transfer(object):
 		return self.amount, self._maxBlock, struct.pack("<B", 0) * 6
 	def details(self):
 		return {'sourceAccount':self.source, 'amount':self.amount, 'destinationAccount':self.destination}
-	def __str__(self):
-		result = 'transfer {} from {} to {}'.format(self.amount, binascii.hexlify(self.source).decode(), binascii.hexlify(self.destination).decode())
-		return result
 
 class LTCBuyOffer(object):
 	typeCode = 2
@@ -86,9 +81,6 @@ class LTCBuyOffer(object):
 		else:
 			expiry = self._maxBlock + self._offerMaxBlockOffset
 		return {'sourceAccount':self.source, 'swapBillOffered':self.amount, 'exchangeRate':self._exchangeRate, 'expiry':expiry, 'receivingAccount':self.destination}
-	def __str__(self):
-		result = 'LTC buy offer from {} funded with {} swapbill, exchange rate {}, receiving LTC at {}, maxBlock offset {}'.format(binascii.hexlify(self.source).decode(), self.amount, self._exchangeRate, binascii.hexlify(self.destination).decode(), self._offerMaxBlockOffset)
-		return result
 
 class LTCSellOffer(object):
 	typeCode = 3
@@ -120,9 +112,6 @@ class LTCSellOffer(object):
 		else:
 			expiry = self._maxBlock + self._offerMaxBlockOffset
 		return {'sourceAccount':self.source, 'swapBillDesired':self.amount, 'exchangeRate':self._exchangeRate, 'expiry':expiry}
-	def __str__(self):
-		result = 'LTC sell offer from {}, for {} swapbill, exchange rate {}, maxBlock offset {}'.format(binascii.hexlify(self.source).decode(), self.amount, self._exchangeRate, self._offerMaxBlockOffset)
-		return result
 
 class LTCExchangeCompletion(object):
 	typeCode = 4
@@ -154,9 +143,6 @@ class LTCExchangeCompletion(object):
 		return self.amount, self._maxBlock, self._formatStruct.pack(low, high)
 	def details(self):
 		return {'pendingExchangeIndex':self._pendingExchangeIndex, 'destinationAccount':self.destination, 'destinationAmount':self.destinationAmount}
-	def __str__(self):
-		result = 'LTC exchange completion payment for pending exchange index {} of {} LTC to {}'.format(self._pendingExchangeIndex, self.destinationAmount, binascii.hexlify(self.destination).decode())
-		return result
 
 class ForwardToFutureVersion(object):
 	## this transaction is designed to be created only during decoding
@@ -168,9 +154,6 @@ class ForwardToFutureVersion(object):
 		self.source = sourceLookup.getSourceFor(hostTX.inputTXID(i), hostTX.inputVOut(i))
 	def details(self):
 		return {'sourceAccount':self.source, 'amount':self.amount}
-	def __str__(self):
-		result = '{} forwarded from {} to future network version (no longer accessible from this network version)'.format(self.amount, binascii.hexlify(self.source).decode())
-		return result
 
 def _decode(typeCode, amount, maxBlock, extraData, hostTX, sourceLookup):
 	assert typeCode >= 0

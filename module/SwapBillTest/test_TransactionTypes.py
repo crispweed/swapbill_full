@@ -43,7 +43,6 @@ class Test(unittest.TestCase):
 		burn = TransactionTypes.Burn()
 		a = binascii.unhexlify(b'0a')
 		burn.init_FromUserRequirements(burnAmount=10, target=a)
-		self.assertEqual(str(burn), 'burn 10 with credit to 0a')
 		self.assertDictEqual(burn.details(), {'amount': 10, 'destinationAccount': a})
 		self.assertEqual(burn.typeCode, 0)
 		self.assertEqual(burn.controlAddressAmount, 10)
@@ -56,7 +55,6 @@ class Test(unittest.TestCase):
 		bob = binascii.unhexlify(b'0b0b')
 		alice = binascii.unhexlify(b'0a11ce')
 		transfer.init_FromUserRequirements(source=bob, amount=10, destination=alice)
-		self.assertEqual(str(transfer), 'transfer 10 from 0b0b to 0a11ce')
 		self.assertDictEqual(transfer.details(),  {'sourceAccount': b'\x0b\x0b', 'destinationAccount': b'\n\x11\xce', 'amount': 10})
 		self.assertEqual(transfer.typeCode, 1)
 		self.assertEqual(transfer.source, bob)
@@ -71,7 +69,6 @@ class Test(unittest.TestCase):
 		tx = TransactionTypes.LTCBuyOffer()
 		bob2 = binascii.unhexlify(b'b0b2')
 		tx.init_FromUserRequirements(source=bob, swapBillAmountOffered=111, exchangeRate=0x7fffffff, receivingDestination=bob2)
-		self.assertEqual(str(tx), 'LTC buy offer from 0b0b funded with 111 swapbill, exchange rate 2147483647, receiving LTC at b0b2, maxBlock offset 0')
 		self.assertDictEqual(tx.details(), {'swapBillOffered': 111, 'expiry': 4294967295, 'sourceAccount': b'\x0b\x0b', 'receivingAccount': b'\xb0\xb2', 'exchangeRate': 2147483647})
 		self.assertEqual(tx.typeCode, 2)
 		self.assertEqual(tx.source, bob)
@@ -87,12 +84,11 @@ class Test(unittest.TestCase):
 		sourceLookup = hostTX
 		decodedTX = TransactionTypes._decode(tx.typeCode, amount, maxBlock, extraData, sourceLookup, hostTX)
 		self.assertIsInstance(decodedTX, TransactionTypes.LTCBuyOffer)
-		self.assertEqual(str(decodedTX), str(tx))
-		self.assertEqual(decodedTX.__dict__, tx.__dict__)
+		self.assertDictEqual(decodedTX.details(), tx.details())
+		self.assertDictEqual(decodedTX.__dict__, tx.__dict__)
 
 		tx = TransactionTypes.LTCSellOffer()
 		tx.init_FromUserRequirements(source=bob, swapBillDesired=111, exchangeRate=0x7fffffff)
-		self.assertEqual(str(tx), 'LTC sell offer from 0b0b, for 111 swapbill, exchange rate 2147483647, maxBlock offset 0')
 		self.assertDictEqual(tx.details(), {'swapBillDesired': 111, 'sourceAccount': b'\x0b\x0b', 'exchangeRate': 2147483647, 'expiry': 4294967295})
 		self.assertEqual(tx.typeCode, 3)
 		self.assertEqual(tx.source, bob)
@@ -108,14 +104,14 @@ class Test(unittest.TestCase):
 		sourceLookup = hostTX
 		decodedTX = TransactionTypes._decode(tx.typeCode, amount, maxBlock, extraData, sourceLookup, hostTX)
 		self.assertIsInstance(decodedTX, TransactionTypes.LTCSellOffer)
-		self.assertEqual(str(decodedTX), str(tx))
-		self.assertEqual(decodedTX.__dict__, tx.__dict__)
+		self.assertDictEqual(decodedTX.details(), tx.details())
+		self.assertDictEqual(decodedTX.__dict__, tx.__dict__)
 
 		hostTX = MockHostTX(burn)
 		#print(hostTX.__dict__)
 		sourceLookup = hostTX
 		decodedBurn = TransactionTypes._decode(burn.typeCode, 0, 0, struct.pack("<B", 0) * 6, sourceLookup, hostTX)
-		self.assertEqual(str(decodedBurn), 'burn 10 with credit to 0a')
+		self.assertDictEqual(burn.details(), {'amount': 10, 'destinationAccount': a})
 		self.assertEqual(decodedBurn.__dict__, burn.__dict__)
 
 		## different extra data for burn should raise an exception
@@ -125,13 +121,13 @@ class Test(unittest.TestCase):
 		sourceLookup = hostTX
 		decodedTransfer = TransactionTypes._decode(transfer.typeCode, 10, 0xffffffff, struct.pack("<B", 0) * 6, sourceLookup, hostTX)
 		assert decodedTransfer._maxBlock == 0xffffffff ## TODO: implement this properly, or move to separate transaction type!
-		assert str(decodedTransfer) == 'transfer 10 from 0b0b to 0a11ce'
+		self.assertDictEqual(transfer.details(),  {'sourceAccount': b'\x0b\x0b', 'destinationAccount': b'\n\x11\xce', 'amount': 10})
 		assert decodedTransfer.__dict__ == transfer.__dict__
 
 		## as before, but different extra data (should be ignored)
 		decodedTransfer = TransactionTypes._decode(transfer.typeCode, 10, 0xffffffff, struct.pack("<B", 99) * 6, sourceLookup, hostTX)
 		assert decodedTransfer._maxBlock == 0xffffffff ## TODO: implement this properly, or move to separate transaction type!
-		assert str(decodedTransfer) == 'transfer 10 from 0b0b to 0a11ce'
+		self.assertDictEqual(transfer.details(),  {'sourceAccount': b'\x0b\x0b', 'destinationAccount': b'\n\x11\xce', 'amount': 10})
 		assert decodedTransfer.__dict__ == transfer.__dict__
 
 ##TODO test backward compatibility, through ForwardToFutureVersion type
