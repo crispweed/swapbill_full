@@ -100,7 +100,8 @@ class MockHostLayer(object):
 		sourceLookup = SourceLookup(self._sourceAddressLookup)
 		for hostTX in decodedHostTransactions:
 			decodedTX = TransactionTypes.Decode(sourceLookup, hostTX)
-			decodedTX.apply(state)
+			#decodedTX.apply(state)
+			state.applyTransaction(decodedTX.__class__.__name__, decodedTX.details())
 		state.advanceToNextBlock()
 
 class SourceLookup(object):

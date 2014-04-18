@@ -101,7 +101,8 @@ def Main(startBlockIndex, startBlockHash, commandLineArgs=sys.argv[1:], host=Non
 		return pubKeyHash
 
 	def CheckAndSend_FromAddress(tx):
-		wouldSucceed, failReason = tx.checkWouldApplySuccessfully(state)
+		#wouldSucceed, failReason = tx.checkWouldApplySuccessfully(state)
+		wouldSucceed, failReason = state.checkTransactionWouldApplySuccessfully(tx.__class__.__name__, tx.details())
 		if not wouldSucceed:
 			raise TransactionNotSuccessfulAgainstCurrentState('Transaction would not complete successfully against current state:', failReason)
 		source = tx.source
@@ -129,22 +130,23 @@ def Main(startBlockIndex, startBlockHash, commandLineArgs=sys.argv[1:], host=Non
 
 	if args.action == 'burn':
 		target = host.getNewSwapBillAddress()
-		burnTX = TransactionTypes.Burn()
-		burnTX.init_FromUserRequirements(burnAmount=int(args.quantity), target=target)
-		wouldSucceed, failReason = burnTX.checkWouldApplySuccessfully(state)
+		tx = TransactionTypes.Burn()
+		tx.init_FromUserRequirements(burnAmount=int(args.quantity), target=target)
+		#wouldSucceed, failReason = burnTX.checkWouldApplySuccessfully(state)
+		wouldSucceed, failReason = state.checkTransactionWouldApplySuccessfully(tx.__class__.__name__, tx.details())
 		if not wouldSucceed:
 			raise TransactionNotSuccessfulAgainstCurrentState('Transaction would not complete successfully against current state:', failReason)
 		unspent = GetUnspent.GetUnspent(transactionBuildLayer, state._balances)
 		change = host.getNewChangeAddress()
-		print('attempting to send swap bill transaction:', burnTX, file=out)
+		print('attempting to send swap bill transaction:', tx, file=out)
 		transactionFee = TransactionFee.baseFee
 		try:
-			litecoinTX = BuildHostedTransaction.Build_FundedByAccount(TransactionFee.dustLimit, transactionFee, burnTX, unspent, change)
+			litecoinTX = BuildHostedTransaction.Build_FundedByAccount(TransactionFee.dustLimit, transactionFee, tx, unspent, change)
 			txID = transactionBuildLayer.sendTransaction(litecoinTX)
 		except Host.InsufficientTransactionFees:
 			try:
 				transactionFee += TransactionFee.feeIncrement
-				litecoinTX = BuildHostedTransaction.Build_FundedByAccount(TransactionFee.dustLimit, transactionFee, burnTX, unspent, change)
+				litecoinTX = BuildHostedTransaction.Build_FundedByAccount(TransactionFee.dustLimit, transactionFee, tx, unspent, change)
 				txID = transactionBuildLayer.sendTransaction(litecoinTX)
 			except Host.InsufficientTransactionFees:
 				raise Exception("Failed: Unexpected failure to meet transaction fee requirement. (Lots of dust inputs?)")
@@ -187,7 +189,8 @@ def Main(startBlockIndex, startBlockHash, commandLineArgs=sys.argv[1:], host=Non
 		exchange = state._pendingExchanges[pendingExchangeID]
 		tx = TransactionTypes.LTCExchangeCompletion()
 		tx.init_FromUserRequirements(ltcAmount=exchange.ltc, destination=exchange.ltcReceiveAddress, pendingExchangeIndex=pendingExchangeID)
-		wouldSucceed, failReason = tx.checkWouldApplySuccessfully(state)
+		#wouldSucceed, failReason = tx.checkWouldApplySuccessfully(state)
+		wouldSucceed, failReason = state.checkTransactionWouldApplySuccessfully(tx.__class__.__name__, tx.details())
 		if not wouldSucceed:
 			raise TransactionNotSuccessfulAgainstCurrentState('Transaction would not complete successfully against current state:', failReason)
 		unspent = GetUnspent.GetUnspent(transactionBuildLayer, state._balances)

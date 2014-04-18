@@ -61,7 +61,8 @@ def _processBlock(host, state, blockHash, out):
 			continue
 		except TransactionTypes.UnsupportedTransaction:
 			continue
-		decodedTX.apply(state)
+		#decodedTX.apply(state)
+		state.applyTransaction(decodedTX.__class__.__name__, decodedTX.details())
 		print('applied transaction:', decodedTX, file=out)
 	state.advanceToNextBlock()
 

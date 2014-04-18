@@ -2,23 +2,6 @@ from __future__ import print_function
 import unittest, struct, binascii
 from SwapBill import TransactionTypes
 
-class MockState(object):
-	def __init__(self):
-		self._log = []
-## TODO: can the following be replaced by something automatic?
-	def apply_Burn(self, amount, destinationAccount):
-		self._log.append(('apply_Burn', amount, destinationAccount))
-	def apply_Transfer(self, sourceAccount, amount, destinationAccount):
-		self._log.append(('apply_Transfer', sourceAccount, amount, destinationAccount))
-	def apply_AddLTCBuyOffer(self, sourceAccount, swapBillOffered, exchangeRate, expiry, receivingAccount):
-		self._log.append(('apply_AddLTCBuyOffer', sourceAccount, swapBillOffered, exchangeRate, expiry, receivingAccount))
-	def apply_AddLTCSellOffer(self, sourceAccount, swapBillDesired, exchangeRate, expiry):
-		self._log.append(('apply_AddLTCSellOffer', sourceAccount, swapBillDesired, exchangeRate, expiry))
-	def apply_CompleteLTCExchange(self, pendingExchangeIndex, destinationAccount, destinationAmount):
-		self._log.append(('apply_CompleteLTCExchange', pendingExchangeIndex, destinationAccount, destinationAmount))
-	def apply_ForwardToFutureNetworkVersion(self, sourceAccount, amount):
-		self._log.append(('apply_ForwardToFutureNetworkVersion', sourceAccount, amount))
-
 class MockHostTX(object):
 	def __init__(self, tx):
 		self._inputIDs = []
@@ -61,9 +44,7 @@ class Test(unittest.TestCase):
 		a = binascii.unhexlify(b'0a')
 		burn.init_FromUserRequirements(burnAmount=10, target=a)
 		self.assertEqual(str(burn), 'burn 10 with credit to 0a')
-		s = MockState()
-		burn.apply(s)
-		self.assertEqual(s._log, [('apply_Burn', 10, a)])
+		self.assertDictEqual(burn.details(), {'amount': 10, 'destination': a})
 		self.assertEqual(burn.typeCode, 0)
 		self.assertEqual(burn.controlAddressAmount, 10)
 		self.assertEqual(burn.destination, a)
@@ -76,10 +57,7 @@ class Test(unittest.TestCase):
 		alice = binascii.unhexlify(b'0a11ce')
 		transfer.init_FromUserRequirements(source=bob, amount=10, destination=alice)
 		self.assertEqual(str(transfer), 'transfer 10 from 0b0b to 0a11ce')
-		s = MockState()
-		transfer.apply(s)
-		#print(s._log)
-		self.assertEqual(s._log, [('apply_Transfer', bob, 10, alice)])
+		self.assertDictEqual(transfer.details(),  {'source': b'\x0b\x0b', 'destination': b'\n\x11\xce', 'amount': 10})
 		self.assertEqual(transfer.typeCode, 1)
 		self.assertEqual(transfer.source, bob)
 		self.assertEqual(transfer.destination, alice)
@@ -94,10 +72,7 @@ class Test(unittest.TestCase):
 		bob2 = binascii.unhexlify(b'b0b2')
 		tx.init_FromUserRequirements(source=bob, swapBillAmountOffered=111, exchangeRate=0x7fffffff, receivingDestination=bob2)
 		self.assertEqual(str(tx), 'LTC buy offer from 0b0b funded with 111 swapbill, exchange rate 2147483647, receiving LTC at b0b2, maxBlock offset 0')
-		s = MockState()
-		tx.apply(s)
-		#print(s._log)
-		self.assertEqual(s._log, [('apply_AddLTCBuyOffer', b'\x0b\x0b', 111, 2147483647, 4294967295, b'\xb0\xb2')])
+		self.assertDictEqual(tx.details(), {'swapBillOffered': 111, 'expiry': 4294967295, 'source': b'\x0b\x0b', 'receivingAccount': b'\xb0\xb2', 'exchangeRate': 2147483647})
 		self.assertEqual(tx.typeCode, 2)
 		self.assertEqual(tx.source, bob)
 		self.assertEqual(tx.destination, bob2)
@@ -118,9 +93,7 @@ class Test(unittest.TestCase):
 		tx = TransactionTypes.LTCSellOffer()
 		tx.init_FromUserRequirements(source=bob, swapBillDesired=111, exchangeRate=0x7fffffff)
 		self.assertEqual(str(tx), 'LTC sell offer from 0b0b, for 111 swapbill, exchange rate 2147483647, maxBlock offset 0')
-		s = MockState()
-		tx.apply(s) ## capped to 1 here by mock state!
-		self.assertEqual(s._log, [('apply_AddLTCSellOffer', b'\x0b\x0b', 111, 2147483647, 4294967295)])
+		self.assertDictEqual(tx.details(), {'swapBillDesired': 111, 'source': b'\x0b\x0b', 'exchangeRate': 2147483647, 'expiry': 4294967295})
 		self.assertEqual(tx.typeCode, 3)
 		self.assertEqual(tx.source, bob)
 		assert not hasattr(tx, 'destination')
