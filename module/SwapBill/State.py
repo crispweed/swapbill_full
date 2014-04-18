@@ -99,34 +99,34 @@ class State(object):
 					self._addToBalance(sellDetails.swapBillAddress, sellDetails.swapBillDeposit)
 			return # break out of while loop
 
-	def checkWouldApplySuccessfully_Burn(self, amount, destinationAccount):
+	def checkWouldApplySuccessfully_Burn(self, amount, destination):
 		assert type(amount) is int
 		assert amount > 0
 		return True, ''
-	def apply_Burn(self, amount, destinationAccount):
+	def apply_Burn(self, amount, destination):
 		self._totalCreated += amount
-		if destinationAccount in self._balances:
-			self._balances[destinationAccount] += amount
+		if destination in self._balances:
+			self._balances[destination] += amount
 		else:
-			self._balances[destinationAccount] = amount
+			self._balances[destination] = amount
 
-	def checkWouldApplySuccessfully_Transfer(self, sourceAccount, amount, destinationAccount):
+	def checkWouldApplySuccessfully_Transfer(self, source, amount, destination):
 		assert type(amount) is int
 		assert amount > 0
-		available = self._balances.get(sourceAccount, 0)
+		available = self._balances.get(source, 0)
 		if available >= amount:
 			return True, ''
 		if available > 0:
 			return False, 'insufficient balance in source account (transfer capped)'
 		return False, 'source account balance is 0'
-	def apply_Transfer(self, sourceAccount, amount, destinationAccount):
-		available = self._balances.get(sourceAccount, 0)
+	def apply_Transfer(self, source, amount, destination):
+		available = self._balances.get(source, 0)
 		if amount > available:
 			amount = available
-		self._subtractFromBalance(sourceAccount, amount)
-		self._addToBalance(destinationAccount, amount)
+		self._subtractFromBalance(source, amount)
+		self._addToBalance(destination, amount)
 
-	def checkWouldApplySuccessfully_AddLTCBuyOffer(self, sourceAccount, swapBillOffered, exchangeRate, expiry, receivingAccount):
+	def checkWouldApplySuccessfully_AddLTCBuyOffer(self, source, swapBillOffered, exchangeRate, expiry, receivingAccount):
 		assert type(swapBillOffered) is int
 		assert swapBillOffered > 0
 		assert type(exchangeRate) is int
@@ -134,25 +134,25 @@ class State(object):
 		assert exchangeRate < 0x100000000
 		assert type(expiry) is int
 		assert expiry > 0
-		if self._balances.get(sourceAccount, 0) < swapBillOffered:
+		if self._balances.get(source, 0) < swapBillOffered:
 			return False, 'insufficient balance in source account (offer not posted)'
 		if not LTCTrading.SatisfiesMinimumExchange(exchangeRate, swapBillOffered):
 			return False, 'does not satisfy minimum exchange amount (offer not posted)'
 		return True, ''
-	def apply_AddLTCBuyOffer(self, sourceAccount, swapBillOffered, exchangeRate, expiry, receivingAccount):
-		if self._balances.get(sourceAccount, 0) < swapBillOffered:
+	def apply_AddLTCBuyOffer(self, source, swapBillOffered, exchangeRate, expiry, receivingAccount):
+		if self._balances.get(source, 0) < swapBillOffered:
 			return
 		if not LTCTrading.SatisfiesMinimumExchange(exchangeRate, swapBillOffered):
 			return
-		self._subtractFromBalance(sourceAccount, swapBillOffered)
+		self._subtractFromBalance(source, swapBillOffered)
 		buyDetails = BuyDetails()
-		buyDetails.swapBillAddress = sourceAccount
+		buyDetails.swapBillAddress = source
 		buyDetails.swapBillAmount = swapBillOffered
 		buyDetails.ltcReceiveAddress = receivingAccount
 		self._LTCBuys.addOffer(exchangeRate, expiry, buyDetails)
 		self._matchLTC()
 
-	def checkWouldApplySuccessfully_AddLTCSellOffer(self, sourceAccount, swapBillDesired, exchangeRate, expiry):
+	def checkWouldApplySuccessfully_AddLTCSellOffer(self, source, swapBillDesired, exchangeRate, expiry):
 		assert type(swapBillDesired) is int
 		assert swapBillDesired > 0
 		assert type(exchangeRate) is int
@@ -161,31 +161,31 @@ class State(object):
 		assert type(expiry) is int
 		assert expiry > 0
 		swapBillDeposit = swapBillDesired // LTCTrading.depositDivisor
-		if self._balances.get(sourceAccount, 0) < swapBillDeposit:
+		if self._balances.get(source, 0) < swapBillDeposit:
 			return False, 'insufficient balance for deposit in source account (offer not posted)'
 		if not LTCTrading.SatisfiesMinimumExchange(exchangeRate, swapBillDesired):
 			return False, 'does not satisfy minimum exchange amount (offer not posted)'
 		return True, ''
-	def apply_AddLTCSellOffer(self, sourceAccount, swapBillDesired, exchangeRate, expiry):
+	def apply_AddLTCSellOffer(self, source, swapBillDesired, exchangeRate, expiry):
 		swapBillDeposit = swapBillDesired // LTCTrading.depositDivisor
-		if self._balances.get(sourceAccount, 0) < swapBillDeposit:
+		if self._balances.get(source, 0) < swapBillDeposit:
 			return
 		if not LTCTrading.SatisfiesMinimumExchange(exchangeRate, swapBillDesired):
 			return
-		self._subtractFromBalance(sourceAccount, swapBillDeposit)
+		self._subtractFromBalance(source, swapBillDeposit)
 		sellDetails = SellDetails()
-		sellDetails.swapBillAddress = sourceAccount
+		sellDetails.swapBillAddress = source
 		sellDetails.swapBillAmount = swapBillDesired
 		sellDetails.swapBillDeposit = swapBillDeposit
 		self._LTCSells.addOffer(exchangeRate, expiry, sellDetails)
 		self._matchLTC()
 
-	def checkWouldApplySuccessfully_CompleteLTCExchange(self, pendingExchangeIndex, destinationAccount, destinationAmount):
+	def checkWouldApplySuccessfully_CompleteLTCExchange(self, pendingExchangeIndex, destination, destinationAmount):
 		assert type(destinationAmount) is int
 		if not pendingExchangeIndex in self._pendingExchanges:
 			return False, 'no pending exchange with the specified index (transaction ignored)'
 		exchangeDetails = self._pendingExchanges[pendingExchangeIndex]
-		if destinationAccount != exchangeDetails.ltcReceiveAddress:
+		if destination != exchangeDetails.ltcReceiveAddress:
 			return False, 'destination account does not match destination for pending exchange with the specified index (transaction ignored)'
 		if destinationAmount < exchangeDetails.ltc:
 			return False, 'amount is less than required payment amount (transaction ignored)'
@@ -195,11 +195,11 @@ class State(object):
 		## and the seller is also refunded their deposit here
 		## TODO don't reuse seller address, need a separate address for this completion credit!
 		return True, ''
-	def apply_CompleteLTCExchange(self, pendingExchangeIndex, destinationAccount, destinationAmount):
+	def apply_CompleteLTCExchange(self, pendingExchangeIndex, destination, destinationAmount):
 		if not pendingExchangeIndex in self._pendingExchanges:
 			return
 		exchangeDetails = self._pendingExchanges[pendingExchangeIndex]
-		if destinationAccount != exchangeDetails.ltcReceiveAddress:
+		if destination != exchangeDetails.ltcReceiveAddress:
 			return
 		if destinationAmount < exchangeDetails.ltc:
 			return
@@ -209,20 +209,20 @@ class State(object):
 		self._addToBalance(exchangeDetails.sellerAddress, exchangeDetails.swapBillAmount + exchangeDetails.swapBillDeposit)
 		self._pendingExchanges.pop(pendingExchangeIndex)
 
-	def checkWouldApplySuccessfully_ForwardToFutureNetworkVersion(self, sourceAccount, amount):
+	def checkWouldApplySuccessfully_ForwardToFutureNetworkVersion(self, source, amount):
 		assert type(amount) is int
 		assert amount > 0
-		available = self._balances.get(sourceAccount, 0)
+		available = self._balances.get(source, 0)
 		if available >= amount:
 			return True, ''
 		if available > 0:
 			return False, 'insufficient balance in source account (amount capped)'
 		return False, 'source account balance is 0'
-	def apply_ForwardToFutureNetworkVersion(self, sourceAccount, amount):
-		available = self._balances.get(sourceAccount, 0)
+	def apply_ForwardToFutureNetworkVersion(self, source, amount):
+		available = self._balances.get(source, 0)
 		if amount > available:
 			amount = available
-		self._subtractFromBalance(sourceAccount, amount)
+		self._subtractFromBalance(source, amount)
 		self._totalForwarded += amount
 
 	def checkTransactionWouldApplySuccessfully(self, transactionType, transactionDetails):
