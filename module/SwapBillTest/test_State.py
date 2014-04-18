@@ -146,6 +146,22 @@ class Test(unittest.TestCase):
 		self.assertEqual(state.totalAccountedFor(), state._totalCreated)
 		self.assertEqual(state._totalForwarded, 1)
 
+	def test_pay(self):
+		state = State.State(100, 'mockhash')
+		self.Apply_AssertSucceeds(state, 'Burn', amount=20, destinationAccount='b')
+		self.Apply_AssertSucceeds(state, 'Burn', amount=30, destinationAccount='c')
+		self.Apply_AssertSucceeds(state, 'Burn', amount=10, destinationAccount='a')
+		self.assertEqual(state._balances, {'a':10, 'b':20, 'c':30})
+		self.Apply_AssertSucceeds(state, 'Pay', sourceAccount='a', amount=3, destinationAccount='c', changeAccount='a2', maxBlock=200)
+		self.assertEqual(state._balances, {'a2':7, 'b':20, 'c':33})
+		reason = self.Apply_AssertFails(state, 'Pay', sourceAccount='a2', amount=8, destinationAccount='c', changeAccount='a3', maxBlock=200)
+		self.assertEqual(reason, 'insufficient balance in source account (transaction ignored)')
+		self.assertEqual(state._balances, {'a2':7, 'b':20, 'c':33})
+		reason = self.Apply_AssertFails(state, 'Pay', sourceAccount='a2', amount=5, destinationAccount='c', changeAccount='a3', maxBlock=99)
+		self.assertEqual(reason, 'max block for transaction has been exceeded')
+		self.assertEqual(state._balances, {'a2':7, 'b':20, 'c':33})
+		self.Apply_AssertSucceeds(state, 'Pay', sourceAccount='a2', amount=5, destinationAccount='b', changeAccount='a3', maxBlock=100)
+		self.assertEqual(state._balances, {'a3':2, 'b':25, 'c':33})
 
 	def test_ltc_trading(self):
 		state = State.State(100, 'starthash')

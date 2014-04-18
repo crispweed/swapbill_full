@@ -13,18 +13,18 @@ class Burn(object):
 		assert type(burnAmount) is int
 		assert burnAmount > 0
 		self.controlAddressAmount = burnAmount
-		self.destination = target
+		self.destinations = (target,)
 	def init_DuringDecoding(self, amount, maxBlock, extraData, hostTX, sourceLookup):
 		if amount != 0 or maxBlock != 0 or extraData != struct.pack("<B", 0) * 6:
 			raise NotValidSwapBillTransaction("invalid burn address")
 		if hostTX.numberOfOutputs() < 2:
 			raise NotValidSwapBillTransaction()
-		self.destination = hostTX.outputPubKeyHash(1)
+		self.destinations = (hostTX.outputPubKeyHash(1),)
 		self.controlAddressAmount = hostTX.outputAmount(0)
 	def encode(self):
 		return 0, 0, struct.pack("<B", 0) * 6
 	def details(self):
-		return {'amount':self.controlAddressAmount, 'destinationAccount':self.destination}
+		return {'amount':self.controlAddressAmount, 'destinationAccount':self.destinations[0]}
 
 class Transfer(object):
 	typeCode = 1
@@ -32,7 +32,7 @@ class Transfer(object):
 		assert type(amount) is int
 		assert amount > 0
 		self.source = source
-		self.destination = destination
+		self.destinations = (destination,)
 		self.amount = amount
 		self._maxBlock = maxBlock
 	def init_DuringDecoding(self, amount, maxBlock, extraData, hostTX, sourceLookup):
@@ -42,11 +42,11 @@ class Transfer(object):
 		self.source = sourceLookup.getSourceFor(hostTX.inputTXID(i), hostTX.inputVOut(i))
 		if hostTX.numberOfOutputs() < 2:
 			raise NotValidSwapBillTransaction()
-		self.destination = hostTX.outputPubKeyHash(1)
+		self.destinations = (hostTX.outputPubKeyHash(1),)
 	def encode(self):
 		return self.amount, self._maxBlock, struct.pack("<B", 0) * 6
 	def details(self):
-		return {'sourceAccount':self.source, 'amount':self.amount, 'destinationAccount':self.destination, 'maxBlock':self._maxBlock}
+		return {'sourceAccount':self.source, 'amount':self.amount, 'destinationAccount':self.destinations[0], 'maxBlock':self._maxBlock}
 
 class LTCBuyOffer(object):
 	typeCode = 2
@@ -57,7 +57,7 @@ class LTCBuyOffer(object):
 		assert type(offerMaxBlockOffset) is int
 		assert offerMaxBlockOffset >= 0
 		self.source = source
-		self.destination = receivingDestination
+		self.destinations = (receivingDestination,)
 		self.amount = swapBillAmountOffered
 		self._exchangeRate = exchangeRate
 		self._offerMaxBlockOffset = offerMaxBlockOffset
@@ -72,7 +72,7 @@ class LTCBuyOffer(object):
 		self.source = sourceLookup.getSourceFor(hostTX.inputTXID(i), hostTX.inputVOut(i))
 		if hostTX.numberOfOutputs() < 2:
 			raise NotValidSwapBillTransaction()
-		self.destination = hostTX.outputPubKeyHash(1)
+		self.destinations = (hostTX.outputPubKeyHash(1),)
 	def encode(self):
 		return self.amount, self._maxBlock, self._formatStruct.pack(self._exchangeRate, self._offerMaxBlockOffset)
 	def details(self):
@@ -80,7 +80,7 @@ class LTCBuyOffer(object):
 			expiry = 0xffffffff
 		else:
 			expiry = self._maxBlock + self._offerMaxBlockOffset
-		return {'sourceAccount':self.source, 'swapBillOffered':self.amount, 'exchangeRate':self._exchangeRate, 'expiry':expiry, 'receivingAccount':self.destination, 'maxBlock':self._maxBlock}
+		return {'sourceAccount':self.source, 'swapBillOffered':self.amount, 'exchangeRate':self._exchangeRate, 'expiry':expiry, 'receivingAccount':self.destinations[0], 'maxBlock':self._maxBlock}
 
 class LTCSellOffer(object):
 	typeCode = 3
@@ -118,23 +118,17 @@ class LTCExchangeCompletion(object):
 	_formatStruct = struct.Struct('<HL')
 	def init_FromUserRequirements(self, ltcAmount, destination, pendingExchangeIndex):
 		self.amount = 0
-		self.destination = destination
-		self.destinationAmount = ltcAmount
+		self.destinations = (destination,)
+		self.destinationAmounts = (ltcAmount,)
 		self._pendingExchangeIndex = pendingExchangeIndex
 	def init_DuringDecoding(self, amount, maxBlock, extraData, hostTX, sourceLookup):
 		self.amount = amount
-		i = hostTX.numberOfInputs() - 1
-		self.source = sourceLookup.getSourceFor(hostTX.inputTXID(i), hostTX.inputVOut(i))
 		## note that maxBlock is currently ignored here
 		## (could be required to be a specific value)
-		if hostTX.numberOfOutputs() >= 2:
-			self.destination = hostTX.outputPubKeyHash(1)
-			self.destinationAmount = hostTX.outputAmount(1)
-		else:
-			## we have to accept this
-			## since clients before this transaction type would have accepted the amount and accounted as 'forwarded'
-			self.destination = b'0' * 20
-			self.destinationAmount = 0
+		if hostTX.numberOfOutputs() < 2:
+			raise NotValidSwapBillTransaction()
+		self.destinations = (hostTX.outputPubKeyHash(1),)
+		self.destinationAmounts = (hostTX.outputAmount(1),)
 		low, high = self._formatStruct.unpack(extraData)
 		self._pendingExchangeIndex = (high << 16) + low
 	def encode(self):
@@ -142,7 +136,7 @@ class LTCExchangeCompletion(object):
 		high = (self._pendingExchangeIndex >> 16)
 		return self.amount, 0xffffffff, self._formatStruct.pack(low, high)
 	def details(self):
-		return {'pendingExchangeIndex':self._pendingExchangeIndex, 'destinationAccount':self.destination, 'destinationAmount':self.destinationAmount}
+		return {'pendingExchangeIndex':self._pendingExchangeIndex, 'destinationAccount':self.destinations[0], 'destinationAmount':self.destinationAmounts[0]}
 
 class Pay(object):
 	typeCode = 5
@@ -150,10 +144,9 @@ class Pay(object):
 		assert type(amount) is int
 		assert amount > 0
 		self.source = source
-		self.destination = destination
+		self.destinations = (destination, change)
 		self.amount = amount
 		self._maxBlock = maxBlock
-		self.destination2 = change
 	def init_DuringDecoding(self, amount, maxBlock, extraData, hostTX, sourceLookup):
 		self.amount = amount
 		self._maxBlock = maxBlock
@@ -161,12 +154,11 @@ class Pay(object):
 		self.source = sourceLookup.getSourceFor(hostTX.inputTXID(i), hostTX.inputVOut(i))
 		if hostTX.numberOfOutputs() < 3:
 			raise NotValidSwapBillTransaction()
-		self.destination = hostTX.outputPubKeyHash(1)
-		self.destination2 = hostTX.outputPubKeyHash(2)
+		self.destinations = (hostTX.outputPubKeyHash(1), hostTX.outputPubKeyHash(2))
 	def encode(self):
 		return self.amount, self._maxBlock, struct.pack("<B", 0) * 6
 	def details(self):
-		return {'sourceAccount':self.source, 'amount':self.amount, 'destinationAccount':self.destination, 'changeAccount':self.destination, 'maxBlock':self._maxBlock}
+		return {'sourceAccount':self.source, 'amount':self.amount, 'destinationAccount':self.destinations[0], 'changeAccount':self.destinations[1], 'maxBlock':self._maxBlock}
 
 
 class ForwardToFutureVersion(object):
@@ -178,7 +170,7 @@ class ForwardToFutureVersion(object):
 		i = hostTX.numberOfInputs() - 1
 		self.source = sourceLookup.getSourceFor(hostTX.inputTXID(i), hostTX.inputVOut(i))
 	def details(self):
-		return {'sourceAccount':self.source, 'amount':self.amount}
+		return {'sourceAccount':self.source, 'amount':self.amount, 'maxBlock':self._maxBlock}
 
 def _decode(typeCode, amount, maxBlock, extraData, hostTX, sourceLookup):
 	assert typeCode >= 0
@@ -195,7 +187,7 @@ def _decode(typeCode, amount, maxBlock, extraData, hostTX, sourceLookup):
 	elif typeCode == Pay.typeCode:
 		result = Pay()
 	elif typeCode < 128:
-		return ForwardToFutureVersion()
+		result = ForwardToFutureVersion()
 	else:
 		raise UnsupportedTransaction()
 	result.init_DuringDecoding(amount, maxBlock, extraData, hostTX, sourceLookup)

@@ -23,12 +23,15 @@ def _build_Common(dustLimit, transactionFee, swapBillTransaction, unspent, force
 	controlAddressData = ControlAddressEncoding.Encode(swapBillTransaction)
 	outDestinations = [controlAddressData]
 
-	if hasattr(swapBillTransaction, 'destination'):
-		outDestinations.append(swapBillTransaction.destination)
-		if hasattr(swapBillTransaction, 'destinationAmount'):
-			outAmounts.append(swapBillTransaction.destinationAmount)
-		else:
-			outAmounts.append(dustLimit)
+	if hasattr(swapBillTransaction, 'destinations'):
+		if hasattr(swapBillTransaction, 'destinationAmounts'):
+			assert len(swapBillTransaction.destinations) == len(swapBillTransaction.destinationAmounts)
+		for i in range(len(swapBillTransaction.destinations)):
+			outDestinations.append(swapBillTransaction.destinations[i])
+			if hasattr(swapBillTransaction, 'destinationAmounts'):
+				outAmounts.append(swapBillTransaction.destinationAmounts[i])
+			else:
+				outAmounts.append(dustLimit)
 
 	if not reSeedPubKeyHash is None:
 		outDestinations.append(reSeedPubKeyHash)

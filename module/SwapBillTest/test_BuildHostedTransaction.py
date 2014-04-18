@@ -51,7 +51,6 @@ class Test(unittest.TestCase):
 
 		hostTX = BuildHostedTransaction.Build_FundedByAccount(dustLimit, transactionFee, swapBillTransaction, unspent, changeAddress)
 		SanityChecks(transactionFee, unspent, hostTX)
-
 		self.assertTupleEqual(AsData(hostTX), ([('txid1', 0)],[(b"SWB\x00\xe8\x03\x00\x00\x00\x00\x10'\x00\x00......", 999), (b'change', 19899001)]))
 
 		swapBillTransaction = MockTransaction()
@@ -59,11 +58,10 @@ class Test(unittest.TestCase):
 		swapBillTransaction.amount = 1001
 		swapBillTransaction.maxBlock = 10001
 		swapBillTransaction.extraData = b'-' * 6
-		swapBillTransaction.destination = b'destination'
+		swapBillTransaction.destinations = (b'destination',)
 
 		hostTX = BuildHostedTransaction.Build_FundedByAccount(dustLimit, transactionFee, swapBillTransaction, unspent, changeAddress)
 		SanityChecks(transactionFee, unspent, hostTX)
-
 		self.assertTupleEqual(AsData(hostTX), ([('txid1', 0)],[(b"SWB\x01\xe9\x03\x00\x00\x00\x00\x11'\x00\x00------", 10), (b'destination', 10), (b'change', 19899980)]))
 
 		swapBillTransaction = MockTransaction()
@@ -72,14 +70,36 @@ class Test(unittest.TestCase):
 		swapBillTransaction.amount = 2002
 		swapBillTransaction.maxBlock = 0xffffff
 		swapBillTransaction.extraData = b'.' * 6
-		swapBillTransaction.destination = b'destination'
+		swapBillTransaction.destinations = (b'destination',)
 
 		sourceAddressSingleUnspent = (1000000, ('txid2', 1, 'scriptPubKey2'))
 
 		hostTX = BuildHostedTransaction.Build_WithSourceAddress(dustLimit, transactionFee, swapBillTransaction, sourceAddressSingleUnspent, unspent, changeAddress)
 		SanityChecks(transactionFee, unspent, hostTX, sourceAddressSingleUnspent)
-
 		self.assertTupleEqual(AsData(hostTX), ([('txid2', 1)],[(b"SWB\x02\xd2\x07\x00\x00\x00\x00\xff\xff\xff\x00......", 10), (b'destination', 10), (b'source', 10), (b'change', 899970)]))
+
+		# with multiple destinations
+		swapBillTransaction.destinations = (b'destination', b'destination2')
+
+		hostTX = BuildHostedTransaction.Build_WithSourceAddress(dustLimit, transactionFee, swapBillTransaction, sourceAddressSingleUnspent, unspent, changeAddress)
+		SanityChecks(transactionFee, unspent, hostTX, sourceAddressSingleUnspent)
+		self.assertTupleEqual(AsData(hostTX), ([('txid2', 1)],[(b"SWB\x02\xd2\x07\x00\x00\x00\x00\xff\xff\xff\x00......", 10), (b'destination', 10), (b'destination2', 10), (b'source', 10), (b'change', 899960)]))
+
+		# with destination amount
+		swapBillTransaction.destinations = (b'destination',)
+		swapBillTransaction.destinationAmounts = (123,)
+
+		hostTX = BuildHostedTransaction.Build_WithSourceAddress(dustLimit, transactionFee, swapBillTransaction, sourceAddressSingleUnspent, unspent, changeAddress)
+		SanityChecks(transactionFee, unspent, hostTX, sourceAddressSingleUnspent)
+		self.assertTupleEqual(AsData(hostTX), ([('txid2', 1)],[(b"SWB\x02\xd2\x07\x00\x00\x00\x00\xff\xff\xff\x00......", 10), (b'destination', 123), (b'source', 10), (b'change', 899857)]))
+
+		# with multiple destination amounts
+		swapBillTransaction.destinations = (b'destination', b'destination2')
+		swapBillTransaction.destinationAmounts = (123, 456)
+
+		hostTX = BuildHostedTransaction.Build_WithSourceAddress(dustLimit, transactionFee, swapBillTransaction, sourceAddressSingleUnspent, unspent, changeAddress)
+		SanityChecks(transactionFee, unspent, hostTX, sourceAddressSingleUnspent)
+		self.assertTupleEqual(AsData(hostTX), ([('txid2', 1)],[(b"SWB\x02\xd2\x07\x00\x00\x00\x00\xff\xff\xff\x00......", 10), (b'destination', 123), (b'destination2', 456), (b'source', 10), (b'change', 899401)]))
 
 ## TODO test error reporting
 
@@ -92,7 +112,7 @@ class Test(unittest.TestCase):
 		sbTX.amount = 10000000
 		sbTX.maxBlock = 0xffffff
 		sbTX.extraData = b'.' * 6
-		sbTX.destination = b'bob_LTC_Receive'
+		sbTX.destinations = (b'bob_LTC_Receive',)
 		sourceSingleUnspent = (100000, ('tx2', 0, 'script pub key for bob'))
 		unspent = ([100000, 9700000, 100000], [('tx6', 2, 'script pub key for alice_LTC_Receive'), ('tx7', 3, 'script pub key for change'), ('tx8', 0, 'script pub key for alice')])
 		transactionFee = 100000
