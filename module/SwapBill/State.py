@@ -130,7 +130,7 @@ class State(object):
 		self._subtractFromBalance(sourceAccount, amount)
 		self._addToBalance(destinationAccount, amount)
 
-	def checkWouldApplySuccessfully_Pay(self, sourceAccount, amount, destinationAccount, changeAccount, maxBlock):
+	def checkWouldApplySuccessfully_Pay(self, sourceAccount, changeAccount, amount, destinationAccount, maxBlock):
 		assert type(amount) is int
 		assert amount > 0
 		if maxBlock < self._currentBlockIndex:
@@ -139,7 +139,7 @@ class State(object):
 		if available < amount:
 			return False, 'insufficient balance in source account (transaction ignored)'
 		return True, ''
-	def apply_Pay(self, sourceAccount, amount, destinationAccount, changeAccount, maxBlock):
+	def apply_Pay(self, sourceAccount, changeAccount, amount, destinationAccount, maxBlock):
 		if maxBlock < self._currentBlockIndex:
 			return
 		available = self._balances.get(sourceAccount, 0)
@@ -150,7 +150,7 @@ class State(object):
 		if available > amount:
 			self._addToBalance(changeAccount, available - amount)
 
-	def checkWouldApplySuccessfully_LTCBuyOffer(self, sourceAccount, swapBillOffered, exchangeRate, expiry, receivingAccount, maxBlock):
+	def checkWouldApplySuccessfully_LTCBuyOffer(self, sourceAccount, changeAccount, swapBillOffered, exchangeRate, expiry, receivingAccount, refundAccount, maxBlock):
 		assert type(swapBillOffered) is int
 		assert swapBillOffered > 0
 		assert type(exchangeRate) is int
@@ -163,22 +163,26 @@ class State(object):
 		if not LTCTrading.SatisfiesMinimumExchange(exchangeRate, swapBillOffered):
 			return False, 'does not satisfy minimum exchange amount (offer not posted)'
 		return True, ''
-	def apply_LTCBuyOffer(self, sourceAccount, swapBillOffered, exchangeRate, expiry, receivingAccount, maxBlock):
+	def apply_LTCBuyOffer(self, sourceAccount, changeAccount, swapBillOffered, exchangeRate, expiry, receivingAccount, refundAccount, maxBlock):
 		if maxBlock < self._currentBlockIndex:
 			return
-		if self._balances.get(sourceAccount, 0) < swapBillOffered:
+		available = self._balances.get(sourceAccount, 0)
+		if available < swapBillOffered:
 			return
 		if not LTCTrading.SatisfiesMinimumExchange(exchangeRate, swapBillOffered):
 			return
-		self._subtractFromBalance(sourceAccount, swapBillOffered)
+		self._subtractFromBalance(sourceAccount, available)
+		if available > swapBillOffered:
+			self._addToBalance(changeAccount, available - swapBillOffered)
 		buyDetails = BuyDetails()
 		buyDetails.swapBillAddress = sourceAccount
 		buyDetails.swapBillAmount = swapBillOffered
 		buyDetails.ltcReceiveAddress = receivingAccount
+		buyDetails.refundAccount = refundAccount
 		self._LTCBuys.addOffer(exchangeRate, expiry, buyDetails)
 		self._matchLTC()
 
-	def checkWouldApplySuccessfully_LTCSellOffer(self, sourceAccount, swapBillDesired, exchangeRate, expiry, maxBlock):
+	def checkWouldApplySuccessfully_LTCSellOffer(self, sourceAccount, changeAccount, swapBillDesired, exchangeRate, expiry, receivingAccount, maxBlock):
 		assert type(swapBillDesired) is int
 		assert swapBillDesired > 0
 		assert type(exchangeRate) is int
@@ -194,19 +198,23 @@ class State(object):
 		if not LTCTrading.SatisfiesMinimumExchange(exchangeRate, swapBillDesired):
 			return False, 'does not satisfy minimum exchange amount (offer not posted)'
 		return True, ''
-	def apply_LTCSellOffer(self, sourceAccount, swapBillDesired, exchangeRate, expiry, maxBlock):
+	def apply_LTCSellOffer(self, sourceAccount, changeAccount, swapBillDesired, exchangeRate, expiry, receivingAccount, maxBlock):
 		if maxBlock < self._currentBlockIndex:
 			return
 		swapBillDeposit = swapBillDesired // LTCTrading.depositDivisor
-		if self._balances.get(sourceAccount, 0) < swapBillDeposit:
+		available = self._balances.get(sourceAccount, 0)
+		if available < swapBillDeposit:
 			return
 		if not LTCTrading.SatisfiesMinimumExchange(exchangeRate, swapBillDesired):
 			return
-		self._subtractFromBalance(sourceAccount, swapBillDeposit)
+		self._subtractFromBalance(sourceAccount, available)
+		if available > swapBillDeposit:
+			self._addToBalance(changeAccount, available - swapBillDeposit)
 		sellDetails = SellDetails()
 		sellDetails.swapBillAddress = sourceAccount
 		sellDetails.swapBillAmount = swapBillDesired
 		sellDetails.swapBillDeposit = swapBillDeposit
+		sellDetails.refundAccount = receivingAccount
 		self._LTCSells.addOffer(exchangeRate, expiry, sellDetails)
 		self._matchLTC()
 

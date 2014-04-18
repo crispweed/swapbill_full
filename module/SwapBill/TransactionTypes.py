@@ -51,13 +51,13 @@ class Transfer(object):
 class LTCBuyOffer(object):
 	typeCode = 2
 	_formatStruct = struct.Struct('<LH')
-	def init_FromUserRequirements(self, source, swapBillAmountOffered, exchangeRate, receivingDestination, offerMaxBlockOffset=0, maxBlock=0xffffffff):
+	def init_FromUserRequirements(self, source, change, refund, swapBillAmountOffered, exchangeRate, receivingDestination, offerMaxBlockOffset=0, maxBlock=0xffffffff):
 		assert type(swapBillAmountOffered) is int
 		assert swapBillAmountOffered >= 0
 		assert type(offerMaxBlockOffset) is int
 		assert offerMaxBlockOffset >= 0
 		self.source = source
-		self.destinations = (receivingDestination,)
+		self.destinations = [receivingDestination, change, refund]
 		self.amount = swapBillAmountOffered
 		self._exchangeRate = exchangeRate
 		self._offerMaxBlockOffset = offerMaxBlockOffset
@@ -72,7 +72,15 @@ class LTCBuyOffer(object):
 		self.source = sourceLookup.getSourceFor(hostTX.inputTXID(i), hostTX.inputVOut(i))
 		if hostTX.numberOfOutputs() < 2:
 			raise NotValidSwapBillTransaction()
-		self.destinations = (hostTX.outputPubKeyHash(1),)
+		self.destinations = [hostTX.outputPubKeyHash(1)]
+		if hostTX.numberOfOutputs() >= 3:
+			self.destinations.append(hostTX.outputPubKeyHash(2))
+		else:
+			self.destinations.append(self.source)
+		if hostTX.numberOfOutputs() >= 4:
+			self.destinations.append(hostTX.outputPubKeyHash(3))
+		else:
+			self.destinations.append(self.destinations[-1])
 	def encode(self):
 		return self.amount, self._maxBlock, self._formatStruct.pack(self._exchangeRate, self._offerMaxBlockOffset)
 	def details(self):
@@ -80,18 +88,19 @@ class LTCBuyOffer(object):
 			expiry = 0xffffffff
 		else:
 			expiry = self._maxBlock + self._offerMaxBlockOffset
-		return {'sourceAccount':self.source, 'swapBillOffered':self.amount, 'exchangeRate':self._exchangeRate, 'expiry':expiry, 'receivingAccount':self.destinations[0], 'maxBlock':self._maxBlock}
+		return {'sourceAccount':self.source, 'changeAccount':self.destinations[1], 'refundAccount':self.destinations[2], 'swapBillOffered':self.amount, 'exchangeRate':self._exchangeRate, 'expiry':expiry, 'receivingAccount':self.destinations[0], 'refundAccount':self.destinations[1], 'maxBlock':self._maxBlock}
 
 class LTCSellOffer(object):
 	typeCode = 3
 	depositMultiplier = 16
 	_formatStruct = struct.Struct('<LH')
-	def init_FromUserRequirements(self, source, swapBillDesired, exchangeRate, offerMaxBlockOffset=0, maxBlock=0xffffffff):
+	def init_FromUserRequirements(self, source, change, swapBillDesired, exchangeRate, receivingDestination, offerMaxBlockOffset=0, maxBlock=0xffffffff):
 		assert type(swapBillDesired) is int
 		assert swapBillDesired > 0
 		assert type(offerMaxBlockOffset) is int
 		assert offerMaxBlockOffset >= 0
 		self.source = source
+		self.destinations = [receivingDestination, change]
 		self.amount = swapBillDesired
 		self._exchangeRate = exchangeRate
 		self._offerMaxBlockOffset = offerMaxBlockOffset
@@ -104,6 +113,14 @@ class LTCSellOffer(object):
 		self._exchangeRate, self._offerMaxBlockOffset = self._formatStruct.unpack(extraData)
 		i = hostTX.numberOfInputs() - 1
 		self.source = sourceLookup.getSourceFor(hostTX.inputTXID(i), hostTX.inputVOut(i))
+		if hostTX.numberOfOutputs() >= 2:
+			self.destinations = [hostTX.outputPubKeyHash(2)]
+		else:
+			self.destinations = [self.source]
+		if hostTX.numberOfOutputs() >= 3:
+			self.destinations.append(hostTX.outputPubKeyHash(2))
+		else:
+			self.destinations.append(self.destinations[-1])
 	def encode(self):
 		return self.amount, self._maxBlock, self._formatStruct.pack(self._exchangeRate, self._offerMaxBlockOffset)
 	def details(self):
@@ -111,7 +128,7 @@ class LTCSellOffer(object):
 			expiry = 0xffffffff
 		else:
 			expiry = self._maxBlock + self._offerMaxBlockOffset
-		return {'sourceAccount':self.source, 'swapBillDesired':self.amount, 'exchangeRate':self._exchangeRate, 'expiry':expiry, 'maxBlock':self._maxBlock}
+		return {'sourceAccount':self.source, 'changeAccount':self.destinations[1], 'receivingAccount':self.destinations[0], 'swapBillDesired':self.amount, 'exchangeRate':self._exchangeRate, 'expiry':expiry, 'maxBlock':self._maxBlock}
 
 class LTCExchangeCompletion(object):
 	typeCode = 4

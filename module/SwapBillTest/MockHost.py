@@ -1,5 +1,6 @@
 import binascii
 from SwapBill import RawTransaction, TransactionFee
+from SwapBill import Host ## just for insufficient fee exception
 
 def TextAsPubKeyHash(s):
 	assert len(s) <= 20
@@ -100,6 +101,17 @@ class MockHost(object):
 		transactionFee = sumOfInputs - sum(outputAmounts)
 		byteSize = len(unsignedTransactionHex) / 2
 		feeRequired = TransactionFee.CalculateRequired_FromSizeAndOutputs(byteSize, outputAmounts)
+		if transactionFee < feeRequired:
+			raise Host.InsufficientTransactionFees
+			#print('byteSize:', byteSize)
+			#print('outputAmounts:')
+			#print(outputAmounts)
+			#print('transactionFee:', transactionFee)
+			#print('feeRequired:', feeRequired)
+		assert transactionFee >= feeRequired
+		if transactionFee > feeRequired:
+			print('transactionFee:', transactionFee)
+			print('feeRequired:', feeRequired)
 		assert transactionFee == feeRequired ## can potentially overspend, in theory, but will be nice to see the actual test case info that causes this
 		if not self._nextBlock in self._transactionsByBlock:
 			self._transactionsByBlock[self._nextBlock] = []

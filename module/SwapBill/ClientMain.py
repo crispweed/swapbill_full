@@ -188,7 +188,7 @@ def Main(startBlockIndex, startBlockHash, commandLineArgs=sys.argv[1:], host=Non
 		exchangeRate = int(float(args.exchangeRate) * 0x100000000)
 		## TODO: add args for block validity limit and offer duration
 		tx = TransactionTypes.LTCBuyOffer()
-		tx.init_FromUserRequirements(source=source, swapBillAmountOffered=int(args.quantity), exchangeRate=exchangeRate, receivingDestination=receivingDestination)
+		tx.init_FromUserRequirements(source=source, change=source, refund=source, swapBillAmountOffered=int(args.quantity), exchangeRate=exchangeRate, receivingDestination=receivingDestination)
 		CheckAndSend_FromAddress(tx)
 
 	elif args.action == 'post_ltc_sell':
@@ -197,7 +197,7 @@ def Main(startBlockIndex, startBlockHash, commandLineArgs=sys.argv[1:], host=Non
 		## TODO: add args for block validity limit and offer duration
 		tx = TransactionTypes.LTCSellOffer()
 		swapBillToBuy=int(args.quantity)
-		tx.init_FromUserRequirements(source=source, swapBillDesired=swapBillToBuy, exchangeRate=exchangeRate)
+		tx.init_FromUserRequirements(source=source, change=source, receivingDestination=source, swapBillDesired=swapBillToBuy, exchangeRate=exchangeRate)
 		CheckAndSend_FromAddress(tx)
 
 	elif args.action == 'complete_ltc_sell':

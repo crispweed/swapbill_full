@@ -267,7 +267,7 @@ class Test(unittest.TestCase):
 
 		source = b'alice'
 		tx = TransactionTypes.LTCBuyOffer()
-		tx.init_FromUserRequirements(source=source, swapBillAmountOffered=ToSatoshis(0.3), exchangeRate=0x80000000, receivingDestination=b'alice_LTC_Receive')
+		tx.init_FromUserRequirements(source=source, change=source, refund=source, swapBillAmountOffered=ToSatoshis(0.3), exchangeRate=0x80000000, receivingDestination=b'alice_LTC_Receive')
 		unspent = hostLayer.AllNonSwapBill(state._balances)
 		sourceSingleUnspent = hostLayer.SingleForAddress(source)
 		hostTX = Build_WithSourceAddress(TransactionFee.dustLimit, TransactionFee.baseFee, tx, sourceSingleUnspent, unspent, change)
@@ -281,14 +281,14 @@ class Test(unittest.TestCase):
 		self.assertEqual(state._LTCBuys.currentBestExchangeRate(), 0x80000000)
 		self.assertEqual(state._LTCBuys.currentBestExpiry(), 0xffffffff)
 		buyDetails = state._LTCBuys.peekCurrentBest()
-		self.assertDictEqual(buyDetails.__dict__, {'swapBillAmount': 30000000, 'ltcReceiveAddress': b'alice_LTC_Receive', 'swapBillAddress': b'alice'})
+		self.assertDictEqual(buyDetails.__dict__, {'swapBillAmount': 30000000, 'ltcReceiveAddress': b'alice_LTC_Receive', 'swapBillAddress': b'alice', 'refundAccount': b'alice'})
 		self.assertEqual(state._LTCSells.size(), 0)
 		self.assertEqual(len(state._pendingExchanges), 0)
 
 		## bob makes better offer, but with smaller amount
 
 		source = b'bob'
-		tx.init_FromUserRequirements(source=source, swapBillAmountOffered=ToSatoshis(0.1), exchangeRate=0x40000000, receivingDestination=b'bob_LTC_Receive')
+		tx.init_FromUserRequirements(source=source, change=source, refund=source, swapBillAmountOffered=ToSatoshis(0.1), exchangeRate=0x40000000, receivingDestination=b'bob_LTC_Receive')
 		#print('host unspent:')
 		#hostLayer.printUnspent()
 		unspent = hostLayer.AllNonSwapBill(state._balances)
@@ -314,7 +314,7 @@ class Test(unittest.TestCase):
 		self.assertEqual(state._LTCBuys.currentBestExpiry(), 0xffffffff)
 		buyDetails = state._LTCBuys.peekCurrentBest()
 		#print(buyDetails.__dict__.__repr__())
-		self.assertDictEqual(buyDetails.__dict__, {'swapBillAmount': 10000000, 'ltcReceiveAddress': b'bob_LTC_Receive', 'swapBillAddress': b'bob'})
+		self.assertDictEqual(buyDetails.__dict__, {'swapBillAmount': 10000000, 'ltcReceiveAddress': b'bob_LTC_Receive', 'swapBillAddress': b'bob', 'refundAccount': b'bob'})
 		self.assertEqual(state._LTCSells.size(), 0)
 		self.assertEqual(len(state._pendingExchanges), 0)
 
@@ -322,7 +322,7 @@ class Test(unittest.TestCase):
 
 		source = b'clive'
 		tx = TransactionTypes.LTCSellOffer()
-		tx.init_FromUserRequirements(source=source, swapBillDesired=ToSatoshis(0.1), exchangeRate=0x40000000)
+		tx.init_FromUserRequirements(source=source, change=source, receivingDestination=source, swapBillDesired=ToSatoshis(0.1), exchangeRate=0x40000000)
 		unspent = hostLayer.AllNonSwapBill(state._balances)
 		sourceSingleUnspent = hostLayer.SingleForAddress(source)
 		hostTX = Build_WithSourceAddress(TransactionFee.dustLimit, TransactionFee.baseFee, tx, sourceSingleUnspent, unspent, change)
@@ -337,7 +337,7 @@ class Test(unittest.TestCase):
 		self.assertEqual(state._LTCBuys.currentBestExpiry(), 0xffffffff)
 		buyDetails = state._LTCBuys.peekCurrentBest()
 		#print(buyDetails.__dict__.__repr__())
-		self.assertDictEqual(buyDetails.__dict__, {'swapBillAmount': 30000000, 'ltcReceiveAddress': b'alice_LTC_Receive', 'swapBillAddress': b'alice'})
+		self.assertDictEqual(buyDetails.__dict__, {'swapBillAmount': 30000000, 'ltcReceiveAddress': b'alice_LTC_Receive', 'swapBillAddress': b'alice', 'refundAccount': b'alice'})
 		self.assertEqual(state._LTCSells.size(), 0)
 		self.assertEqual(len(state._pendingExchanges), 1)
 		exchangeDetails = state._pendingExchanges[0]
@@ -349,7 +349,7 @@ class Test(unittest.TestCase):
 
 		source = b'bob'
 		tx = TransactionTypes.LTCBuyOffer()
-		tx.init_FromUserRequirements(source=source, swapBillAmountOffered=ToSatoshis(0.1), exchangeRate=0x40000000, receivingDestination=b'bob_LTC_Receive2')
+		tx.init_FromUserRequirements(source=source, change=source, refund=source, swapBillAmountOffered=ToSatoshis(0.1), exchangeRate=0x40000000, receivingDestination=b'bob_LTC_Receive2')
 		unspent = hostLayer.AllNonSwapBill(state._balances)
 		sourceSingleUnspent = hostLayer.SingleForAddress(source)
 		hostTX = Build_WithSourceAddress(TransactionFee.dustLimit, TransactionFee.baseFee, tx, sourceSingleUnspent, unspent, change)
@@ -365,7 +365,7 @@ class Test(unittest.TestCase):
 
 		source = b'dave'
 		tx = TransactionTypes.LTCSellOffer()
-		tx.init_FromUserRequirements(source=source, swapBillDesired=ToSatoshis(0.2), exchangeRate=0x45000000)
+		tx.init_FromUserRequirements(source=source, change=source, receivingDestination=source, swapBillDesired=ToSatoshis(0.2), exchangeRate=0x45000000)
 		unspent = hostLayer.AllNonSwapBill(state._balances)
 		sourceSingleUnspent = hostLayer.SingleForAddress(source)
 		hostTX = Build_WithSourceAddress(TransactionFee.dustLimit, TransactionFee.baseFee, tx, sourceSingleUnspent, unspent, change)
