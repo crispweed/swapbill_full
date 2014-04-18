@@ -125,6 +125,8 @@ class LTCExchangeCompletion(object):
 		self.amount = amount
 		i = hostTX.numberOfInputs() - 1
 		self.source = sourceLookup.getSourceFor(hostTX.inputTXID(i), hostTX.inputVOut(i))
+		## note that maxBlock is currently ignored here
+		## (could be required to be a specific value)
 		if hostTX.numberOfOutputs() >= 2:
 			self.destination = hostTX.outputPubKeyHash(1)
 			self.destinationAmount = hostTX.outputAmount(1)
