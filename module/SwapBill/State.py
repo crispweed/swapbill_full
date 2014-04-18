@@ -2,6 +2,11 @@ from __future__ import print_function
 import binascii
 from SwapBill import TradeOfferHeap, LTCTrading
 
+class InvalidTransactionParameters(Exception):
+	pass
+class InvalidTransactionType(Exception):
+	pass
+
 class BuyDetails(object):
 	pass
 class SellDetails(object):
@@ -220,41 +225,21 @@ class State(object):
 		self._subtractFromBalance(sourceAccount, amount)
 		self._totalForwarded += amount
 
-	#def create(self, amount):
-		#assert amount >= 0
-		#if amount == 0:
-			#return
-		#self._totalCreated += amount
-	#def undoCreate(self, amount):
-		#assert amount >= 0
-		#if amount == 0:
-			#return
-		#self._totalCreated -= amount
-
-
-	#def subtractFromBalance_Capped(self, address, amount):
-		#assert amount >= 0
-		#if amount == 0:
-			#return 0
-		#if not address in self._balances:
-			#return 0
-		#if self._balances[address] <= amount:
-			#cappedAmount = self._balances[address]
-			#self._balances.pop(address)
-			#return cappedAmount
-		#self._balances[address] -= amount
-		#return amount
-
-	#def forwardToFutureVersion(amount):
-		#self._totalForwarded += amount
-
-
-	#def addPendingExchange(self, exchange):
-		#exchange.expiry = self._currentBlockIndex + 50
-		#key = self._nextExchangeIndex
-		#self._nextExchangeIndex += 1
-		#self._pendingExchanges[key] = exchange
-
+	def checkTransactionWouldApplySuccessfully(self, transactionType, transactionDetails):
+		methodName = 'checkWouldApplySuccessfully_' + transactionType
+		try:
+			method = getattr(self, methodName)
+		except AttributeError as e:
+			raise InvalidTransactionType(e)
+		try:
+			return method(**transactionDetails)
+		except TypeError as e:
+			raise InvalidTransactionParameters(e)
+	def applyTransaction(self, transactionType, transactionDetails):
+		assert self.checkTransactionWouldApplySuccessfully(transactionType, transactionDetails) == (True, '')
+		methodName = 'apply_' + transactionType
+		method = getattr(self, methodName)
+		return method(**transactionDetails)
 
 	def totalAccountedFor(self):
 		result = 0
@@ -276,4 +261,5 @@ class State(object):
 		#print('+exchanges:', result)
 		result += self._totalForwarded
 		return result
+
 

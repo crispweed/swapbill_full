@@ -371,5 +371,33 @@ class Test(unittest.TestCase):
 		self.assertEqual(state.totalAccountedFor(), state._totalCreated)
 		self.assertEqual(state._balances, {'b': 60000000})
 
+	def test_state_transaction(self):
+		state = State.State(100, 'starthash')
+		transactionType = 'Burneeheeyooo'
+		transactionDetails = {'amount':1000, 'destinationAccount':'burnDestination'}
+		self.assertRaises(State.InvalidTransactionType, state.checkTransactionWouldApplySuccessfully, transactionType, transactionDetails)
+		transactionType = 'Burn'
+		transactionDetails = {'amount':1000, 'destinationAccount':'burnDestination', 'spuriousValue':'blah'}
+		self.assertRaises(State.InvalidTransactionParameters, state.checkTransactionWouldApplySuccessfully, transactionType, transactionDetails)
+		transactionDetails = {'amount':1000, 'destinationAccount':'burnDestination'}
+		result = state.checkTransactionWouldApplySuccessfully(transactionType, transactionDetails)
+		self.assertEqual(result, (True, ''))
+		self.assertEqual(state.totalAccountedFor(), state._totalCreated)
+		self.assertEqual(state._balances, {})
+		state.applyTransaction(transactionType, transactionDetails)
+		self.assertEqual(state.totalAccountedFor(), state._totalCreated)
+		self.assertEqual(state._balances, {'burnDestination': 1000})
+
+		#print(result)
+		#checkMethod = getattr(state, 'checkWouldApplySuccessfully_' + transactionName)
+		#result = checkMethod(**transactionDetails)
+		#print(result)
+		#transactionName = 'Transfer'
+		#transactionDetails = {'amount':1000, 'destinationAccount':'burnDestination'}
+		#checkMethod = getattr(state, 'checkWouldApplySuccessfully_' + transactionName)
+		#result = checkMethod(**transactionDetails)
+		#print(result)
+
+
 ## TODO tests for offer matching multiple other offers
 ## TODO - test for fail to complete due to expiry
