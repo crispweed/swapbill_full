@@ -7,10 +7,9 @@ prefix = b'SWB'
 formatStruct = struct.Struct('<BHLL')
 
 def Encode(transaction):
-	typeCode = transaction.typeCode
+	typeCode, amount, maxBlock, extraData = transaction.encode()
 	assert type(typeCode) is int
 	assert typeCode >= 0 and typeCode <= 0xff
-	amount, maxBlock, extraData = transaction.encode()
 	assert type(amount) is int
 	assert amount >= 0 and amount <= 0xffffffffffff
 	assert type(maxBlock) is int

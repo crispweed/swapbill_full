@@ -4,7 +4,7 @@ from SwapBill import ControlAddressEncoding
 
 class MockTransaction(object):
 	def encode(self):
-		return self.amount, self.maxBlock, self.extraData
+		return self.typeCode, self.amount, self.maxBlock, self.extraData
 
 def _checkDecode(address, transaction):
 	typeCode, amount, maxBlock, extraData = ControlAddressEncoding.Decode(address)

@@ -125,12 +125,12 @@ def Main(startBlockIndex, startBlockHash, commandLineArgs=sys.argv[1:], host=Non
 		try:
 			litecoinTX = BuildHostedTransaction.Build_WithSourceAddress(TransactionFee.dustLimit, transactionFee, tx, sourceSingleUnspent, backerUnspent, change)
 			txID = transactionBuildLayer.sendTransaction(litecoinTX)
-		except InsufficientTransactionFees:
+		except Host.InsufficientTransactionFees:
 			try:
 				transactionFee += TransactionFee.feeIncrement
 				litecoinTX = BuildHostedTransaction.Build_WithSourceAddress(TransactionFee.dustLimit, transactionFee, tx, sourceSingleUnspent, backerUnspent, change)
 				txID = transactionBuildLayer.sendTransaction(litecoinTX)
-			except InsufficientTransactionFees:
+			except Host.InsufficientTransactionFees:
 				raise Exception("Failed: Unexpected failure to meet transaction fee requirement. (Lots of dust inputs?)")
 		else:
 			print('Transaction sent with transactionID:', file=out)
@@ -224,7 +224,7 @@ def Main(startBlockIndex, startBlockHash, commandLineArgs=sys.argv[1:], host=Non
 				transactionFee += TransactionFee.feeIncrement
 				litecoinTX = BuildHostedTransaction.Build_FundedByAccount(TransactionFee.dustLimit, transactionFee, tx, unspent, change)
 				txID = transactionBuildLayer.sendTransaction(litecoinTX)
-			except InsufficientTransactionFees:
+			except Host.InsufficientTransactionFees:
 				print("Failed: Unexpected failure to meet transaction fee requirement. (Lots of dust inputs?)")
 		else:
 			print('Transaction sent with transactionID:', file=out)

@@ -5,7 +5,7 @@ from SwapBill.HostTransaction import AsData
 
 class MockTransaction(object):
 	def encode(self):
-		return self.amount, self.maxBlock, self.extraData
+		return self.typeCode, self.amount, self.maxBlock, self.extraData
 
 def AmountForInput(hostTX, i, unspent, sourceAddressSingleUnspent):
 	assert len(unspent[0]) == len(unspent[1])
