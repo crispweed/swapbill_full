@@ -72,3 +72,21 @@ class Test(unittest.TestCase):
 
 		info = GetStateInfo(host)
 		self.assertEqual(info['balances'], {"swapbill2": 1000001, "swapbill3": 1999999, "swapbill5": 300000000}) # swapbill5 gets deposit returned plus payment for ltc
+
+	def test_pay(self):
+		host = MockHost()
+		if os.path.exists(cacheFile):
+			os.remove(cacheFile)
+
+		host._addUnspent(100000000)
+		RunClient(host, ['burn', '--quantity', '1000000'])
+		RunClient(host, ['burn', '--quantity', '2000000'])
+		RunClient(host, ['burn', '--quantity', '3000000'])
+		info = GetStateInfo(host)
+		self.assertEqual(info['balances'], {"swapbill1": 1000000, "swapbill2": 2000000, "swapbill3": 3000000})
+
+		output = RunClient(host, ['pay', '--fromAddress', 'swapbill1', '--quantity', '1', '--toAddress', 'swapbill2', '--changeAddress', 'swapbill3'])
+		#print(output)
+		info = GetStateInfo(host)
+		self.assertEqual(info['balances'], {"swapbill2": 2000001, "swapbill3": 3999999})
+

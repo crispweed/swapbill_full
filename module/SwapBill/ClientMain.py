@@ -38,6 +38,12 @@ sp.add_argument('--fromAddress', required=True, help='pay from this address')
 sp.add_argument('--quantity', required=True, help='quantity of swapbill to be paid (in swapbill satoshis)')
 sp.add_argument('--toAddress', required=True, help='pay to this address')
 
+sp = subparsers.add_parser('pay', help='make a swapbill payment')
+sp.add_argument('--fromAddress', required=True, help='pay from this address')
+sp.add_argument('--quantity', required=True, help='quantity of swapbill to be paid (in swapbill satoshis)')
+sp.add_argument('--toAddress', required=True, help='pay to this address')
+sp.add_argument('--changeAddress', required=True, help='change from the payment is sent here')
+
 sp = subparsers.add_parser('post_ltc_buy', help='make an offer to buy litecoin with swapbill')
 sp.add_argument('--fromAddress', required=True, help='the address to fund the offer')
 sp.add_argument('--quantity', required=True, help='amount of swapbill offered')
@@ -166,6 +172,15 @@ def Main(startBlockIndex, startBlockHash, commandLineArgs=sys.argv[1:], host=Non
 		## TODO: add arg for block validity limit
 		transferTX.init_FromUserRequirements(source=source, amount=int(args.quantity), destination=destination)
 		CheckAndSend_FromAddress(transferTX)
+
+	elif args.action == 'pay':
+		source = CheckAndReturnPubKeyHash(args.fromAddress)
+		destination = CheckAndReturnPubKeyHash(args.toAddress)
+		change = CheckAndReturnPubKeyHash(args.changeAddress)
+		tx = TransactionTypes.Pay()
+		## TODO: add arg for block validity limit
+		tx.init_FromUserRequirements(source=source, amount=int(args.quantity), destination=destination, change=change)
+		CheckAndSend_FromAddress(tx)
 
 	elif args.action == 'post_ltc_buy':
 		source = CheckAndReturnPubKeyHash(args.fromAddress)
