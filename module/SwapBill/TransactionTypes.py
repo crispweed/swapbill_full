@@ -144,6 +144,31 @@ class LTCExchangeCompletion(object):
 	def details(self):
 		return {'pendingExchangeIndex':self._pendingExchangeIndex, 'destinationAccount':self.destination, 'destinationAmount':self.destinationAmount}
 
+class Pay(object):
+	typeCode = 5
+	def init_FromUserRequirements(self, source, amount, destination, change, maxBlock=0xffffffff):
+		assert type(amount) is int
+		assert amount > 0
+		self.source = source
+		self.destination = destination
+		self.amount = amount
+		self._maxBlock = maxBlock
+		self.destination2 = change
+	def init_DuringDecoding(self, amount, maxBlock, extraData, hostTX, sourceLookup):
+		self.amount = amount
+		self._maxBlock = maxBlock
+		i = hostTX.numberOfInputs() - 1
+		self.source = sourceLookup.getSourceFor(hostTX.inputTXID(i), hostTX.inputVOut(i))
+		if hostTX.numberOfOutputs() < 3:
+			raise NotValidSwapBillTransaction()
+		self.destination = hostTX.outputPubKeyHash(1)
+		self.destination2 = hostTX.outputPubKeyHash(2)
+	def encode(self):
+		return self.amount, self._maxBlock, struct.pack("<B", 0) * 6
+	def details(self):
+		return {'sourceAccount':self.source, 'amount':self.amount, 'destinationAccount':self.destination, 'changeAccount':self.destination, 'maxBlock':self._maxBlock}
+
+
 class ForwardToFutureVersion(object):
 	## this transaction is designed to be created only during decoding
 	## (and so omits some stuff found in other transaction types)
@@ -167,6 +192,8 @@ def _decode(typeCode, amount, maxBlock, extraData, hostTX, sourceLookup):
 		result = LTCSellOffer()
 	elif typeCode == LTCExchangeCompletion.typeCode:
 		result = LTCExchangeCompletion()
+	elif typeCode == Pay.typeCode:
+		result = Pay()
 	elif typeCode < 128:
 		return ForwardToFutureVersion()
 	else:

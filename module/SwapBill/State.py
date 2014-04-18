@@ -130,6 +130,26 @@ class State(object):
 		self._subtractFromBalance(sourceAccount, amount)
 		self._addToBalance(destinationAccount, amount)
 
+	def checkWouldApplySuccessfully_Pay(self, sourceAccount, amount, destinationAccount, changeAccount, maxBlock):
+		assert type(amount) is int
+		assert amount > 0
+		if maxBlock < self._currentBlockIndex:
+			return False, 'max block for transaction has been exceeded'
+		available = self._balances.get(sourceAccount, 0)
+		if available < amount:
+			return False, 'insufficient balance in source account (transaction ignored)'
+		return True, ''
+	def apply_Pay(self, sourceAccount, amount, destinationAccount, changeAccount, maxBlock):
+		if maxBlock < self._currentBlockIndex:
+			return
+		available = self._balances.get(sourceAccount, 0)
+		if available < amount:
+			return
+		self._subtractFromBalance(sourceAccount, available)
+		self._addToBalance(destinationAccount, amount)
+		if available > amount:
+			self._addToBalance(changeAccount, available - amount)
+
 	def checkWouldApplySuccessfully_LTCBuyOffer(self, sourceAccount, swapBillOffered, exchangeRate, expiry, receivingAccount, maxBlock):
 		assert type(swapBillOffered) is int
 		assert swapBillOffered > 0
