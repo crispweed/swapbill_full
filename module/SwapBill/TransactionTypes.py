@@ -8,9 +8,6 @@ class UnsupportedTransaction(Exception):
 class NotValidSwapBillTransaction(Exception):
 	pass
 
-class Transaction(object):
-	pass
-
 class Burn(object):
 	typeCode = 0
 	def init_FromUserRequirements(self, burnAmount, target):
