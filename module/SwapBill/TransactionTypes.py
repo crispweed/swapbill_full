@@ -1,6 +1,5 @@
 from __future__ import print_function
 import struct, binascii
-#import sys, inspect
 from SwapBill import ControlAddressEncoding, Address
 
 class UnsupportedTransaction(Exception):
@@ -25,11 +24,7 @@ class Burn(object):
 	def encode(self):
 		return 0, 0, struct.pack("<B", 0) * 6
 	def details(self):
-		return {'amount':self.controlAddressAmount, 'destination':self.destination}
-	#def checkWouldApplySuccessfully(self, state):
-		#return state.checkWouldApplySuccessfully_Burn(self.controlAddressAmount, self.destination)
-	#def apply(self, state):
-		#state.apply_Burn(self.controlAddressAmount, self.destination)
+		return {'amount':self.controlAddressAmount, 'destinationAccount':self.destination}
 	def __str__(self):
 		return 'burn {} with credit to {}'.format(self.controlAddressAmount, binascii.hexlify(self.destination).decode())
 
@@ -53,11 +48,7 @@ class Transfer(object):
 	def encode(self):
 		return self.amount, self._maxBlock, struct.pack("<B", 0) * 6
 	def details(self):
-		return {'source':self.source, 'amount':self.amount, 'destination':self.destination}
-	#def checkWouldApplySuccessfully(self, state):
-		#return state.checkWouldApplySuccessfully_Transfer(self.source, self.amount, self.destination)
-	#def apply(self, state):
-		#state.apply_Transfer(self.source, self.amount, self.destination)
+		return {'sourceAccount':self.source, 'amount':self.amount, 'destinationAccount':self.destination}
 	def __str__(self):
 		result = 'transfer {} from {} to {}'.format(self.amount, binascii.hexlify(self.source).decode(), binascii.hexlify(self.destination).decode())
 		return result
@@ -94,19 +85,7 @@ class LTCBuyOffer(object):
 			expiry = 0xffffffff
 		else:
 			expiry = self._maxBlock + self._offerMaxBlockOffset
-		return {'source':self.source, 'swapBillOffered':self.amount, 'exchangeRate':self._exchangeRate, 'expiry':expiry, 'receivingAccount':self.destination}
-	#def checkWouldApplySuccessfully(self, state):
-		#if self._maxBlock >= 0xffffffff - self._offerMaxBlockOffset:
-			#expiry = 0xffffffff
-		#else:
-			#expiry = self._maxBlock + self._offerMaxBlockOffset
-		#return state.checkWouldApplySuccessfully_LTCBuyOffer(self.source, self.amount, self._exchangeRate, expiry, self.destination)
-	#def apply(self, state):
-		#if self._maxBlock >= 0xffffffff - self._offerMaxBlockOffset:
-			#expiry = 0xffffffff
-		#else:
-			#expiry = self._maxBlock + self._offerMaxBlockOffset
-		#return state.apply_LTCBuyOffer(self.source, self.amount, self._exchangeRate, expiry, self.destination)
+		return {'sourceAccount':self.source, 'swapBillOffered':self.amount, 'exchangeRate':self._exchangeRate, 'expiry':expiry, 'receivingAccount':self.destination}
 	def __str__(self):
 		result = 'LTC buy offer from {} funded with {} swapbill, exchange rate {}, receiving LTC at {}, maxBlock offset {}'.format(binascii.hexlify(self.source).decode(), self.amount, self._exchangeRate, binascii.hexlify(self.destination).decode(), self._offerMaxBlockOffset)
 		return result
@@ -140,19 +119,7 @@ class LTCSellOffer(object):
 			expiry = 0xffffffff
 		else:
 			expiry = self._maxBlock + self._offerMaxBlockOffset
-		return {'source':self.source, 'swapBillDesired':self.amount, 'exchangeRate':self._exchangeRate, 'expiry':expiry}
-	#def checkWouldApplySuccessfully(self, state):
-		#if self._maxBlock >= 0xffffffff - self._offerMaxBlockOffset:
-			#expiry = 0xffffffff
-		#else:
-			#expiry = self._maxBlock + self._offerMaxBlockOffset
-		#return state.checkWouldApplySuccessfully_LTCSellOffer(self.source, self.amount, self._exchangeRate, expiry)
-	#def apply(self, state):
-		#if self._maxBlock >= 0xffffffff - self._offerMaxBlockOffset:
-			#expiry = 0xffffffff
-		#else:
-			#expiry = self._maxBlock + self._offerMaxBlockOffset
-		#return state.apply_LTCSellOffer(self.source, self.amount, self._exchangeRate, expiry)
+		return {'sourceAccount':self.source, 'swapBillDesired':self.amount, 'exchangeRate':self._exchangeRate, 'expiry':expiry}
 	def __str__(self):
 		result = 'LTC sell offer from {}, for {} swapbill, exchange rate {}, maxBlock offset {}'.format(binascii.hexlify(self.source).decode(), self.amount, self._exchangeRate, self._offerMaxBlockOffset)
 		return result
@@ -167,7 +134,6 @@ class LTCExchangeCompletion(object):
 		self._maxBlock = maxBlock
 		self._pendingExchangeIndex = pendingExchangeIndex
 	def init_DuringDecoding(self, amount, maxBlock, extraData, hostTX, sourceLookup):
-		#print('LTCExchangeCompletion being decoded')
 		self.amount = amount
 		self._maxBlock = maxBlock
 		i = hostTX.numberOfInputs() - 1
@@ -187,11 +153,7 @@ class LTCExchangeCompletion(object):
 		high = (self._pendingExchangeIndex >> 16)
 		return self.amount, self._maxBlock, self._formatStruct.pack(low, high)
 	def details(self):
-		return {'pendingExchangeIndex':self._pendingExchangeIndex, 'destination':self.destination, 'destinationAmount':self.destinationAmount}
-	#def checkWouldApplySuccessfully(self, state):
-		#return state.checkWouldApplySuccessfully_LTCExchangeCompletion(self._pendingExchangeIndex, self.destination, self.destinationAmount)
-	#def apply(self, state):
-		#return state.apply_LTCExchangeCompletion(self._pendingExchangeIndex, self.destination, self.destinationAmount)
+		return {'pendingExchangeIndex':self._pendingExchangeIndex, 'destinationAccount':self.destination, 'destinationAmount':self.destinationAmount}
 	def __str__(self):
 		result = 'LTC exchange completion payment for pending exchange index {} of {} LTC to {}'.format(self._pendingExchangeIndex, self.destinationAmount, binascii.hexlify(self.destination).decode())
 		return result
@@ -205,18 +167,13 @@ class ForwardToFutureVersion(object):
 		i = hostTX.numberOfInputs() - 1
 		self.source = sourceLookup.getSourceFor(hostTX.inputTXID(i), hostTX.inputVOut(i))
 	def details(self):
-		return {'source':self.source, 'amount':self.amount}
-	#def apply(self, state):
-		#return state.apply_ForwardToFutureNetworkVersion(self.source, self.amount)
+		return {'sourceAccount':self.source, 'amount':self.amount}
 	def __str__(self):
 		result = '{} forwarded from {} to future network version (no longer accessible from this network version)'.format(self.amount, binascii.hexlify(self.source).decode())
 		return result
 
 def _decode(typeCode, amount, maxBlock, extraData, hostTX, sourceLookup):
 	assert typeCode >= 0
-	#for transactionClass in (Burn, Transfer):
-		#if typeCode == transactionClass.typeCode:
-			#result = transactionClass
 	if typeCode == Burn.typeCode:
 		result = Burn()
 	elif typeCode == Transfer.typeCode:
