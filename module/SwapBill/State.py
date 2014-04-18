@@ -110,23 +110,27 @@ class State(object):
 		else:
 			self._balances[destinationAccount] = amount
 
-	def checkWouldApplySuccessfully_Transfer(self, sourceAccount, amount, destinationAccount):
+	def checkWouldApplySuccessfully_Transfer(self, sourceAccount, amount, destinationAccount, maxBlock):
 		assert type(amount) is int
 		assert amount > 0
+		if maxBlock < self._currentBlockIndex:
+			return False, 'max block for transaction has been exceeded'
 		available = self._balances.get(sourceAccount, 0)
 		if available >= amount:
 			return True, ''
 		if available > 0:
 			return False, 'insufficient balance in source account (transfer capped)'
 		return False, 'source account balance is 0'
-	def apply_Transfer(self, sourceAccount, amount, destinationAccount):
+	def apply_Transfer(self, sourceAccount, amount, destinationAccount, maxBlock):
+		if maxBlock < self._currentBlockIndex:
+			return
 		available = self._balances.get(sourceAccount, 0)
 		if amount > available:
 			amount = available
 		self._subtractFromBalance(sourceAccount, amount)
 		self._addToBalance(destinationAccount, amount)
 
-	def checkWouldApplySuccessfully_LTCBuyOffer(self, sourceAccount, swapBillOffered, exchangeRate, expiry, receivingAccount):
+	def checkWouldApplySuccessfully_LTCBuyOffer(self, sourceAccount, swapBillOffered, exchangeRate, expiry, receivingAccount, maxBlock):
 		assert type(swapBillOffered) is int
 		assert swapBillOffered > 0
 		assert type(exchangeRate) is int
@@ -139,7 +143,9 @@ class State(object):
 		if not LTCTrading.SatisfiesMinimumExchange(exchangeRate, swapBillOffered):
 			return False, 'does not satisfy minimum exchange amount (offer not posted)'
 		return True, ''
-	def apply_LTCBuyOffer(self, sourceAccount, swapBillOffered, exchangeRate, expiry, receivingAccount):
+	def apply_LTCBuyOffer(self, sourceAccount, swapBillOffered, exchangeRate, expiry, receivingAccount, maxBlock):
+		if maxBlock < self._currentBlockIndex:
+			return
 		if self._balances.get(sourceAccount, 0) < swapBillOffered:
 			return
 		if not LTCTrading.SatisfiesMinimumExchange(exchangeRate, swapBillOffered):
@@ -152,7 +158,7 @@ class State(object):
 		self._LTCBuys.addOffer(exchangeRate, expiry, buyDetails)
 		self._matchLTC()
 
-	def checkWouldApplySuccessfully_LTCSellOffer(self, sourceAccount, swapBillDesired, exchangeRate, expiry):
+	def checkWouldApplySuccessfully_LTCSellOffer(self, sourceAccount, swapBillDesired, exchangeRate, expiry, maxBlock):
 		assert type(swapBillDesired) is int
 		assert swapBillDesired > 0
 		assert type(exchangeRate) is int
@@ -160,13 +166,17 @@ class State(object):
 		assert exchangeRate < 0x100000000
 		assert type(expiry) is int
 		assert expiry > 0
+		if maxBlock < self._currentBlockIndex:
+			return False, 'max block for transaction has been exceeded'
 		swapBillDeposit = swapBillDesired // LTCTrading.depositDivisor
 		if self._balances.get(sourceAccount, 0) < swapBillDeposit:
 			return False, 'insufficient balance for deposit in source account (offer not posted)'
 		if not LTCTrading.SatisfiesMinimumExchange(exchangeRate, swapBillDesired):
 			return False, 'does not satisfy minimum exchange amount (offer not posted)'
 		return True, ''
-	def apply_LTCSellOffer(self, sourceAccount, swapBillDesired, exchangeRate, expiry):
+	def apply_LTCSellOffer(self, sourceAccount, swapBillDesired, exchangeRate, expiry, maxBlock):
+		if maxBlock < self._currentBlockIndex:
+			return
 		swapBillDeposit = swapBillDesired // LTCTrading.depositDivisor
 		if self._balances.get(sourceAccount, 0) < swapBillDeposit:
 			return
@@ -209,16 +219,20 @@ class State(object):
 		self._addToBalance(exchangeDetails.sellerAddress, exchangeDetails.swapBillAmount + exchangeDetails.swapBillDeposit)
 		self._pendingExchanges.pop(pendingExchangeIndex)
 
-	def checkWouldApplySuccessfully_ForwardToFutureNetworkVersion(self, sourceAccount, amount):
+	def checkWouldApplySuccessfully_ForwardToFutureNetworkVersion(self, sourceAccount, amount, maxBlock):
 		assert type(amount) is int
 		assert amount > 0
+		if maxBlock < self._currentBlockIndex:
+			return False, 'max block for transaction has been exceeded'
 		available = self._balances.get(sourceAccount, 0)
 		if available >= amount:
 			return True, ''
 		if available > 0:
 			return False, 'insufficient balance in source account (amount capped)'
 		return False, 'source account balance is 0'
-	def apply_ForwardToFutureNetworkVersion(self, sourceAccount, amount):
+	def apply_ForwardToFutureNetworkVersion(self, sourceAccount, amount, maxBlock):
+		if maxBlock < self._currentBlockIndex:
+			return
 		available = self._balances.get(sourceAccount, 0)
 		if amount > available:
 			amount = available

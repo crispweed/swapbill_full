@@ -46,7 +46,7 @@ class Transfer(object):
 	def encode(self):
 		return self.amount, self._maxBlock, struct.pack("<B", 0) * 6
 	def details(self):
-		return {'sourceAccount':self.source, 'amount':self.amount, 'destinationAccount':self.destination}
+		return {'sourceAccount':self.source, 'amount':self.amount, 'destinationAccount':self.destination, 'maxBlock':self._maxBlock}
 
 class LTCBuyOffer(object):
 	typeCode = 2
@@ -80,7 +80,7 @@ class LTCBuyOffer(object):
 			expiry = 0xffffffff
 		else:
 			expiry = self._maxBlock + self._offerMaxBlockOffset
-		return {'sourceAccount':self.source, 'swapBillOffered':self.amount, 'exchangeRate':self._exchangeRate, 'expiry':expiry, 'receivingAccount':self.destination}
+		return {'sourceAccount':self.source, 'swapBillOffered':self.amount, 'exchangeRate':self._exchangeRate, 'expiry':expiry, 'receivingAccount':self.destination, 'maxBlock':self._maxBlock}
 
 class LTCSellOffer(object):
 	typeCode = 3
@@ -111,20 +111,18 @@ class LTCSellOffer(object):
 			expiry = 0xffffffff
 		else:
 			expiry = self._maxBlock + self._offerMaxBlockOffset
-		return {'sourceAccount':self.source, 'swapBillDesired':self.amount, 'exchangeRate':self._exchangeRate, 'expiry':expiry}
+		return {'sourceAccount':self.source, 'swapBillDesired':self.amount, 'exchangeRate':self._exchangeRate, 'expiry':expiry, 'maxBlock':self._maxBlock}
 
 class LTCExchangeCompletion(object):
 	typeCode = 4
 	_formatStruct = struct.Struct('<HL')
-	def init_FromUserRequirements(self, ltcAmount, destination, pendingExchangeIndex, maxBlock=0xffffffff):
+	def init_FromUserRequirements(self, ltcAmount, destination, pendingExchangeIndex):
 		self.amount = 0
 		self.destination = destination
 		self.destinationAmount = ltcAmount
-		self._maxBlock = maxBlock
 		self._pendingExchangeIndex = pendingExchangeIndex
 	def init_DuringDecoding(self, amount, maxBlock, extraData, hostTX, sourceLookup):
 		self.amount = amount
-		self._maxBlock = maxBlock
 		i = hostTX.numberOfInputs() - 1
 		self.source = sourceLookup.getSourceFor(hostTX.inputTXID(i), hostTX.inputVOut(i))
 		if hostTX.numberOfOutputs() >= 2:
@@ -140,7 +138,7 @@ class LTCExchangeCompletion(object):
 	def encode(self):
 		low = (self._pendingExchangeIndex & 0xffff)
 		high = (self._pendingExchangeIndex >> 16)
-		return self.amount, self._maxBlock, self._formatStruct.pack(low, high)
+		return self.amount, 0xffffffff, self._formatStruct.pack(low, high)
 	def details(self):
 		return {'pendingExchangeIndex':self._pendingExchangeIndex, 'destinationAccount':self.destination, 'destinationAmount':self.destinationAmount}
 
