@@ -157,7 +157,7 @@ class State(object):
 		assert exchangeRate > 0
 		assert exchangeRate < 0x100000000
 		assert type(maxBlockOffset) is int
-		assert maxBlockOffset > 0
+		assert maxBlockOffset >= 0
 		if maxBlock < self._currentBlockIndex:
 			return False, 'max block for transaction has been exceeded'
 		if self._balances.get(sourceAccount, 0) < swapBillOffered:
@@ -194,7 +194,7 @@ class State(object):
 		assert exchangeRate > 0
 		assert exchangeRate < 0x100000000
 		assert type(maxBlockOffset) is int
-		assert maxBlockOffset > 0
+		assert maxBlockOffset >= 0
 		if maxBlock < self._currentBlockIndex:
 			return False, 'max block for transaction has been exceeded'
 		swapBillDeposit = swapBillDesired // LTCTrading.depositDivisor
