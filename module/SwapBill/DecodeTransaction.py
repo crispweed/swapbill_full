@@ -1,7 +1,7 @@
 from __future__ import print_function
 import binascii
 #from SwapBill import HostTransaction
-from SwapBill import RawTransaction
+from SwapBill import RawTransaction, HostTransaction
 #from SwapBill.Amounts import ToSatoshis
 
 #class NotValidSwapBillTransaction(Exception):
