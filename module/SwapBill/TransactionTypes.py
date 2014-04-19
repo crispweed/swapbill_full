@@ -7,58 +7,132 @@ class UnsupportedTransaction(Exception):
 class NotValidSwapBillTransaction(Exception):
 	pass
 
+_mappingByTypeCode = (
+    ('Burn', None, ((0, 16), 'amount'), ('destinationAccount', None)),
+    ('Pay', 'sourceAccount', (('amount', 6, 'maxBlock', 4, None, 6), None), ('changeAccount', None), ('destinationAccount', None)),
+    ('LTCBuyOffer',
+     'sourceAccount',
+     (('swapBillOffered', 6, 'maxBlock', 4, 'exchangeRate', 4, 'maxBlockOffset', 2), None),
+     ('changeAccount', None), ('receivingAccount', None), ('refundAccount', None)
+	),
+    ('LTCSellOffer',
+     'sourceAccount',
+     (('swapBillDesired', 6, 'maxBlock', 4, 'exchangeRate', 4, 'maxBlockOffset', 2), None),
+     ('changeAccount', None), ('receivingAccount', None)
+	),
+    ('LTCExchangeCompletion', None, (('pendingExchangeIndex', 6, None, 10), None), ('destinationAccount', 'destinationAmount')),
+	)
+
+_forwardCompatibilityMapping = ('ForwardToFutureNetworkVersion', None, ('amount', 6, 'maxBlock', 4, None, 6), ('changeAccount', None))
+
+def _decodeInt(data):
+	multiplier = 1
+	result = 0
+	for i in range(len(data)):
+		byteValue = struct.unpack('<B', data[i:i + 1])[0]
+		result += byteValue * multiplier
+		multiplier = multiplier << 8
+	return result
+
+def _encodeInt(value, numberOfBytes):
+	result = b''
+	for i in range(numberOfBytes):
+		byteValue = value & 255
+		value = value // 256
+		result += struct.pack('<B', byteValue)
+	assert value == 0
+	return result
+
 def ToStateTransaction(sourceLookup, tx):
-	typeCode, amount, maxBlock, extraData = ControlAddressEncoding.Decode(tx.outputPubKeyHash(0))
-	exchangeRate, maxBlockOffset = struct.unpack('<LH', extraData)
-	try:
-		if typeCode == 0:
-			return 'Burn', {'amount':tx.outputAmount(0), 'destinationAccount':tx.outputPubKeyHash(1)}
-		if typeCode == 1:
-			return 'Pay', {
-			    'sourceAccount':sourceLookup.first(tx), 'amount':amount,
-			    'destinationAccount':tx.outputPubKeyHash(1), 'changeAccount':tx.outputPubKeyHash(2),
-			    'maxBlock':maxBlock
-				}
-		if typeCode == 2: # reuses source address
-			return 'Pay', {
-			    'sourceAccount':sourceLookup.first(tx), 'amount':amount,
-			    'destinationAccount':tx.outputPubKeyHash(1), 'changeAccount':sourceLookup.first(tx),
-			    'maxBlock':maxBlock
-				}
-		if typeCode == 3:
-			return 'LTCBuyOffer', {
-			    'sourceAccount':sourceLookup.first(tx), 'swapBillOffered':amount,
-			    'receivingAccount':tx.outputPubKeyHash(1), 'changeAccount':tx.outputPubKeyHash(2), 'refundAccount':tx.outputPubKeyHash(3),
-			    'exchangeRate':exchangeRate, 'maxBlockOffset':maxBlockOffset, 'maxBlock':maxBlock
-				}
-		if typeCode == 4: # reuses source address
-			return 'LTCBuyOffer', {
-			    'sourceAccount':sourceLookup.first(tx), 'swapBillOffered':amount,
-			    'receivingAccount':tx.outputPubKeyHash(1), 'changeAccount':sourceLookup.first(tx), 'refundAccount':sourceLookup.first(tx),
-			    'exchangeRate':exchangeRate, 'maxBlockOffset':maxBlockOffset, 'maxBlock':maxBlock
-				}
-		if typeCode == 5:
-			return 'LTCSellOffer', {
-			    'sourceAccount':sourceLookup.first(tx), 'swapBillDesired':amount,
-			    'receivingAccount':tx.outputPubKeyHash(1), 'changeAccount':tx.outputPubKeyHash(2),
-			    'exchangeRate':exchangeRate, 'maxBlockOffset':maxBlockOffset, 'maxBlock':maxBlock
-				}
-		if typeCode == 6: # reuses source address
-			return 'LTCSellOffer', {
-			    'sourceAccount':sourceLookup.first(tx), 'swapBillDesired':amount,
-			    'receivingAccount':tx.outputPubKeyHash(1), 'changeAccount':sourceLookup.first(tx),
-			    'exchangeRate':exchangeRate, 'maxBlockOffset':maxBlockOffset, 'maxBlock':maxBlock
-				}
-		if typeCode == 7:
-			low, high = struct.unpack('<HL', extraData)
-			pendingExchangeIndex = (high << 16) + low
-			return 'LTCExchangeCompletion', {'pendingExchangeIndex':pendingExchangeIndex, 'destinationAccount':tx.outputPubKeyHash(1), 'destinationAmount':tx.outputAmount(1)}
-		if typeCode < 128:
-			return 'ForwardToFutureNetworkVersion', {'sourceAccount':sourceLookup.first(tx), 'amount':amount, 'maxBlock':maxBlock}
-	except IndexError:
-		raise NotValidSwapBillTransaction()
+	controlAddressData = tx.outputPubKeyHash(0)
+	assert controlAddressData.startswith(b'SWB')
+	typeCode = _decodeInt(controlAddressData[3:4])
+	if typeCode < len(_mappingByTypeCode):
+		mapping = _mappingByTypeCode[typeCode]
+	elif typeCode < 128:
+		mapping = _forwardCompatibilityMapping
 	else:
 		raise UnsupportedTransaction()
+	transactionType = mapping[0]
+	details = {}
+	if mapping[1] is not None:
+		details[mapping[1]] = sourceLookup.first(tx)
+	controlAddressMapping, amountMapping = mapping[2]
+	pos = 4
+	for i in range(len(controlAddressMapping) // 2):
+		valueMapping = controlAddressMapping[i * 2]
+		numberOfBytes = controlAddressMapping[i * 2 + 1]
+		data = controlAddressData[pos:pos + numberOfBytes]
+		if valueMapping == 0:
+			if data != struct.pack('<B', 0) * numberOfBytes:
+				raise NotValidSwapBillTransaction
+		elif valueMapping is not None:
+			details[valueMapping] = _decodeInt(data)
+		pos += numberOfBytes
+	assert pos == 20
+	if amountMapping is not None:
+		details[amountMapping] = tx.outputAmount(0)
+	for i in range(len(mapping) - 3):
+		addressMapping, amountMapping = mapping[3 + i]
+		assert addressMapping is not None
+		if addressMapping is not None:
+			details[addressMapping] = tx.outputPubKeyHash(1 + i)
+		if amountMapping is not None:
+			details[amountMapping] = tx.outputAmount(1 + i)
+	return transactionType, details
+
+#def ToStateTransaction(sourceLookup, tx):
+	#typeCode, amount, maxBlock, extraData = ControlAddressEncoding.Decode(tx.outputPubKeyHash(0))
+	#exchangeRate, maxBlockOffset = struct.unpack('<LH', extraData)
+	#try:
+		#if typeCode == 0:
+			#return 'Burn', {'amount':tx.outputAmount(0), 'destinationAccount':tx.outputPubKeyHash(1)}
+		#if typeCode == 1:
+			#return 'Pay', {
+				#'sourceAccount':sourceLookup.first(tx), 'amount':amount,
+				#'destinationAccount':tx.outputPubKeyHash(1), 'changeAccount':tx.outputPubKeyHash(2),
+				#'maxBlock':maxBlock
+			#}
+		#if typeCode == 2: # reuses source address
+			#return 'Pay', {
+				#'sourceAccount':sourceLookup.first(tx), 'amount':amount,
+				#'destinationAccount':tx.outputPubKeyHash(1), 'changeAccount':sourceLookup.first(tx),
+				#'maxBlock':maxBlock
+			#}
+		#if typeCode == 3:
+			#return 'LTCBuyOffer', {
+				#'sourceAccount':sourceLookup.first(tx), 'swapBillOffered':amount,
+				#'receivingAccount':tx.outputPubKeyHash(1), 'changeAccount':tx.outputPubKeyHash(2), 'refundAccount':tx.outputPubKeyHash(3),
+				#'exchangeRate':exchangeRate, 'maxBlockOffset':maxBlockOffset, 'maxBlock':maxBlock
+			#}
+		#if typeCode == 4: # reuses source address
+			#return 'LTCBuyOffer', {
+				#'sourceAccount':sourceLookup.first(tx), 'swapBillOffered':amount,
+				#'receivingAccount':tx.outputPubKeyHash(1), 'changeAccount':sourceLookup.first(tx), 'refundAccount':sourceLookup.first(tx),
+				#'exchangeRate':exchangeRate, 'maxBlockOffset':maxBlockOffset, 'maxBlock':maxBlock
+			#}
+		#if typeCode == 5:
+			#return 'LTCSellOffer', {
+				#'sourceAccount':sourceLookup.first(tx), 'swapBillDesired':amount,
+				#'receivingAccount':tx.outputPubKeyHash(1), 'changeAccount':tx.outputPubKeyHash(2),
+				#'exchangeRate':exchangeRate, 'maxBlockOffset':maxBlockOffset, 'maxBlock':maxBlock
+			#}
+		#if typeCode == 6: # reuses source address
+			#return 'LTCSellOffer', {
+				#'sourceAccount':sourceLookup.first(tx), 'swapBillDesired':amount,
+				#'receivingAccount':tx.outputPubKeyHash(1), 'changeAccount':sourceLookup.first(tx),
+				#'exchangeRate':exchangeRate, 'maxBlockOffset':maxBlockOffset, 'maxBlock':maxBlock
+			#}
+		#if typeCode == 7:
+			#low, high = struct.unpack('<HL', extraData)
+			#pendingExchangeIndex = (high << 16) + low
+			#return 'LTCExchangeCompletion', {'pendingExchangeIndex':pendingExchangeIndex, 'destinationAccount':tx.outputPubKeyHash(1), 'destinationAmount':tx.outputAmount(1)}
+		#if typeCode < 128:
+			#return 'ForwardToFutureNetworkVersion', {'sourceAccount':sourceLookup.first(tx), 'amount':amount, 'maxBlock':maxBlock}
+	#except IndexError:
+		#raise NotValidSwapBillTransaction()
+	#else:
+		#raise UnsupportedTransaction()
 
 def _addInput(tx, inputProvider, sourceAccount):
 	txID, vout = inputProvider.lookupUnspentFor(sourceAccount)
@@ -66,60 +140,92 @@ def _addInput(tx, inputProvider, sourceAccount):
 
 def FromStateTransaction(transactionType, details, inputProvider):
 	tx = HostTransaction.InMemoryTransaction()
-	if transactionType == 'Burn':
-		controlAddress = ControlAddressEncoding.Encode(0, 0, 0, struct.pack("<B", 0) * 6)
-		tx.addOutput(controlAddress, details['amount'])
-		tx.addOutput(details['destinationAccount'])
-	elif transactionType == 'Pay':
-		source = details['sourceAccount']
-		change = details['changeAccount']
-		typeCode = 1
-		if change == source:
-			typeCode += 1
-		controlAddress = ControlAddressEncoding.Encode(typeCode, details['amount'], details['maxBlock'], struct.pack("<B", 0) * 6)
-		tx.addOutput(controlAddress)
-		tx.addOutput(details['destinationAccount'])
-		if change != source:
-			tx.addOutput(change)
-		_addInput(tx, inputProvider, source)
-	elif transactionType == 'LTCBuyOffer':
-		source = details['sourceAccount']
-		change = details['changeAccount']
-		refund = details['refundAccount']
-		typeCode = 3
-		if change == source and refund == source:
-			typeCode += 1
-		extraData = struct.pack('<LH', details['exchangeRate'], details['maxBlockOffset'])
-		controlAddress = ControlAddressEncoding.Encode(typeCode, details['swapBillOffered'], details['maxBlock'], extraData)
-		tx.addOutput(controlAddress)
-		tx.addOutput(details['receivingAccount'])
-		if typeCode == 3:
-			tx.addOutput(change)
-			tx.addOutput(refund)
-		_addInput(tx, inputProvider, source)
-	elif transactionType == 'LTCSellOffer':
-		source = details['sourceAccount']
-		change = details['changeAccount']
-		typeCode = 5
-		if change == source:
-			typeCode += 1
-		extraData = struct.pack('<LH', details['exchangeRate'], details['maxBlockOffset'])
-		controlAddress = ControlAddressEncoding.Encode(typeCode, details['swapBillDesired'], details['maxBlock'], extraData)
-		tx.addOutput(controlAddress)
-		tx.addOutput(details['receivingAccount'])
-		if typeCode == 5:
-			tx.addOutput(change)
-		_addInput(tx, inputProvider, source)
-	elif transactionType == 'LTCExchangeCompletion':
-		low = (details['pendingExchangeIndex'] & 0xffff)
-		high = (details['pendingExchangeIndex'] >> 16)
-		extraData = struct.pack('<HL', low, high)
-		controlAddress = ControlAddressEncoding.Encode(7, 0, 0xffffffff, extraData)
-		tx.addOutput(controlAddress)
-		tx.addOutput(details['destinationAccount'])
+	for i in range(len(_mappingByTypeCode)):
+		if transactionType == _mappingByTypeCode[i][0]:
+			mapping = _mappingByTypeCode[i]
+			typeCode = i
+			break
+	if mapping[1] is not None:
+		_addInput(tx, inputProvider, details[mapping[1]])
+	controlAddressMapping, amountMapping = mapping[2]
+	controlAddressData = b'SWB' + _encodeInt(typeCode, 1)
+	for i in range(len(controlAddressMapping) // 2):
+		valueMapping = controlAddressMapping[i * 2]
+		numberOfBytes = controlAddressMapping[i * 2 + 1]
+		#data = controlAddressData[pos:pos + numberOfBytes]
+		value = 0
+		if valueMapping is not None and valueMapping != 0:
+			value = details[valueMapping]
+		controlAddressData += _encodeInt(value, numberOfBytes)
+	assert len(controlAddressData) == 20
+	if amountMapping is None:
+		amount = 0
 	else:
-		raise Exception('Unexpected state transaction.')
+		amount = details[amountMapping]
+	tx.addOutput(controlAddressData, amount)
+	for i in range(len(mapping) - 3):
+		addressMapping, amountMapping = mapping[3 + i]
+		assert addressMapping is not None
+		amount = details[amountMapping] if amountMapping is not None else 0
+		tx.addOutput(details[addressMapping], amount)
 	return tx
+
+#def FromStateTransaction(transactionType, details, inputProvider):
+	#tx = HostTransaction.InMemoryTransaction()
+	#if transactionType == 'Burn':
+		#controlAddress = ControlAddressEncoding.Encode(0, 0, 0, struct.pack("<B", 0) * 6)
+		#tx.addOutput(controlAddress, details['amount'])
+		#tx.addOutput(details['destinationAccount'])
+	#elif transactionType == 'Pay':
+		#source = details['sourceAccount']
+		#change = details['changeAccount']
+		#typeCode = 1
+		#if change == source:
+			#typeCode += 1
+		#controlAddress = ControlAddressEncoding.Encode(typeCode, details['amount'], details['maxBlock'], struct.pack("<B", 0) * 6)
+		#tx.addOutput(controlAddress)
+		#tx.addOutput(details['destinationAccount'])
+		#if change != source:
+			#tx.addOutput(change)
+		#_addInput(tx, inputProvider, source)
+	#elif transactionType == 'LTCBuyOffer':
+		#source = details['sourceAccount']
+		#change = details['changeAccount']
+		#refund = details['refundAccount']
+		#typeCode = 3
+		#if change == source and refund == source:
+			#typeCode += 1
+		#extraData = struct.pack('<LH', details['exchangeRate'], details['maxBlockOffset'])
+		#controlAddress = ControlAddressEncoding.Encode(typeCode, details['swapBillOffered'], details['maxBlock'], extraData)
+		#tx.addOutput(controlAddress)
+		#tx.addOutput(details['receivingAccount'])
+		#if typeCode == 3:
+			#tx.addOutput(change)
+			#tx.addOutput(refund)
+		#_addInput(tx, inputProvider, source)
+	#elif transactionType == 'LTCSellOffer':
+		#source = details['sourceAccount']
+		#change = details['changeAccount']
+		#typeCode = 5
+		#if change == source:
+			#typeCode += 1
+		#extraData = struct.pack('<LH', details['exchangeRate'], details['maxBlockOffset'])
+		#controlAddress = ControlAddressEncoding.Encode(typeCode, details['swapBillDesired'], details['maxBlock'], extraData)
+		#tx.addOutput(controlAddress)
+		#tx.addOutput(details['receivingAccount'])
+		#if typeCode == 5:
+			#tx.addOutput(change)
+		#_addInput(tx, inputProvider, source)
+	#elif transactionType == 'LTCExchangeCompletion':
+		#low = (details['pendingExchangeIndex'] & 0xffff)
+		#high = (details['pendingExchangeIndex'] >> 16)
+		#extraData = struct.pack('<HL', low, high)
+		#controlAddress = ControlAddressEncoding.Encode(7, 0, 0xffffffff, extraData)
+		#tx.addOutput(controlAddress)
+		#tx.addOutput(details['destinationAccount'])
+	#else:
+		#raise Exception('Unexpected state transaction.')
+	#return tx
 
 #class Burn(object):
 	#_typeCode = 0

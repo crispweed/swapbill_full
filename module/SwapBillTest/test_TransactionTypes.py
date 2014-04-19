@@ -24,15 +24,38 @@ class MockSourceLookup(object):
 
 class Test(unittest.TestCase):
 
-	def EncodeAndCheck(self, transactionType, details):
+	def EncodeAndCheck(self, transactionType, details, ignoredBytesAtEnd=0):
 		inputProvider = MockInputProvider()
 		tx = TransactionTypes.FromStateTransaction(transactionType, details, inputProvider)
 		sourceLookup = MockSourceLookup()
 		decodedType, decodedDetails = TransactionTypes.ToStateTransaction(sourceLookup, tx)
 		self.assertEqual(transactionType, decodedType)
 		self.assertDictEqual(details, decodedDetails)
+		if ignoredBytesAtEnd > 0:
+			tx._outputs[0] = (tx._outputs[0][0][:-ignoredBytesAtEnd] + b'\xff' * ignoredBytesAtEnd, tx._outputs[0][1])
+			decodedType, decodedDetails = TransactionTypes.ToStateTransaction(sourceLookup, tx)
+			self.assertEqual(transactionType, decodedType)
+			self.assertDictEqual(details, decodedDetails)
 		return tx
 
+	def EncodeInt_CheckDecode(self, value, numberOfBytes):
+		result = TransactionTypes._encodeInt(value, numberOfBytes)
+		self.assertTrue(type(result) is type(b''))
+		self.assertEqual(len(result), numberOfBytes)
+		decoded = TransactionTypes._decodeInt(result)
+		self.assertEqual(decoded, value)
+		return result
+
+	def test_internal(self):
+		self.assertEqual(self.EncodeInt_CheckDecode(0, 1), b'\x00')
+		self.assertEqual(self.EncodeInt_CheckDecode(1, 1), b'\x01')
+		self.assertEqual(self.EncodeInt_CheckDecode(255, 1), b'\xff')
+		self.assertEqual(self.EncodeInt_CheckDecode(0, 2), b'\x00\x00')
+		self.assertEqual(self.EncodeInt_CheckDecode(1, 2), b'\x01\x00')
+		self.assertEqual(self.EncodeInt_CheckDecode(255, 2), b'\xff\x00')
+		self.assertEqual(self.EncodeInt_CheckDecode(256, 2), b'\x00\x01')
+		self.assertEqual(self.EncodeInt_CheckDecode(258, 2), b'\x02\x01')
+		
 	def test(self):
 		bob = binascii.unhexlify(b'0b0b')
 		bob2 = binascii.unhexlify(b'b0b2')
@@ -43,17 +66,41 @@ class Test(unittest.TestCase):
 		tx = self.EncodeAndCheck('Burn', {'amount':10, 'destinationAccount': bob})
 		self.assertEqual(tx.numberOfInputs(), 0)
 		self.assertEqual(tx.numberOfOutputs(), 2)
-		self.assertDictEqual(tx.__dict__, {'_inputs': [], '_outputs': [(b'SWB\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00', 10), (b'\x0b\x0b', 100000)]})
+		self.assertDictEqual(tx.__dict__, {'_inputs': [], '_outputs': [(b'SWB\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00', 10), (b'\x0b\x0b', 0)]})
 
-		tx = self.EncodeAndCheck('Pay', {'sourceAccount':bob, 'amount':10, 'destinationAccount':alice, 'changeAccount':bob2, 'maxBlock':100})
+		# burn decode must only accept all zeros
+		tx._outputs[0] = (b'SWB\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x01', 10)
+		self.assertRaises(TransactionTypes.NotValidSwapBillTransaction, TransactionTypes.ToStateTransaction, MockSourceLookup(), tx)
+		tx._outputs[0] = (b'SWB\x00\x01\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00', 10)
+		self.assertRaises(TransactionTypes.NotValidSwapBillTransaction, TransactionTypes.ToStateTransaction, MockSourceLookup(), tx)
+		tx._outputs[0] = (b'SWB\x00\x00\x00\x00\x00\x00\x00\x00\x00\x80\x00\x00\x00\x00\x00\x00\x00', 10)
+		self.assertRaises(TransactionTypes.NotValidSwapBillTransaction, TransactionTypes.ToStateTransaction, MockSourceLookup(), tx)
+
+		details = {'sourceAccount':bob, 'amount':10, 'destinationAccount':alice, 'changeAccount':bob2, 'maxBlock':100}
+		tx = self.EncodeAndCheck('Pay', details)
 		self.assertEqual(tx.numberOfInputs(), 1)
 		self.assertEqual(tx.numberOfOutputs(), 3)
-		self.assertDictEqual(tx.__dict__, {'_outputs': [(b'SWB\x01\n\x00\x00\x00\x00\x00d\x00\x00\x00\x00\x00\x00\x00\x00\x00', 100000), (b'\n\x11\xce', 100000), (b'\xb0\xb2', 100000)], '_inputs': [('txID_1_0b0b', 1)]})
-		# and then reusing source address
+		self.assertDictEqual(tx.__dict__, {'_outputs': [(b'SWB\x01\n\x00\x00\x00\x00\x00d\x00\x00\x00\x00\x00\x00\x00\x00\x00', 0), (b'\xb0\xb2', 0), (b'\n\x11\xce', 0)], '_inputs': [('txID_1_0b0b', 1)]})
+
+		# pay transaction doesn't care about last 6 bytes of control address data
+		tx._outputs[0] = (b'SWB\x01\n\x00\x00\x00\x00\x00d\x00\x00\x01\x00\x00\x00\x00\x00\x00', 0) # changes byte just before last 6
+		decodedType, decodedDetails = TransactionTypes.ToStateTransaction(MockSourceLookup(), tx)
+		self.assertNotEqual(decodedDetails, details)
+		tx._outputs[0] = (b'SWB\x01\n\x00\x00\x00\x00\x00d\x00\x00\x00\x80\x00\x00\x00\x00\x00', 0) # changes byte in last 6
+		decodedType, decodedDetails = TransactionTypes.ToStateTransaction(MockSourceLookup(), tx)
+		self.assertEqual(decodedDetails, details)
+		tx._outputs[0] = (b'SWB\x01\n\x00\x00\x00\x00\x00d\x00\x00\x00\x00\xff\xff\x00\x00\x00', 0) # changes bytes in last 6
+		decodedType, decodedDetails = TransactionTypes.ToStateTransaction(MockSourceLookup(), tx)
+		self.assertEqual(decodedDetails, details)
+		tx._outputs[0] = (b'SWB\x01\n\x00\x00\x00\x00\x00d\x00\x00\x00\xff\xff\xff\xff\xff\xff', 0) # changes bytes in last 6
+		decodedType, decodedDetails = TransactionTypes.ToStateTransaction(MockSourceLookup(), tx)
+		self.assertEqual(decodedDetails, details)
+
+		# and then reusing source address (doesn't make any difference now, to encoding, since we need to reseed in fact)
 		tx = self.EncodeAndCheck('Pay', {'sourceAccount':bob, 'amount':10, 'destinationAccount':alice, 'changeAccount':bob, 'maxBlock':100})
 		self.assertEqual(tx.numberOfInputs(), 1)
-		self.assertEqual(tx.numberOfOutputs(), 2)
-		self.assertDictEqual(tx.__dict__, {'_inputs': [('txID_1_0b0b', 1)], '_outputs': [(b'SWB\x02\n\x00\x00\x00\x00\x00d\x00\x00\x00\x00\x00\x00\x00\x00\x00', 100000), (b'\n\x11\xce', 100000)]})
+		self.assertEqual(tx.numberOfOutputs(), 3)
+		self.assertDictEqual(tx.__dict__, {'_inputs': [('txID_1_0b0b', 1)], '_outputs': [(b'SWB\x01\n\x00\x00\x00\x00\x00d\x00\x00\x00\x00\x00\x00\x00\x00\x00', 0), (b'\x0b\x0b', 0), (b'\n\x11\xce', 0)]})
 
 		tx = self.EncodeAndCheck('LTCBuyOffer', {
 		    'sourceAccount':bob, 'changeAccount':bob2, 'refundAccount':bob3, 'receivingAccount':bob4,
@@ -62,22 +109,16 @@ class Test(unittest.TestCase):
 			})
 		self.assertEqual(tx.numberOfInputs(), 1)
 		self.assertEqual(tx.numberOfOutputs(), 4)
-		self.assertDictEqual(tx.__dict__, {'_inputs': [('txID_1_0b0b', 1)], '_outputs': [(b'SWB\x03d\x00\x00\x00\x00\x00d\x00\x00\x00\xd2\x04\x00\x00\n\x00', 100000), (b'\xb0\xb4', 100000), (b'\xb0\xb2', 100000), (b'\xb0\xb3', 100000)]})
-		# and then reusing source address
+		self.assertDictEqual(tx.__dict__, {'_inputs': [('txID_1_0b0b', 1)], '_outputs': [(b'SWB\x02d\x00\x00\x00\x00\x00d\x00\x00\x00\xd2\x04\x00\x00\n\x00', 0), (b'\xb0\xb2', 0), (b'\xb0\xb4', 0), (b'\xb0\xb3', 0)]})
+		# and then reusing source address (doesn't make any difference, as no special encoding for this currently)
 		tx = self.EncodeAndCheck('LTCBuyOffer', {
 		    'sourceAccount':bob, 'changeAccount':bob, 'refundAccount':bob, 'receivingAccount':bob2,
 		    'swapBillOffered':100, 'exchangeRate':1234,
 		    'maxBlock':100, 'maxBlockOffset':10
 			})
 		self.assertEqual(tx.numberOfInputs(), 1)
-		self.assertEqual(tx.numberOfOutputs(), 2)
-		self.assertDictEqual(tx.__dict__, {'_inputs': [('txID_1_0b0b', 1)], '_outputs': [(b'SWB\x04d\x00\x00\x00\x00\x00d\x00\x00\x00\xd2\x04\x00\x00\n\x00', 100000), (b'\xb0\xb2', 100000)]})
-
-
-				#'sourceAccount':sourceLookup.first(tx), 'swapBillDesired':amount,
-				#'receivingAccount':tx.outputPubKeyHash(1), 'changeAccount':tx.outputPubKeyHash(2),
-				#'exchangeRate':exchangeRate, 'maxBlockOffset':maxBlockOffset, 'maxBlock':maxBlock
-
+		self.assertEqual(tx.numberOfOutputs(), 4)
+		self.assertDictEqual(tx.__dict__, {'_outputs': [(b'SWB\x02d\x00\x00\x00\x00\x00d\x00\x00\x00\xd2\x04\x00\x00\n\x00', 0), (b'\x0b\x0b', 0), (b'\xb0\xb2', 0), (b'\x0b\x0b', 0)], '_inputs': [('txID_1_0b0b', 1)]})
 
 		tx = self.EncodeAndCheck('LTCSellOffer', {
 		    'sourceAccount':bob, 'changeAccount':bob2, 'receivingAccount':bob3,
@@ -86,158 +127,20 @@ class Test(unittest.TestCase):
 			})
 		self.assertEqual(tx.numberOfInputs(), 1)
 		self.assertEqual(tx.numberOfOutputs(), 3)
-		self.assertDictEqual(tx.__dict__, {'_inputs': [('txID_1_0b0b', 1)], '_outputs': [(b'SWB\x05d\x00\x00\x00\x00\x00d\x00\x00\x00\xd2\x04\x00\x00\n\x00', 100000), (b'\xb0\xb3', 100000), (b'\xb0\xb2', 100000)]})
-		# and then reusing source address
+		self.assertDictEqual(tx.__dict__, {'_outputs': [(b'SWB\x03d\x00\x00\x00\x00\x00d\x00\x00\x00\xd2\x04\x00\x00\n\x00', 0), (b'\xb0\xb2', 0), (b'\xb0\xb3', 0)], '_inputs': [('txID_1_0b0b', 1)]})
+		# and then reusing source address (no difference currently)
 		tx = self.EncodeAndCheck('LTCSellOffer', {
 		    'sourceAccount':bob, 'changeAccount':bob, 'receivingAccount':bob,
 		    'swapBillDesired':100, 'exchangeRate':1234,
 		    'maxBlock':100, 'maxBlockOffset':10
 			})
 		self.assertEqual(tx.numberOfInputs(), 1)
+		self.assertEqual(tx.numberOfOutputs(), 3)
+		#print('\t\tself.assertDictEqual(tx.__dict__,', tx.__dict__.__repr__() + ')')
+		self.assertDictEqual(tx.__dict__, {'_outputs': [(b'SWB\x03d\x00\x00\x00\x00\x00d\x00\x00\x00\xd2\x04\x00\x00\n\x00', 0), (b'\x0b\x0b', 0), (b'\x0b\x0b', 0)], '_inputs': [('txID_1_0b0b', 1)]})
+
+		tx = self.EncodeAndCheck('LTCExchangeCompletion', {'pendingExchangeIndex':7, 'destinationAccount':alice, 'destinationAmount':1234}, ignoredBytesAtEnd=10)
+		self.assertEqual(tx.numberOfInputs(), 0)
 		self.assertEqual(tx.numberOfOutputs(), 2)
-		#print(tx.__dict__)
-		self.assertDictEqual(tx.__dict__, {'_outputs': [(b'SWB\x06d\x00\x00\x00\x00\x00d\x00\x00\x00\xd2\x04\x00\x00\n\x00', 100000), (b'\x0b\x0b', 100000)], '_inputs': [('txID_1_0b0b', 1)]})
-
-
-		return
-
-		burn = TransactionTypes.Burn()
-		burn.init_FromUserRequirements(burnAmount=10, target=a)
-		self.assertDictEqual(burn.details(), {'amount': 10, 'destinationAccount': a})
-		self.assertEqual(burn.controlAddressAmount, 10)
-		self.assertSequenceEqual(burn.destinations, [a])
-		assert not hasattr(burn, 'source')
-		assert not hasattr(burn, 'destinationAmounts')
-		# burn encoding is set up so that control address is obviously unspendable
-		self.assertEqual(burn.encode(), (0, 0, 0, struct.pack("<B", 0) * 6))
-		self.CheckDecode(burn)
-		self.assertRaises(TransactionTypes.NotValidSwapBillTransaction, self.CheckDecode, tx=burn, suppliedExtraData=struct.pack("<B", 99) * 6)
-
-		transfer = TransactionTypes.Transfer()
-		transfer.init_FromUserRequirements(source=bob, amount=10, destination=alice)
-		self.assertDictEqual(transfer.details(),  {'sourceAccount': b'\x0b\x0b', 'destinationAccount': b'\n\x11\xce', 'amount': 10, 'maxBlock':4294967295})
-		self.assertEqual(transfer.source, bob)
-		self.assertSequenceEqual(transfer.destinations, [alice])
-		assert not hasattr(transfer, 'controlAddressAmount')
-		assert not hasattr(transfer, 'destinationAmounts')
-		typeCode, amount, maxBlock, extraData = transfer.encode()
-		self.assertEqual(typeCode, 1)
-		self.assertEqual(amount, 10)
-		self.assertEqual(maxBlock, 0xffffffff)
-		self.assertEqual(extraData, struct.pack("<B", 0) * 6) ## can be changed
-		self.CheckDecode(transfer)
-		## different extra data should be ignored
-		self.CheckDecode(transfer, suppliedExtraData=struct.pack("<B", 99) * 6)
-
-		# as above, but with max block limit
-		transfer = TransactionTypes.Transfer()
-		transfer.init_FromUserRequirements(source=bob, amount=10, destination=alice, maxBlock=200)
-		self.assertDictEqual(transfer.details(),  {'sourceAccount': b'\x0b\x0b', 'destinationAccount': b'\n\x11\xce', 'amount': 10, 'maxBlock':200})
-		self.assertEqual(transfer.source, bob)
-		self.assertSequenceEqual(transfer.destinations, [alice])
-		assert not hasattr(transfer, 'controlAddressAmount')
-		assert not hasattr(transfer, 'destinationAmounts')
-		typeCode, amount, maxBlock, extraData = transfer.encode()
-		self.assertEqual(typeCode, 1)
-		self.assertEqual(amount, 10)
-		self.assertEqual(maxBlock, 200)
-		self.assertEqual(extraData, struct.pack("<B", 0) * 6) ## can be changed
-		self.CheckDecode(transfer)
-		## different extra data should be ignored
-		self.CheckDecode(transfer, suppliedExtraData=struct.pack("<B", 99) * 6)
-
-		tx = TransactionTypes.Pay()
-		tx.init_FromUserRequirements(source=bob, amount=123, destination=alice, change=bob2)
-		self.assertDictEqual(tx.details(),  {'sourceAccount': b'\x0b\x0b', 'changeAccount': b'\xb0\xb2', 'destinationAccount': b'\n\x11\xce', 'amount': 123, 'maxBlock':4294967295})
-		self.assertEqual(tx.source, bob)
-		self.assertSequenceEqual(tx.destinations, [alice, bob2])
-		assert not hasattr(tx, 'controlAddressAmount')
-		assert not hasattr(tx, 'destinationAmounts')
-		typeCode, amount, maxBlock, extraData = tx.encode()
-		self.assertEqual(typeCode, 5)
-		self.assertEqual(amount, 123)
-		self.assertEqual(maxBlock, 0xffffffff)
-		self.assertEqual(extraData, struct.pack("<B", 0) * 6) ## can be changed
-		self.CheckDecode(tx)
-		## different extra data should be ignored
-		self.CheckDecode(tx, suppliedExtraData=struct.pack("<B", 99) * 6)
-
-		# as above, but with max block limit
-		tx.init_FromUserRequirements(source=bob, amount=123, destination=alice, change=bob2, maxBlock=1)
-		self.assertDictEqual(tx.details(),  {'sourceAccount': b'\x0b\x0b', 'changeAccount': b'\xb0\xb2', 'destinationAccount': b'\n\x11\xce', 'amount': 123, 'maxBlock':1})
-		self.assertEqual(tx.source, bob)
-		self.assertSequenceEqual(tx.destinations, [alice, bob2])
-		assert not hasattr(tx, 'controlAddressAmount')
-		assert not hasattr(tx, 'destinationAmounts')
-		typeCode, amount, maxBlock, extraData = tx.encode()
-		self.assertEqual(typeCode, 5)
-		self.assertEqual(amount, 123)
-		self.assertEqual(maxBlock, 1)
-		self.assertEqual(extraData, struct.pack("<B", 0) * 6) ## can be changed
-		self.CheckDecode(tx)
-		## different extra data should be ignored
-		self.CheckDecode(tx, suppliedExtraData=struct.pack("<B", 99) * 6)
-
-		tx = TransactionTypes.LTCBuyOffer()
-		tx.init_FromUserRequirements(source=bob, change=bob, refund=bob, swapBillAmountOffered=111, exchangeRate=0x7fffffff, receivingDestination=bob2)
-		self.assertDictEqual(tx.details(), {'swapBillOffered': 111, 'expiry': 4294967295, 'sourceAccount': b'\x0b\x0b', 'changeAccount': b'\x0b\x0b', 'refundAccount': b'\x0b\x0b', 'receivingAccount': b'\xb0\xb2', 'exchangeRate': 2147483647, 'maxBlock':4294967295})
-		self.assertEqual(tx.source, bob)
-		self.assertSequenceEqual(tx.destinations, [bob2, bob, bob])
-		self.assertEqual(tx._maxBlock, 0xffffffff)
-		assert not hasattr(tx, 'controlAddressAmount')
-		assert not hasattr(tx, 'destinationAmounts')
-		typeCode, amount, maxBlock, extraData = tx.encode()
-		self.assertEqual(typeCode, 2)
-		self.assertEqual(amount, 111)
-		self.assertEqual(maxBlock, 0xffffffff)
-		self.assertEqual(extraData, b'\xff\xff\xff\x7f\x00\x00')
-		self.CheckDecode(tx)
-		# test backward compatibility, through ForwardToFutureVersion type
-		hostTX = MockHostTX(tx)
-		sourceLookup = hostTX
-		decodedTX = TransactionTypes._decode(127, amount, maxBlock, extraData, sourceLookup, hostTX)
-		self.assertIsInstance(decodedTX, TransactionTypes.ForwardToFutureNetworkVersion)
-		self.assertDictEqual(decodedTX.details(), {'sourceAccount': b'\x0b\x0b', 'amount': 111, 'maxBlock': 4294967295})
-		self.assertDictEqual(decodedTX.__dict__, {'source': b'\x0b\x0b', 'amount': 111, '_maxBlock': 4294967295})
-		# transaction types below 128 will be decoded like this
-		self.assertRaises(TransactionTypes.UnsupportedTransaction, TransactionTypes._decode, 128, amount, maxBlock, extraData, sourceLookup, hostTX)
-
-		tx = TransactionTypes.LTCSellOffer()
-		tx.init_FromUserRequirements(source=bob, change=bob, receivingDestination=bob, swapBillDesired=111, exchangeRate=0x7fffffff)
-		self.assertDictEqual(tx.details(), {'swapBillDesired': 111, 'sourceAccount': b'\x0b\x0b', 'changeAccount': b'\x0b\x0b', 'receivingAccount': b'\x0b\x0b', 'exchangeRate': 2147483647, 'expiry': 4294967295, 'maxBlock':4294967295})
-		self.assertEqual(tx.source, bob)
-		self.assertSequenceEqual(tx.destinations, [bob, bob])
-		assert not hasattr(tx, 'controlAddressAmount')
-		assert not hasattr(tx, 'destinationAmounts')
-		typeCode, amount, maxBlock, extraData = tx.encode()
-		self.assertEqual(typeCode, 3)
-		self.assertEqual(amount, 111)
-		self.assertEqual(maxBlock, 0xffffffff)
-		self.assertEqual(extraData, b'\xff\xff\xff\x7f\x00\x00')
-		self.CheckDecode(tx)
-		# test backward compatibility, through ForwardToFutureVersion type
-		hostTX = MockHostTX(tx)
-		sourceLookup = hostTX
-		decodedTX = TransactionTypes._decode(20, amount, maxBlock, extraData, sourceLookup, hostTX)
-		self.assertIsInstance(decodedTX, TransactionTypes.ForwardToFutureNetworkVersion)
-		self.assertDictEqual(decodedTX.details(), {'sourceAccount': b'\x0b\x0b', 'amount': 111, 'maxBlock': 4294967295})
-		self.assertDictEqual(decodedTX.__dict__, {'source': b'\x0b\x0b', 'amount': 111, '_maxBlock': 4294967295})
-		# with different maxBlock
-		decodedTX = TransactionTypes._decode(25, amount, 1, extraData, sourceLookup, hostTX)
-		self.assertIsInstance(decodedTX, TransactionTypes.ForwardToFutureNetworkVersion)
-		self.assertDictEqual(decodedTX.details(), {'sourceAccount': b'\x0b\x0b', 'amount': 111, 'maxBlock': 1})
-		self.assertDictEqual(decodedTX.__dict__, {'source': b'\x0b\x0b', 'amount': 111, '_maxBlock': 1})
-
-		tx = TransactionTypes.LTCExchangeCompletion()
-		tx.init_FromUserRequirements(ltcAmount=10000000, destination=bob, pendingExchangeIndex=7)
-		self.assertDictEqual(tx.details(), {'pendingExchangeIndex': 7, 'destinationAccount': b'\x0b\x0b', 'destinationAmount': 10000000})
-		self.assertSequenceEqual(tx.destinations, [bob])
-		self.assertSequenceEqual(tx.destinationAmounts, [10000000])
-		assert not hasattr(tx, 'controlAddressAmount')
-		typeCode, amount, maxBlock, extraData = tx.encode()
-		self.assertEqual(typeCode, 4)
-		self.assertEqual(amount, 0)
-		self.assertEqual(maxBlock, 0xffffffff)
-		self.assertEqual(extraData, b'\x07\x00\x00\x00\x00\x00')
-		self.CheckDecode(tx)
-
+		#print('\t\tself.assertDictEqual(tx.__dict__,', tx.__dict__.__repr__() + ')')
+		self.assertDictEqual(tx.__dict__, {'_outputs': [(b'SWB\x04\x07\x00\x00\x00\x00\x00\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff', 0), (b'\n\x11\xce', 1234)], '_inputs': []})

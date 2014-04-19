@@ -1,5 +1,3 @@
-from SwapBill import TransactionFee
-
 class InMemoryTransaction(object):
 	def __init__(self):
 		self._inputs = []
@@ -7,9 +5,9 @@ class InMemoryTransaction(object):
 	# construction
 	def addInput(self, txID, vOut):
 		self._inputs.append((txID, vOut))
-	def addOutput(self, pubKeyHash, amount=TransactionFee.dustLimit):
+	def addOutput(self, pubKeyHash, amount):
 		assert type(amount) is int
-		assert amount > 0
+		assert amount >= 0
 		self._outputs.append((pubKeyHash, amount))
 	def addOutputsFromSeparateLists(self, pubKeyHashes, amounts):
 		assert len(pubKeyHashes) == len(amounts)
