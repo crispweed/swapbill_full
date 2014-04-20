@@ -108,8 +108,8 @@ def Create(tx, scriptPubKeyLookup):
 	data += _encodeVarInt(tx.numberOfOutputs())
 
 	for i in range(tx.numberOfOutputs()):
-		pubKeyHash = tx.outputPubKeyHash(i)
-		value = tx.outputAmount(i)
+		pubKeyHash = tx.outputPubKeyHash(tx.numberOfOutputs() - 1 - i)
+		value = tx.outputAmount(tx.numberOfOutputs() - 1 - i)
 		assert len(pubKeyHash) == 20
 		data += struct.pack("<Q", value)
 		script = OP_DUP
@@ -256,6 +256,7 @@ def Decode(txBytes):
 		#thisOutput['pubKeyHash'] = pubKeyHash
 		thisOutput['pubKeyHash'] = binascii.hexlify(pubKeyHash).decode('ascii')
 		outputs.append(thisOutput)
+	outputs.reverse()
 	result['vout'] = outputs
 
 	return result
