@@ -101,6 +101,19 @@ class Test(unittest.TestCase):
 		self.assertEqual(tx.numberOfInputs(), 1)
 		self.assertEqual(tx.numberOfOutputs(), 3)
 		self.assertDictEqual(tx.__dict__, {'_inputs': [('txID_1_0b0b', 1)], '_outputs': [(b'SWB\x01\n\x00\x00\x00\x00\x00d\x00\x00\x00\x00\x00\x00\x00\x00\x00', 0), (b'\x0b\x0b', 0), (b'\n\x11\xce', 0)]})
+		# change type code and check the transaction is decoded correctly as forward to future network version
+		tx._outputs[0] = (b'SWB\x09\n\x00\x00\x00\x00\x00d\x00\x00\x00\x00\x00\x00\x00\x00\x00', 0)
+		decodedType, decodedDetails = TransactionTypes.ToStateTransaction(MockSourceLookup(), tx)
+		self.assertEqual(decodedType, 'ForwardToFutureNetworkVersion')
+		self.assertDictEqual(decodedDetails, {'changeAccount': b'\x0b\x0b', 'maxBlock': 100, 'amount': 10})
+		# last supported type code for forwarding
+		tx._outputs[0] = (b'SWB\x7f\n\x00\x00\x00\x00\x00d\x00\x00\x00\x00\x00\x00\x00\x00\x00', 0)
+		decodedType, decodedDetails = TransactionTypes.ToStateTransaction(MockSourceLookup(), tx)
+		self.assertEqual(decodedType, 'ForwardToFutureNetworkVersion')
+		self.assertDictEqual(decodedDetails, {'changeAccount': b'\x0b\x0b', 'maxBlock': 100, 'amount': 10})
+		# type codes after that are not supported by this client version
+		tx._outputs[0] = (b'SWB\x80\n\x00\x00\x00\x00\x00d\x00\x00\x00\x00\x00\x00\x00\x00\x00', 0)
+		self.assertRaises(TransactionTypes.UnsupportedTransaction, TransactionTypes.ToStateTransaction, MockSourceLookup(), tx)
 
 		tx = self.EncodeAndCheck('LTCBuyOffer', {
 		    'sourceAccount':bob, 'changeAccount':bob2, 'refundAccount':bob3, 'receivingAccount':bob4,
