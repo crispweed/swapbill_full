@@ -43,6 +43,11 @@ def _encodeInt(value, numberOfBytes):
 	assert value == 0
 	return result
 
+def _firstSource(sourceLookup, tx):
+	txID = tx.inputTXID(0)
+	vOut = tx.inputVOut(0)
+	return sourceLookup.getSourceFor(txID, vOut)
+
 def ToStateTransaction(sourceLookup, tx):
 	controlAddressData = tx.outputPubKeyHash(0)
 	assert controlAddressData.startswith(ControlAddressPrefix.prefix)
@@ -57,7 +62,7 @@ def ToStateTransaction(sourceLookup, tx):
 	transactionType = mapping[0]
 	details = {}
 	if mapping[1] is not None:
-		details[mapping[1]] = sourceLookup.first(tx)
+		details[mapping[1]] = _firstSource(sourceLookup, tx)
 	controlAddressMapping, amountMapping = mapping[2]
 	pos = 4
 	for i in range(len(controlAddressMapping) // 2):
@@ -83,8 +88,8 @@ def ToStateTransaction(sourceLookup, tx):
 	return transactionType, details
 
 def _addInput(tx, inputProvider, sourceAccount):
-	txID, vout = inputProvider.getTXInputForAddress(sourceAccount)
-	tx.addInput(txID, vout)
+	txID, vOut = inputProvider.getTXInputForAddress(sourceAccount)
+	tx.addInput(txID, vOut)
 
 def FromStateTransaction(transactionType, details, inputProvider):
 	tx = HostTransaction.InMemoryTransaction()

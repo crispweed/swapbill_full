@@ -148,7 +148,7 @@ def UnexpectedFormat_Fast(txBytes, controlAddressPrefix):
 		for i in range(numberOfOutputs):
 			pos += 8
 			pos, scriptLen = _decodeVarInt(txBytes, pos)
-			if i == 0:
+			if i == numberOfOutputs - 1:
 				script = txBytes[pos:pos + scriptLen]
 				expectedScriptStart = OP_DUP
 				expectedScriptStart += OP_HASH160

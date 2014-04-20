@@ -44,7 +44,7 @@ class Test(unittest.TestCase):
 		info = GetStateInfo(host)
 		self.assertEqual(info['balances'], {"swapbill2": 1000000, "swapbill3": 2000000})
 
-		output = RunClient(host, ['transfer', '--fromAddress', "swapbill3", '--quantity', '1', '--toAddress', "swapbill2"])
+		output = RunClient(host, ['pay', '--fromAddress', "swapbill3", '--changeAddress', "swapbill3", '--quantity', '1', '--toAddress', "swapbill2"])
 
 		info = GetStateInfo(host)
 		self.assertEqual(info['balances'], {"swapbill2": 1000001, "swapbill3": 1999999})
@@ -69,8 +69,14 @@ class Test(unittest.TestCase):
 		self.assertEqual(info['balances'], {"swapbill2": 1000001, "swapbill3": 1999999, "swapbill5": 87500000}) # deposit of 12500000 moved in to sell offer
 
 		output = RunClient(host, ['complete_ltc_sell', '--pending_exchange_id', "0"])
+		#print('complete:')
+		#print(output)
+		#print('end complete')
 
 		info = GetStateInfo(host)
+		#print('get info:')
+		#print(output)
+		#print('end get info')
 		self.assertEqual(info['balances'], {"swapbill2": 1000001, "swapbill3": 1999999, "swapbill5": 300000000}) # swapbill5 gets deposit returned plus payment for ltc
 
 	def test_pay(self):

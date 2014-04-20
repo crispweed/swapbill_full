@@ -3,7 +3,7 @@ import unittest, random
 #from collections import deque
 from SwapBill import TransactionTypes, State, TransactionFee, LTCTrading
 from SwapBill.Amounts import FromSatoshis, ToSatoshis
-from SwapBill.BuildHostedTransaction import InsufficientFunds, Build_FundedByAccount, Build_WithSourceAddress
+from SwapBill.BuildHostedTransaction import InsufficientFunds, AddPaymentFeesAndChange
 
 class MockHostLayer(object):
 	def __init__(self):

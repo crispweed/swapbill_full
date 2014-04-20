@@ -68,3 +68,12 @@ class Test(unittest.TestCase):
 		txBytes = RawTransaction.FromHex(txHex)
 		pubKey = ExtractOutputPubKeyHash(txBytes, 0)
 		self.assertEqual(pubKey, b'SWB\x03\x88\x13\x00\x00\x00\x00\xff\xff\xff\xff\x99\x99\x99Y\x00\x00')
+
+	def test_decode(self):
+		txHex = '01000000010100000000000000000000000000000000000000000000000000000000000000070000001976a914737570706c696564312d2d2d2d2d2d2d2d2d2d2d88acffffffff038091e305000000001976a9146368616e6765342d2d2d2d2d2d2d2d2d2d2d2d2d88aca0860100000000001976a9147377617062696c6c332d2d2d2d2d2d2d2d2d2d2d88ac40420f00000000001976a914535750000000000000000000000000000000000088ac00000000'
+		txBytes = RawTransaction.FromHex(txHex)
+		self.assertFalse(RawTransaction.UnexpectedFormat_Fast(txBytes, b'SWP'))
+		
+		#decoded = RawTransaction.Decode(txBytes)
+		#self.assertDictEqual(decoded, {})
+		

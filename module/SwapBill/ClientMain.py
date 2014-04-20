@@ -33,11 +33,6 @@ subparsers = parser.add_subparsers(dest='action', help='the action to be taken')
 sp = subparsers.add_parser('burn', help='destroy litecoin to create swapbill')
 sp.add_argument('--quantity', required=True, help='quantity of LTC to be destroyed (in LTC satoshis)')
 
-sp = subparsers.add_parser('transfer', help='move swapbill from one swapbill balance to another')
-sp.add_argument('--fromAddress', required=True, help='pay from this address')
-sp.add_argument('--quantity', required=True, help='quantity of swapbill to be paid (in swapbill satoshis)')
-sp.add_argument('--toAddress', required=True, help='pay to this address')
-
 sp = subparsers.add_parser('pay', help='make a swapbill payment')
 sp.add_argument('--fromAddress', required=True, help='pay from this address')
 sp.add_argument('--quantity', required=True, help='quantity of swapbill to be paid (in swapbill satoshis)')
@@ -100,6 +95,38 @@ def Main(startBlockIndex, startBlockHash, commandLineArgs=sys.argv[1:], host=Non
 
 	transactionBuildLayer = TransactionBuildLayer.TransactionBuildLayer(host)
 
+	def SetFeeAndSend(sourceLookup, baseTX, unspent):
+		change = host.getNewChangeAddress()
+		transactionFee = TransactionFee.baseFee
+		try:
+			filledOutTX = BuildHostedTransaction.AddPaymentFeesAndChange(baseTX, sourceLookup, TransactionFee.dustLimit, transactionFee, unspent, change)
+			return transactionBuildLayer.sendTransaction(filledOutTX)
+		except Host.InsufficientTransactionFees:
+			print("Transaction fee increased.")
+			try:
+				transactionFee += TransactionFee.feeIncrement
+				filledOutTX = BuildHostedTransaction.AddPaymentFeesAndChange(baseTX, sourceLookup, TransactionFee.dustLimit, transactionFee, unspent, change)
+				return transactionBuildLayer.sendTransaction(filledOutTX)
+			except Host.InsufficientTransactionFees:
+				raise Exception("Failed: Unexpected failure to meet transaction fee requirement. (Lots of dust inputs?)")
+
+	def CheckAndSend(transactionType, details):
+		wouldSucceed, failReason = state.checkTransactionWouldApplySuccessfully(transactionType, details)
+		if not wouldSucceed:
+			raise TransactionNotSuccessfulAgainstCurrentState('Transaction would not complete successfully against current state:', failReason)
+		change = host.getNewChangeAddress()
+		print('attempting to send ' + transactionType + ' transaction with details:', file=out)
+		print(details)
+		unspent, sourceLookup = GetUnspent.GetUnspent(transactionBuildLayer, state._balances)
+		#print(FormatTransactionForUserDisplay.Format(host, tx), file=out)
+		baseTX = TransactionTypes.FromStateTransaction(transactionType, details, sourceLookup)
+		decodedType, decodedDetails = TransactionTypes.ToStateTransaction(sourceLookup, baseTX)
+		assert decodedType == transactionType
+		assert decodedDetails == details
+		txID = SetFeeAndSend(sourceLookup, baseTX, unspent)
+		print('Transaction sent with transactionID:', file=out)
+		print(txID, file=out)
+
 	def CheckAndReturnPubKeyHash(address):
 		try:
 			pubKeyHash = host.addressFromEndUserFormat(address)
@@ -107,128 +134,63 @@ def Main(startBlockIndex, startBlockHash, commandLineArgs=sys.argv[1:], host=Non
 			raise BadAddressArgument(address)
 		return pubKeyHash
 
-	def CheckAndSend_FromAddress(tx):
-		#wouldSucceed, failReason = tx.checkWouldApplySuccessfully(state)
-		wouldSucceed, failReason = state.checkTransactionWouldApplySuccessfully(tx.__class__.__name__, tx.details())
-		if not wouldSucceed:
-			raise TransactionNotSuccessfulAgainstCurrentState('Transaction would not complete successfully against current state:', failReason)
-		source = tx.source
-		backerUnspent, sourceSingleUnspent = GetUnspent.GetUnspent_WithSingleSource(transactionBuildLayer, state._balances, source)
-		if sourceSingleUnspent == None:
-			raise SourceAddressUnseeded('No unspent outputs reported by litecoind for the specified from address.',
-				"This could be because a transaction is in progress and needs to be confirmed (in which case you may just need to wait),",
-			    "or it's also possible that all litecoin seeded to this address has been spent (in which case you will need to reseed).")
-		change = host.getNewChangeAddress()
-		print('attempting to send swap bill transaction:', file=out)
-		print(FormatTransactionForUserDisplay.Format(host, tx), file=out)
-		transactionFee = TransactionFee.baseFee
-		try:
-			litecoinTX = BuildHostedTransaction.Build_WithSourceAddress(TransactionFee.dustLimit, transactionFee, tx, sourceSingleUnspent, backerUnspent, change)
-			txID = transactionBuildLayer.sendTransaction(litecoinTX)
-		except Host.InsufficientTransactionFees:
-			try:
-				transactionFee += TransactionFee.feeIncrement
-				litecoinTX = BuildHostedTransaction.Build_WithSourceAddress(TransactionFee.dustLimit, transactionFee, tx, sourceSingleUnspent, backerUnspent, change)
-				txID = transactionBuildLayer.sendTransaction(litecoinTX)
-			except Host.InsufficientTransactionFees:
-				raise Exception("Failed: Unexpected failure to meet transaction fee requirement. (Lots of dust inputs?)")
-		else:
-			print('Transaction sent with transactionID:', file=out)
-			print(txID, file=out)
-
 	if args.action == 'burn':
-		target = host.getNewSwapBillAddress()
-		tx = TransactionTypes.Burn()
-		tx.init_FromUserRequirements(burnAmount=int(args.quantity), target=target)
-		#wouldSucceed, failReason = burnTX.checkWouldApplySuccessfully(state)
-		wouldSucceed, failReason = state.checkTransactionWouldApplySuccessfully(tx.__class__.__name__, tx.details())
-		if not wouldSucceed:
-			raise TransactionNotSuccessfulAgainstCurrentState('Transaction would not complete successfully against current state:', failReason)
-		unspent = GetUnspent.GetUnspent(transactionBuildLayer, state._balances)
-		change = host.getNewChangeAddress()
-		print('attempting to send swap bill transaction:', file=out)
-		print(FormatTransactionForUserDisplay.Format(host, tx), file=out)
-		transactionFee = TransactionFee.baseFee
-		try:
-			litecoinTX = BuildHostedTransaction.Build_FundedByAccount(TransactionFee.dustLimit, transactionFee, tx, unspent, change)
-			txID = transactionBuildLayer.sendTransaction(litecoinTX)
-		except Host.InsufficientTransactionFees:
-			try:
-				transactionFee += TransactionFee.feeIncrement
-				litecoinTX = BuildHostedTransaction.Build_FundedByAccount(TransactionFee.dustLimit, transactionFee, tx, unspent, change)
-				txID = transactionBuildLayer.sendTransaction(litecoinTX)
-			except Host.InsufficientTransactionFees:
-				raise Exception("Failed: Unexpected failure to meet transaction fee requirement. (Lots of dust inputs?)")
-		except BuildHostedTransaction.ControlAddressBelowDustLimit:
-			raise BadAmountArgument('Burn quantity is below configured dust limit')
-		else:
-			print('Transaction sent with transactionID:', file=out)
-			print(txID, file=out)
-
-	elif args.action == 'transfer':
-		source = CheckAndReturnPubKeyHash(args.fromAddress)
-		destination = CheckAndReturnPubKeyHash(args.toAddress)
-		transferTX = TransactionTypes.Transfer()
-		## TODO: add arg for block validity limit
-		transferTX.init_FromUserRequirements(source=source, amount=int(args.quantity), destination=destination)
-		CheckAndSend_FromAddress(transferTX)
+		transactionType = 'Burn'
+		details = {'amount':int(args.quantity), 'destinationAccount':host.getNewSwapBillAddress()}
+		CheckAndSend(transactionType, details)
 
 	elif args.action == 'pay':
-		source = CheckAndReturnPubKeyHash(args.fromAddress)
-		destination = CheckAndReturnPubKeyHash(args.toAddress)
-		change = CheckAndReturnPubKeyHash(args.changeAddress)
-		tx = TransactionTypes.Pay()
-		## TODO: add arg for block validity limit
-		tx.init_FromUserRequirements(source=source, amount=int(args.quantity), destination=destination, change=change)
-		CheckAndSend_FromAddress(tx)
+		transactionType = 'Pay'
+		details = {
+		    'sourceAccount':CheckAndReturnPubKeyHash(args.fromAddress),
+		    'changeAccount':CheckAndReturnPubKeyHash(args.changeAddress),
+		    'amount':int(args.quantity),
+		    'destinationAccount':CheckAndReturnPubKeyHash(args.toAddress),
+		    'maxBlock':0xffffffff
+		}
+		CheckAndSend(transactionType, details)
 
 	elif args.action == 'post_ltc_buy':
+		transactionType = 'LTCBuyOffer'
 		source = CheckAndReturnPubKeyHash(args.fromAddress)
-		receivingDestination = host.getNewSwapBillAddress()
-		exchangeRate = int(float(args.exchangeRate) * 0x100000000)
-		## TODO: add args for block validity limit and offer duration
-		tx = TransactionTypes.LTCBuyOffer()
-		tx.init_FromUserRequirements(source=source, change=source, refund=source, swapBillAmountOffered=int(args.quantity), exchangeRate=exchangeRate, receivingDestination=receivingDestination)
-		CheckAndSend_FromAddress(tx)
+		details = {
+		    'sourceAccount':source,
+		    'changeAccount':source,
+		    'refundAccount':source,
+		    'swapBillOffered':int(args.quantity),
+		    'exchangeRate':int(float(args.exchangeRate) * 0x100000000),
+		    'receivingAccount':host.getNewChangeAddress(), ## TODO - this is not actually a change address, rename or add a separate call for this
+		    'maxBlock':0xffffffff,
+		    'maxBlockOffset':0
+		}
+		CheckAndSend(transactionType, details)
 
 	elif args.action == 'post_ltc_sell':
+		transactionType = 'LTCSellOffer'
 		source = CheckAndReturnPubKeyHash(args.fromAddress)
-		exchangeRate = int(float(args.exchangeRate) * 0x100000000)
-		## TODO: add args for block validity limit and offer duration
-		tx = TransactionTypes.LTCSellOffer()
-		swapBillToBuy=int(args.quantity)
-		tx.init_FromUserRequirements(source=source, change=source, receivingDestination=source, swapBillDesired=swapBillToBuy, exchangeRate=exchangeRate)
-		CheckAndSend_FromAddress(tx)
+		details = {
+		    'sourceAccount':source,
+		    'changeAccount':source,
+		    'swapBillDesired':int(args.quantity),
+		    'exchangeRate':int(float(args.exchangeRate) * 0x100000000),
+		    'receivingAccount':source,
+		    'maxBlock':0xffffffff,
+		    'maxBlockOffset':0
+		}
+		CheckAndSend(transactionType, details)
 
-	elif args.action == 'complete_ltc_sell':
+	elif args.action == 'LTCExchangeCompletion':
+		transactionType = 'LTCSellOffer'
 		pendingExchangeID = int(args.pending_exchange_id)
 		if not pendingExchangeID in state._pendingExchanges:
 			raise ExceptionReportedToUser('No pending exchange with the specified ID.')
 		exchange = state._pendingExchanges[pendingExchangeID]
-		tx = TransactionTypes.LTCExchangeCompletion()
-		tx.init_FromUserRequirements(ltcAmount=exchange.ltc, destination=exchange.ltcReceiveAddress, pendingExchangeIndex=pendingExchangeID)
-		#wouldSucceed, failReason = tx.checkWouldApplySuccessfully(state)
-		wouldSucceed, failReason = state.checkTransactionWouldApplySuccessfully(tx.__class__.__name__, tx.details())
-		if not wouldSucceed:
-			raise TransactionNotSuccessfulAgainstCurrentState('Transaction would not complete successfully against current state:', failReason)
-		unspent = GetUnspent.GetUnspent(transactionBuildLayer, state._balances)
-		change = host.getNewChangeAddress()
-		print('attempting to send swap bill transaction:', file=out)
-		print(FormatTransactionForUserDisplay.Format(host, tx), file=out)
-		transactionFee = TransactionFee.baseFee
-		try:
-			litecoinTX = BuildHostedTransaction.Build_FundedByAccount(TransactionFee.dustLimit, transactionFee, tx, unspent, change)
-			txID = transactionBuildLayer.sendTransaction(litecoinTX)
-		except Host.InsufficientTransactionFees:
-			try:
-				transactionFee += TransactionFee.feeIncrement
-				litecoinTX = BuildHostedTransaction.Build_FundedByAccount(TransactionFee.dustLimit, transactionFee, tx, unspent, change)
-				txID = transactionBuildLayer.sendTransaction(litecoinTX)
-			except Host.InsufficientTransactionFees:
-				print("Failed: Unexpected failure to meet transaction fee requirement. (Lots of dust inputs?)")
-		else:
-			print('Transaction sent with transactionID:', file=out)
-			print(txID, file=out)
+		details = {
+		    'pendingExchangeIndex':pendingExchangeID,
+		    'destinationAccount':exchange.ltcReceiveAddress,
+		    'destinationAmount':exchange.ltc
+		}
+		CheckAndSend(transactionType, details)
 
 	elif args.action == 'show_balances':
 		print('all balances:')
@@ -243,7 +205,7 @@ def Main(startBlockIndex, startBlockHash, commandLineArgs=sys.argv[1:], host=Non
 
 	elif args.action == 'show_my_balances':
 		#print(transactionBuildLayer.getUnspent())
-		addressesWithUnspent = GetUnspent.AddressesWithUnspent(transactionBuildLayer, state._balances)
+		unspent, sourceLookup = GetUnspent.GetUnspent(transactionBuildLayer, state._balances)
 		print('my balances:')
 		totalSpendable = 0
 		for pubKeyHash in state._balances:
@@ -252,7 +214,7 @@ def Main(startBlockIndex, startBlockHash, commandLineArgs=sys.argv[1:], host=Non
 			if validateResults['ismine'] == True:
 				balance = state._balances[pubKeyHash]
 				line = address + ': ' + str(balance)
-				if not pubKeyHash in addressesWithUnspent:
+				if not sourceLookup.addressIsSeeded(pubKeyHash):
 					line += ' (needs seeding)'
 				print(line)
 				totalSpendable += balance

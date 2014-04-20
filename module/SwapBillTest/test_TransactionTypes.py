@@ -13,9 +13,7 @@ class MockInputProvider(object):
 		return txID, vOut
 
 class MockSourceLookup(object):
-	def first(self, tx):
-		txID = tx.inputTXID(0)
-		vOut = tx.inputVOut(0)
+	def getSourceFor(self, txID, vOut):
 		prefix = 'txID_' + str(vOut) + '_'
 		assert txID.startswith(prefix)
 		sourceAccountAscii = txID[len(prefix):]
@@ -66,33 +64,33 @@ class Test(unittest.TestCase):
 		tx = self.EncodeAndCheck('Burn', {'amount':10, 'destinationAccount': bob})
 		self.assertEqual(tx.numberOfInputs(), 0)
 		self.assertEqual(tx.numberOfOutputs(), 2)
-		self.assertDictEqual(tx.__dict__, {'_inputs': [], '_outputs': [(b'SWB\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00', 10), (b'\x0b\x0b', 0)]})
+		self.assertDictEqual(tx.__dict__, {'_inputs': [], '_outputs': [(b'SWP\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00', 10), (b'\x0b\x0b', 0)]})
 
 		# burn decode must only accept all zeros
-		tx._outputs[0] = (b'SWB\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x01', 10)
+		tx._outputs[0] = (b'SWP\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x01', 10)
 		self.assertRaises(TransactionTypes.NotValidSwapBillTransaction, TransactionTypes.ToStateTransaction, MockSourceLookup(), tx)
-		tx._outputs[0] = (b'SWB\x00\x01\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00', 10)
+		tx._outputs[0] = (b'SWP\x00\x01\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00', 10)
 		self.assertRaises(TransactionTypes.NotValidSwapBillTransaction, TransactionTypes.ToStateTransaction, MockSourceLookup(), tx)
-		tx._outputs[0] = (b'SWB\x00\x00\x00\x00\x00\x00\x00\x00\x00\x80\x00\x00\x00\x00\x00\x00\x00', 10)
+		tx._outputs[0] = (b'SWP\x00\x00\x00\x00\x00\x00\x00\x00\x00\x80\x00\x00\x00\x00\x00\x00\x00', 10)
 		self.assertRaises(TransactionTypes.NotValidSwapBillTransaction, TransactionTypes.ToStateTransaction, MockSourceLookup(), tx)
 
 		details = {'sourceAccount':bob, 'amount':10, 'destinationAccount':alice, 'changeAccount':bob2, 'maxBlock':100}
 		tx = self.EncodeAndCheck('Pay', details)
 		self.assertEqual(tx.numberOfInputs(), 1)
 		self.assertEqual(tx.numberOfOutputs(), 3)
-		self.assertDictEqual(tx.__dict__, {'_outputs': [(b'SWB\x01\n\x00\x00\x00\x00\x00d\x00\x00\x00\x00\x00\x00\x00\x00\x00', 0), (b'\xb0\xb2', 0), (b'\n\x11\xce', 0)], '_inputs': [('txID_1_0b0b', 1)]})
+		self.assertDictEqual(tx.__dict__, {'_outputs': [(b'SWP\x01\n\x00\x00\x00\x00\x00d\x00\x00\x00\x00\x00\x00\x00\x00\x00', 0), (b'\xb0\xb2', 0), (b'\n\x11\xce', 0)], '_inputs': [('txID_1_0b0b', 1)]})
 
 		# pay transaction doesn't care about last 6 bytes of control address data
-		tx._outputs[0] = (b'SWB\x01\n\x00\x00\x00\x00\x00d\x00\x00\x01\x00\x00\x00\x00\x00\x00', 0) # changes byte just before last 6
+		tx._outputs[0] = (b'SWP\x01\n\x00\x00\x00\x00\x00d\x00\x00\x01\x00\x00\x00\x00\x00\x00', 0) # changes byte just before last 6
 		decodedType, decodedDetails = TransactionTypes.ToStateTransaction(MockSourceLookup(), tx)
 		self.assertNotEqual(decodedDetails, details)
-		tx._outputs[0] = (b'SWB\x01\n\x00\x00\x00\x00\x00d\x00\x00\x00\x80\x00\x00\x00\x00\x00', 0) # changes byte in last 6
+		tx._outputs[0] = (b'SWP\x01\n\x00\x00\x00\x00\x00d\x00\x00\x00\x80\x00\x00\x00\x00\x00', 0) # changes byte in last 6
 		decodedType, decodedDetails = TransactionTypes.ToStateTransaction(MockSourceLookup(), tx)
 		self.assertEqual(decodedDetails, details)
-		tx._outputs[0] = (b'SWB\x01\n\x00\x00\x00\x00\x00d\x00\x00\x00\x00\xff\xff\x00\x00\x00', 0) # changes bytes in last 6
+		tx._outputs[0] = (b'SWP\x01\n\x00\x00\x00\x00\x00d\x00\x00\x00\x00\xff\xff\x00\x00\x00', 0) # changes bytes in last 6
 		decodedType, decodedDetails = TransactionTypes.ToStateTransaction(MockSourceLookup(), tx)
 		self.assertEqual(decodedDetails, details)
-		tx._outputs[0] = (b'SWB\x01\n\x00\x00\x00\x00\x00d\x00\x00\x00\xff\xff\xff\xff\xff\xff', 0) # changes bytes in last 6
+		tx._outputs[0] = (b'SWP\x01\n\x00\x00\x00\x00\x00d\x00\x00\x00\xff\xff\xff\xff\xff\xff', 0) # changes bytes in last 6
 		decodedType, decodedDetails = TransactionTypes.ToStateTransaction(MockSourceLookup(), tx)
 		self.assertEqual(decodedDetails, details)
 
@@ -100,19 +98,19 @@ class Test(unittest.TestCase):
 		tx = self.EncodeAndCheck('Pay', {'sourceAccount':bob, 'amount':10, 'destinationAccount':alice, 'changeAccount':bob, 'maxBlock':100})
 		self.assertEqual(tx.numberOfInputs(), 1)
 		self.assertEqual(tx.numberOfOutputs(), 3)
-		self.assertDictEqual(tx.__dict__, {'_inputs': [('txID_1_0b0b', 1)], '_outputs': [(b'SWB\x01\n\x00\x00\x00\x00\x00d\x00\x00\x00\x00\x00\x00\x00\x00\x00', 0), (b'\x0b\x0b', 0), (b'\n\x11\xce', 0)]})
+		self.assertDictEqual(tx.__dict__, {'_inputs': [('txID_1_0b0b', 1)], '_outputs': [(b'SWP\x01\n\x00\x00\x00\x00\x00d\x00\x00\x00\x00\x00\x00\x00\x00\x00', 0), (b'\x0b\x0b', 0), (b'\n\x11\xce', 0)]})
 		# change type code and check the transaction is decoded correctly as forward to future network version
-		tx._outputs[0] = (b'SWB\x09\n\x00\x00\x00\x00\x00d\x00\x00\x00\x00\x00\x00\x00\x00\x00', 0)
+		tx._outputs[0] = (b'SWP\x09\n\x00\x00\x00\x00\x00d\x00\x00\x00\x00\x00\x00\x00\x00\x00', 0)
 		decodedType, decodedDetails = TransactionTypes.ToStateTransaction(MockSourceLookup(), tx)
 		self.assertEqual(decodedType, 'ForwardToFutureNetworkVersion')
 		self.assertDictEqual(decodedDetails, {'changeAccount': b'\x0b\x0b', 'maxBlock': 100, 'amount': 10})
 		# last supported type code for forwarding
-		tx._outputs[0] = (b'SWB\x7f\n\x00\x00\x00\x00\x00d\x00\x00\x00\x00\x00\x00\x00\x00\x00', 0)
+		tx._outputs[0] = (b'SWP\x7f\n\x00\x00\x00\x00\x00d\x00\x00\x00\x00\x00\x00\x00\x00\x00', 0)
 		decodedType, decodedDetails = TransactionTypes.ToStateTransaction(MockSourceLookup(), tx)
 		self.assertEqual(decodedType, 'ForwardToFutureNetworkVersion')
 		self.assertDictEqual(decodedDetails, {'changeAccount': b'\x0b\x0b', 'maxBlock': 100, 'amount': 10})
 		# type codes after that are not supported by this client version
-		tx._outputs[0] = (b'SWB\x80\n\x00\x00\x00\x00\x00d\x00\x00\x00\x00\x00\x00\x00\x00\x00', 0)
+		tx._outputs[0] = (b'SWP\x80\n\x00\x00\x00\x00\x00d\x00\x00\x00\x00\x00\x00\x00\x00\x00', 0)
 		self.assertRaises(TransactionTypes.UnsupportedTransaction, TransactionTypes.ToStateTransaction, MockSourceLookup(), tx)
 
 		tx = self.EncodeAndCheck('LTCBuyOffer', {
@@ -122,7 +120,7 @@ class Test(unittest.TestCase):
 			})
 		self.assertEqual(tx.numberOfInputs(), 1)
 		self.assertEqual(tx.numberOfOutputs(), 4)
-		self.assertDictEqual(tx.__dict__, {'_inputs': [('txID_1_0b0b', 1)], '_outputs': [(b'SWB\x02d\x00\x00\x00\x00\x00d\x00\x00\x00\xd2\x04\x00\x00\n\x00', 0), (b'\xb0\xb2', 0), (b'\xb0\xb4', 0), (b'\xb0\xb3', 0)]})
+		self.assertDictEqual(tx.__dict__, {'_inputs': [('txID_1_0b0b', 1)], '_outputs': [(b'SWP\x02d\x00\x00\x00\x00\x00d\x00\x00\x00\xd2\x04\x00\x00\n\x00', 0), (b'\xb0\xb2', 0), (b'\xb0\xb4', 0), (b'\xb0\xb3', 0)]})
 		# and then reusing source address (doesn't make any difference, as no special encoding for this currently)
 		tx = self.EncodeAndCheck('LTCBuyOffer', {
 		    'sourceAccount':bob, 'changeAccount':bob, 'refundAccount':bob, 'receivingAccount':bob2,
@@ -131,7 +129,7 @@ class Test(unittest.TestCase):
 			})
 		self.assertEqual(tx.numberOfInputs(), 1)
 		self.assertEqual(tx.numberOfOutputs(), 4)
-		self.assertDictEqual(tx.__dict__, {'_outputs': [(b'SWB\x02d\x00\x00\x00\x00\x00d\x00\x00\x00\xd2\x04\x00\x00\n\x00', 0), (b'\x0b\x0b', 0), (b'\xb0\xb2', 0), (b'\x0b\x0b', 0)], '_inputs': [('txID_1_0b0b', 1)]})
+		self.assertDictEqual(tx.__dict__, {'_outputs': [(b'SWP\x02d\x00\x00\x00\x00\x00d\x00\x00\x00\xd2\x04\x00\x00\n\x00', 0), (b'\x0b\x0b', 0), (b'\xb0\xb2', 0), (b'\x0b\x0b', 0)], '_inputs': [('txID_1_0b0b', 1)]})
 
 		tx = self.EncodeAndCheck('LTCSellOffer', {
 		    'sourceAccount':bob, 'changeAccount':bob2, 'receivingAccount':bob3,
@@ -140,7 +138,7 @@ class Test(unittest.TestCase):
 			})
 		self.assertEqual(tx.numberOfInputs(), 1)
 		self.assertEqual(tx.numberOfOutputs(), 3)
-		self.assertDictEqual(tx.__dict__, {'_outputs': [(b'SWB\x03d\x00\x00\x00\x00\x00d\x00\x00\x00\xd2\x04\x00\x00\n\x00', 0), (b'\xb0\xb2', 0), (b'\xb0\xb3', 0)], '_inputs': [('txID_1_0b0b', 1)]})
+		self.assertDictEqual(tx.__dict__, {'_outputs': [(b'SWP\x03d\x00\x00\x00\x00\x00d\x00\x00\x00\xd2\x04\x00\x00\n\x00', 0), (b'\xb0\xb2', 0), (b'\xb0\xb3', 0)], '_inputs': [('txID_1_0b0b', 1)]})
 		# and then reusing source address (no difference currently)
 		tx = self.EncodeAndCheck('LTCSellOffer', {
 		    'sourceAccount':bob, 'changeAccount':bob, 'receivingAccount':bob,
@@ -150,10 +148,10 @@ class Test(unittest.TestCase):
 		self.assertEqual(tx.numberOfInputs(), 1)
 		self.assertEqual(tx.numberOfOutputs(), 3)
 		#print('\t\tself.assertDictEqual(tx.__dict__,', tx.__dict__.__repr__() + ')')
-		self.assertDictEqual(tx.__dict__, {'_outputs': [(b'SWB\x03d\x00\x00\x00\x00\x00d\x00\x00\x00\xd2\x04\x00\x00\n\x00', 0), (b'\x0b\x0b', 0), (b'\x0b\x0b', 0)], '_inputs': [('txID_1_0b0b', 1)]})
+		self.assertDictEqual(tx.__dict__, {'_outputs': [(b'SWP\x03d\x00\x00\x00\x00\x00d\x00\x00\x00\xd2\x04\x00\x00\n\x00', 0), (b'\x0b\x0b', 0), (b'\x0b\x0b', 0)], '_inputs': [('txID_1_0b0b', 1)]})
 
 		tx = self.EncodeAndCheck('LTCExchangeCompletion', {'pendingExchangeIndex':7, 'destinationAccount':alice, 'destinationAmount':1234}, ignoredBytesAtEnd=10)
 		self.assertEqual(tx.numberOfInputs(), 0)
 		self.assertEqual(tx.numberOfOutputs(), 2)
 		#print('\t\tself.assertDictEqual(tx.__dict__,', tx.__dict__.__repr__() + ')')
-		self.assertDictEqual(tx.__dict__, {'_outputs': [(b'SWB\x04\x07\x00\x00\x00\x00\x00\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff', 0), (b'\n\x11\xce', 1234)], '_inputs': []})
+		self.assertDictEqual(tx.__dict__, {'_outputs': [(b'SWP\x04\x07\x00\x00\x00\x00\x00\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff', 0), (b'\n\x11\xce', 1234)], '_inputs': []})

@@ -7,7 +7,7 @@ else:
 	import cPickle as pickle
 from os import path
 from collections import deque
-from SwapBill import State, DecodeTransaction, TransactionTypes, SourceLookup, ControlAddressEncoding
+from SwapBill import State, DecodeTransaction, TransactionTypes, SourceLookup
 from SwapBill import FormatTransactionForUserDisplay
 
 class ReindexingRequiredException(Exception):
@@ -50,23 +50,18 @@ def _save(blockIndex, blockHash, state, cacheFile):
 def _processBlock(host, state, blockHash, out):
 	transactions = host.getBlockTransactions(blockHash)
 	for litecoinTXHex in transactions:
-		#hostTX = DecodeTransaction.Transaction(litecoinTXHex, host._rpcHost)
 		hostTX = DecodeTransaction.Decode(litecoinTXHex)
 		if hostTX == None:
 			continue
 		try:
-			decodedTX = TransactionTypes.Decode(host, hostTX)
-		except ControlAddressEncoding.NotSwapBillControlAddress:
-			continue
+			transactionType, transactionDetails = TransactionTypes.ToStateTransaction(host, hostTX)
 		except TransactionTypes.NotValidSwapBillTransaction:
 			continue
 		except TransactionTypes.UnsupportedTransaction:
 			continue
-		#decodedTX.apply(state)
-		transactionType = decodedTX.__class__.__name__
-		details = decodedTX.details()
-		state.applyTransaction(transactionType, details)
-		print('applied ' + FormatTransactionForUserDisplay.Format(host, decodedTX), file=out)
+		state.applyTransaction(transactionType, transactionDetails)
+		print('applied ' + transactionType + ' with details:', file=out)
+		print(transactionDetails, file=out)
 	state.advanceToNextBlock()
 
 def SyncAndReturnState(cacheFile, startBlockIndex, startBlockHash, host, out):
