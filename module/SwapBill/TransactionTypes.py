@@ -1,6 +1,6 @@
 from __future__ import print_function
 import struct, binascii
-from SwapBill import Address, HostTransaction
+from SwapBill import Address, HostTransaction, ControlAddressPrefix
 
 class UnsupportedTransaction(Exception):
 	pass
@@ -45,7 +45,8 @@ def _encodeInt(value, numberOfBytes):
 
 def ToStateTransaction(sourceLookup, tx):
 	controlAddressData = tx.outputPubKeyHash(0)
-	assert controlAddressData.startswith(b'SWB')
+	assert controlAddressData.startswith(ControlAddressPrefix.prefix)
+	assert len(ControlAddressPrefix.prefix) == 3
 	typeCode = _decodeInt(controlAddressData[3:4])
 	if typeCode < len(_mappingByTypeCode):
 		mapping = _mappingByTypeCode[typeCode]
@@ -95,7 +96,7 @@ def FromStateTransaction(transactionType, details, inputProvider):
 	if mapping[1] is not None:
 		_addInput(tx, inputProvider, details[mapping[1]])
 	controlAddressMapping, amountMapping = mapping[2]
-	controlAddressData = b'SWB' + _encodeInt(typeCode, 1)
+	controlAddressData = ControlAddressPrefix.prefix + _encodeInt(typeCode, 1)
 	for i in range(len(controlAddressMapping) // 2):
 		valueMapping = controlAddressMapping[i * 2]
 		numberOfBytes = controlAddressMapping[i * 2 + 1]

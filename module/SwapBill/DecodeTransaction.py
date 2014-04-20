@@ -1,7 +1,7 @@
 from __future__ import print_function
 import binascii
 #from SwapBill import HostTransaction
-from SwapBill import RawTransaction, HostTransaction
+from SwapBill import RawTransaction, HostTransaction, ControlAddressPrefix
 #from SwapBill.Amounts import ToSatoshis
 
 #class NotValidSwapBillTransaction(Exception):
@@ -41,7 +41,7 @@ from SwapBill import RawTransaction, HostTransaction
 
 def Decode(txHex):
 	txBytes = RawTransaction.FromHex(txHex)
-	if RawTransaction.UnexpectedFormat_Fast(txBytes, b'SWB'):
+	if RawTransaction.UnexpectedFormat_Fast(txBytes, ControlAddressPrefix.prefix):
 		return None
 	decoded = RawTransaction.Decode(txBytes)
 	result = HostTransaction.InMemoryTransaction()
