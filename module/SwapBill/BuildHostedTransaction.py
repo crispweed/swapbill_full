@@ -1,94 +1,43 @@
 from __future__ import print_function
-import struct
-from SwapBill import ControlAddressEncoding, HostTransaction
+from SwapBill import HostTransaction
 from SwapBill.ChooseInputs import ChooseInputs
 from SwapBill.ExceptionReportedToUser import ExceptionReportedToUser
 
 class InsufficientFunds(ExceptionReportedToUser):
 	pass
-class ControlAddressBelowDustLimit(Exception):
-	pass
 
-def _build_Common(dustLimit, transactionFee, swapBillTransaction, unspent, forceIncludeLast, reSeedPubKeyHash, changePubKeyHash):
+def AddPaymentFeesAndChange(baseTX, sourceLookup, dustLimit, transactionFee, unspent, changePubKeyHash):
 	unspentAmounts, unspentAsInputs = unspent
 
-	hostedTX = HostTransaction.InMemoryTransaction()
+	filledOutTX = HostTransaction.InMemoryTransaction()
 
-	if hasattr(swapBillTransaction, 'controlAddressAmount'):
-		if swapBillTransaction.controlAddressAmount < dustLimit:
-			raise ControlAddressBelowDustLimit()
-		outAmounts = [swapBillTransaction.controlAddressAmount]
-	else:
-		outAmounts = [dustLimit]
-	controlAddressData = ControlAddressEncoding.Encode(swapBillTransaction)
-	outDestinations = [controlAddressData]
+	for i in range(baseTX.numberOfOutputs()):
+		amount = baseTX.outputAmount(i)
+		if amount < dustLimit:
+			amount = dustLimit
+		filledOutTX.addOutput(baseTX.outputPubKeyHash(i), amount)
 
-	if hasattr(swapBillTransaction, 'destinations'):
-		if hasattr(swapBillTransaction, 'destinationAmounts'):
-			assert len(swapBillTransaction.destinations) == len(swapBillTransaction.destinationAmounts)
-		for i in range(len(swapBillTransaction.destinations)):
-			outDestinations.append(swapBillTransaction.destinations[i])
-			if hasattr(swapBillTransaction, 'destinationAmounts'):
-				outAmounts.append(swapBillTransaction.destinationAmounts[i])
-			else:
-				outAmounts.append(dustLimit)
-
-	if not reSeedPubKeyHash is None:
-		outDestinations.append(reSeedPubKeyHash)
-		outAmounts.append(dustLimit)
-
-	totalRequired = sum(outAmounts) + transactionFee
-	if sum(unspentAmounts) < totalRequired:
+	baseInputAmount = 0
+	for i in range(baseTX.numberOfInputs()):
+		txID = baseTX.inputTXID(i)
+		vOut = baseTX.inputVOut(i)
+		baseInputAmount += sourceLookup.lookupAmountForTXInput(txID, vOut)
+		filledOutTX.addInput(txID, vOut)
+		
+	totalRequired = filledOutTX.sumOfOutputs() + transactionFee
+	if baseInputAmount + sum(unspentAmounts) < totalRequired:
 		raise InsufficientFunds('Not enough funds available for the transaction, total required:', totalRequired, 'transaction fee:', transactionFee, 'sum of unspent:', sum(unspentAmounts))
 
-	if forceIncludeLast:
-		#assert config.maxInputs > 0
-		if totalRequired > unspentAmounts[-1]:
-			#outputAssignments, outputsTotal = ChooseInputs(maxInputs=config.maxInputs - 1, unspentAmounts=unspentAmounts[:-1], amountRequired=totalRequired - unspentAmounts[-1])
-			outputAssignments, outputsTotal = ChooseInputs(maxInputs=len(unspentAmounts), unspentAmounts=unspentAmounts[:-1], amountRequired=totalRequired - unspentAmounts[-1])
-		else:
-			outputAssignments = []
-			outputsTotal = 0
-		outputAssignments.append(len(unspentAmounts) - 1)
-		outputsTotal += unspentAmounts[-1]
+	if baseInputAmount < totalRequired:
+		outputAssignments, outputsTotal = ChooseInputs(maxInputs=len(unspentAmounts), unspentAmounts=unspentAmounts, amountRequired=totalRequired - baseInputAmount)
+		for i in outputAssignments:
+			filledOutTX.addInput(unspentAsInputs[i][0], unspentAsInputs[i][1])
 	else:
-		#outputAssignments, outputsTotal = ChooseInputs(maxInputs=config.maxInputs, unspentAmounts=unspentAmounts, amountRequired=totalRequired)
-		outputAssignments, outputsTotal = ChooseInputs(maxInputs=len(unspentAmounts), unspentAmounts=unspentAmounts, amountRequired=totalRequired)
-	#assert len(outputAssignments) <= config.maxInputs
+		outputsTotal = 0
 
-	#if outputsTotal < totalRequired:
-		#print('Cannot pay for transaction within the current maximum inputs constraint (maximum {} inputs).'.format(config.maxInputs))
-		#print('Available unspent output amounts reported by litecoind:')
-		#print(unspentAmounts)
-		#return None
-
-	for i in outputAssignments:
-		hostedTX.addInput(unspentAsInputs[i][0], unspentAsInputs[i][1])
-
-	if outputsTotal > totalRequired:
-		overSupply = outputsTotal - totalRequired
+	if baseInputAmount + outputsTotal > totalRequired:
+		overSupply = baseInputAmount + outputsTotal - totalRequired
 		if overSupply >= dustLimit:
-			outDestinations.append(changePubKeyHash)
-			outAmounts.append(overSupply)
-		elif outDestinations[-1] == reSeedPubKeyHash:
-			outAmounts[-1] += overSupply
+			filledOutTX.addOutput(changePubKeyHash, overSupply)
 
-	hostedTX.addOutputsFromSeparateLists(outDestinations, outAmounts)
-
-	return hostedTX
-
-def Build_FundedByAccount(dustLimit, transactionFee, swapBillTransaction, fundingAccountUnspent, changePubKeyHash):
-	assert not hasattr(swapBillTransaction, 'source')
-	return _build_Common(dustLimit, transactionFee, swapBillTransaction, fundingAccountUnspent, False, None, changePubKeyHash)
-
-def Build_WithSourceAddress(dustLimit, transactionFee, swapBillTransaction, sourceAddressSingleUnspent, backerAccountUnspent, changePubKeyHash):
-	sourceUnspentAmount, sourceUnspentAsInput = sourceAddressSingleUnspent
-	unspentAmounts, unspentAsInputs = backerAccountUnspent
-	unspentAmounts = list(unspentAmounts)
-	unspentAsInputs = list(unspentAsInputs)
-	unspentAmounts.append(sourceUnspentAmount)
-	unspentAsInputs.append(sourceUnspentAsInput)
-	return _build_Common(dustLimit, transactionFee, swapBillTransaction, (unspentAmounts, unspentAsInputs), True, swapBillTransaction.source, changePubKeyHash)
-
-def Build_Native(addressVersion, dustLimit, transactionFee, fundingAccountUnspent, destination, amount, changePubKeyHash):
-	pass
+	return filledOutTX

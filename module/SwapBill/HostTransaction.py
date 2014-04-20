@@ -13,6 +13,12 @@ class InMemoryTransaction(object):
 		assert len(pubKeyHashes) == len(amounts)
 		for i in range(len(pubKeyHashes)):
 			self.addOutput(pubKeyHashes[i], amounts[i])
+	# helper
+	def sumOfOutputs(self):
+		result = 0
+		for pkh, amount in self._outputs:
+			result += amount
+		return result
 	# actual transaction interface
 	def numberOfInputs(self):
 		return len(self._inputs)

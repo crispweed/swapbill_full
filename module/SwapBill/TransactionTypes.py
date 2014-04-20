@@ -83,7 +83,7 @@ def ToStateTransaction(sourceLookup, tx):
 	return transactionType, details
 
 def _addInput(tx, inputProvider, sourceAccount):
-	txID, vout = inputProvider.lookupUnspentFor(sourceAccount)
+	txID, vout = inputProvider.getTXInputForAddress(sourceAccount)
 	tx.addInput(txID, vout)
 
 def FromStateTransaction(transactionType, details, inputProvider):

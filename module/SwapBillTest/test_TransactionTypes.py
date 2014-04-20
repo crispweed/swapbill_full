@@ -5,7 +5,7 @@ from SwapBill import TransactionTypes
 class MockInputProvider(object):
 	def __init__(self):
 		self._count = 0
-	def lookupUnspentFor(self, sourceAccount):
+	def getTXInputForAddress(self, sourceAccount):
 		sourceAccountAscii = binascii.hexlify(sourceAccount).decode('ascii')
 		self._count += 1
 		txID = 'txID_' + str(self._count) + '_' + sourceAccountAscii
