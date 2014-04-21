@@ -292,7 +292,8 @@ class State(object):
 		self.checkTransactionWouldApplySuccessfully(transactionType, transactionDetails)
 		methodName = 'apply_' + transactionType
 		method = getattr(self, methodName)
-		return method(**transactionDetails)
+		method(**transactionDetails)
+		assert self.totalAccountedFor() == self._totalCreated
 
 	def totalAccountedFor(self):
 		result = 0

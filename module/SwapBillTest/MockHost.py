@@ -109,10 +109,10 @@ class MockHost(object):
 			#print('transactionFee:', transactionFee)
 			#print('feeRequired:', feeRequired)
 		assert transactionFee >= feeRequired
-		if transactionFee > feeRequired:
+		if transactionFee >= feeRequired + TransactionFee.dustLimit:
 			print('transactionFee:', transactionFee)
 			print('feeRequired:', feeRequired)
-		assert transactionFee == feeRequired ## can potentially overspend, in theory, but will be nice to see the actual test case info that causes this
+		assert transactionFee < feeRequired + TransactionFee.dustLimit ## can potentially overspend, in theory, but will be nice to see the actual test case info that causes this
 		if not self._nextBlock in self._transactionsByBlock:
 			self._transactionsByBlock[self._nextBlock] = []
 		self._transactionsByBlock[self._nextBlock].append(unsignedTransactionHex)
@@ -143,3 +143,6 @@ class MockHost(object):
 		return PubKeyHashAsText(pubKeyHash)
 	def addressFromEndUserFormat(self,  address):
 		return TextAsPubKeyHash(address)
+
+	def _advance(self, numberOfBlocks):
+		self._nextBlock += numberOfBlocks

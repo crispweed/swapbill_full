@@ -85,7 +85,9 @@ def Main(startBlockIndex, startBlockHash, commandLineArgs=sys.argv[1:], host=Non
 			#sellDetails.swapBillAddress = host.formatAddressForEndUser(pubKeyHash)
 		info = {
 		    'atEndOfBlock':state._currentBlockIndex - 1, 'balances':balancesByAddress, 'syncOutput':syncOut.getvalue(),
-		    #'buyOffers':buyOffers, 'sellOffers':sellOffers
+		    'numberOfLTCBuyOffers':state._LTCBuys.size(),
+		    'numberOfLTCSellOffers':state._LTCSells.size(),
+		    'numberOfPendingExchanges':len(state._pendingExchanges)
 		}
 		print(json.dumps(info), file=out)
 		return
@@ -98,8 +100,14 @@ def Main(startBlockIndex, startBlockHash, commandLineArgs=sys.argv[1:], host=Non
 	def SetFeeAndSend(sourceLookup, baseTX, unspent):
 		change = host.getNewChangeAddress()
 		transactionFee = TransactionFee.baseFee
+		#if hasattr(sourceLookup, '_asInput'):
+			#print(sourceLookup._asInput)
+			#print(sourceLookup._amount)	
+		#print(unspent)
+		#print(baseTX.__dict__)
 		try:
 			filledOutTX = BuildHostedTransaction.AddPaymentFeesAndChange(baseTX, sourceLookup, TransactionFee.dustLimit, transactionFee, unspent, change)
+			#print(filledOutTX.__dict__)
 			return transactionBuildLayer.sendTransaction(filledOutTX)
 		except Host.InsufficientTransactionFees:
 			print("Transaction fee increased.")
