@@ -179,8 +179,8 @@ def Main(startBlockIndex, startBlockHash, commandLineArgs=sys.argv[1:], host=Non
 		}
 		CheckAndSend(transactionType, details)
 
-	elif args.action == 'LTCExchangeCompletion':
-		transactionType = 'LTCSellOffer'
+	elif args.action == 'complete_ltc_sell':
+		transactionType = 'LTCExchangeCompletion'
 		pendingExchangeID = int(args.pending_exchange_id)
 		if not pendingExchangeID in state._pendingExchanges:
 			raise ExceptionReportedToUser('No pending exchange with the specified ID.')
