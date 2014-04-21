@@ -116,7 +116,7 @@ def Main(startBlockIndex, startBlockHash, commandLineArgs=sys.argv[1:], host=Non
 			raise TransactionNotSuccessfulAgainstCurrentState('Transaction would not complete successfully against current state:', failReason)
 		change = host.getNewChangeAddress()
 		print('attempting to send ' + transactionType + ' transaction with details:', file=out)
-		print(details)
+		print(details, file=out)
 		unspent, sourceLookup = GetUnspent.GetUnspent(transactionBuildLayer, state._balances)
 		#print(FormatTransactionForUserDisplay.Format(host, tx), file=out)
 		baseTX = TransactionTypes.FromStateTransaction(transactionType, details, sourceLookup)
