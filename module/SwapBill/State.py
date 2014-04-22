@@ -110,26 +110,6 @@ class State(object):
 		else:
 			self._balances[destinationAccount] = amount
 
-	def checkWouldApplySuccessfully_Transfer(self, sourceAccount, amount, destinationAccount, maxBlock):
-		assert type(amount) is int
-		assert amount > 0
-		if maxBlock < self._currentBlockIndex:
-			return False, 'max block for transaction has been exceeded'
-		available = self._balances.get(sourceAccount, 0)
-		if available >= amount:
-			return True, ''
-		if available > 0:
-			return False, 'insufficient balance in source account (transfer capped)'
-		return False, 'source account balance is 0'
-	def apply_Transfer(self, sourceAccount, amount, destinationAccount, maxBlock):
-		if maxBlock < self._currentBlockIndex:
-			return
-		available = self._balances.get(sourceAccount, 0)
-		if amount > available:
-			amount = available
-		self._subtractFromBalance(sourceAccount, amount)
-		self._addToBalance(destinationAccount, amount)
-
 	def checkWouldApplySuccessfully_Pay(self, sourceAccount, changeAccount, amount, destinationAccount, maxBlock):
 		assert type(amount) is int
 		assert amount > 0

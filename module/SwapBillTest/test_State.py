@@ -32,15 +32,18 @@ class Test(unittest.TestCase):
 		self.Apply_AssertSucceeds(state, 'Burn', amount=30, destinationAccount='c')
 		self.assertEqual(state._balances, {'a':10, 'b':20, 'c':30})
 
-		self.Apply_AssertSucceeds(state, 'Transfer', sourceAccount='c', amount=20, destinationAccount='a', maxBlock=200)
+		self.Apply_AssertSucceeds(state, 'Pay', sourceAccount='c', changeAccount='c', amount=20, destinationAccount='a', maxBlock=200)
 		self.assertEqual(state._balances, {'a':30, 'b':20, 'c':10})
 
-		reason = self.Apply_AssertFails(state, 'Transfer', sourceAccount='c', amount=15, destinationAccount='a', maxBlock=200)
-		self.assertEqual(reason, 'insufficient balance in source account (transfer capped)')
+		reason = self.Apply_AssertFails(state, 'Pay', sourceAccount='c', changeAccount='c', amount=15, destinationAccount='a', maxBlock=200)
+		self.assertEqual(reason, 'insufficient balance in source account (transaction ignored)')
+		self.assertEqual(state._balances, {'a':30, 'b':20, 'c':10})
+
+		self.Apply_AssertSucceeds(state, 'Pay', sourceAccount='c', changeAccount='c', amount=10, destinationAccount='a', maxBlock=200)
 		self.assertEqual(state._balances, {'a':40, 'b':20})
 
-		reason = self.Apply_AssertFails(state, 'Transfer', sourceAccount='c', amount=5, destinationAccount='a', maxBlock=200)
-		self.assertEqual(reason, 'source account balance is 0')
+		reason = self.Apply_AssertFails(state, 'Pay', sourceAccount='c', changeAccount='c', amount=15, destinationAccount='a', maxBlock=200)
+		self.assertEqual(reason, 'insufficient balance in source account (transaction ignored)')
 		self.assertEqual(state._balances, {'a':40, 'b':20})
 
 		# cannot post buy or sell offers, because of minimum exchange amount constraint
