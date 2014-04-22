@@ -103,7 +103,7 @@ def Main(startBlockIndex, startBlockHash, commandLineArgs=sys.argv[1:], host=Non
 				raise Exception("Failed: Unexpected failure to meet transaction fee requirement. (Lots of dust inputs?)")
 
 	def CheckAndSend(transactionType, details):
-		wouldSucceed, failReason = state.checkTransactionWouldApplySuccessfully(transactionType, details)
+		wouldSucceed, failReason = state.checkTransaction(transactionType, details)
 		if not wouldSucceed:
 			raise TransactionNotSuccessfulAgainstCurrentState('Transaction would not complete successfully against current state:', failReason)
 		change = host.getNewNonSwapBillAddress()
