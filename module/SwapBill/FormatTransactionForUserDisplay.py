@@ -1,6 +1,4 @@
-def Format(host, tx):
-	transactionType = tx.__class__.__name__
-	details = tx.details()
+def Format(host, transactionType, details):
 	result = transactionType
 	for key in sorted(details):
 		result += ', ' + key + '='

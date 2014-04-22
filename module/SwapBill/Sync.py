@@ -60,8 +60,7 @@ def _processBlock(host, state, blockHash, out):
 		except TransactionTypes.UnsupportedTransaction:
 			continue
 		state.applyTransaction(transactionType, transactionDetails)
-		print('applied ' + transactionType + ' with details:', file=out)
-		print(transactionDetails, file=out)
+		print('applied ' + FormatTransactionForUserDisplay.Format(host, transactionType, transactionDetails), file=out)
 	state.advanceToNextBlock()
 
 def SyncAndReturnState(cacheFile, startBlockIndex, startBlockHash, host, out):

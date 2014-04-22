@@ -102,7 +102,7 @@ def Main(startBlockIndex, startBlockHash, commandLineArgs=sys.argv[1:], host=Non
 		transactionFee = TransactionFee.baseFee
 		#if hasattr(sourceLookup, '_asInput'):
 			#print(sourceLookup._asInput)
-			#print(sourceLookup._amount)	
+			#print(sourceLookup._amount)
 		#print(unspent)
 		#print(baseTX.__dict__)
 		try:
@@ -123,8 +123,7 @@ def Main(startBlockIndex, startBlockHash, commandLineArgs=sys.argv[1:], host=Non
 		if not wouldSucceed:
 			raise TransactionNotSuccessfulAgainstCurrentState('Transaction would not complete successfully against current state:', failReason)
 		change = host.getNewChangeAddress()
-		print('attempting to send ' + transactionType + ' transaction with details:', file=out)
-		print(details, file=out)
+		print('attempting to send ' + FormatTransactionForUserDisplay.Format(host, transactionType, details), file=out)
 		unspent, sourceLookup = GetUnspent.GetUnspent(transactionBuildLayer, state._balances)
 		#print(FormatTransactionForUserDisplay.Format(host, tx), file=out)
 		baseTX = TransactionTypes.FromStateTransaction(transactionType, details, sourceLookup)
