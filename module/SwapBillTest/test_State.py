@@ -173,8 +173,8 @@ class Test(unittest.TestCase):
 	def test_ltc_trading(self):
 		state = State.State(100, 'starthash')
 
-		state.apply_Burn(10000 * milliCoin, 'a')
-		state.apply_Burn(10000 * milliCoin, 'b')
+		state.applyTransaction('Burn', {'amount':10000 * milliCoin, 'destinationAccount':'a'})
+		state.applyTransaction('Burn', {'amount':10000 * milliCoin, 'destinationAccount':'b'})
 
 		self.assertEqual(state.totalAccountedFor(), state._totalCreated)
 		self.assertEqual(state._balances, {'a': 10000 * milliCoin, 'b': 10000 * milliCoin})
@@ -246,116 +246,147 @@ class Test(unittest.TestCase):
 		self.assertEqual(state._pendingExchanges[1].__dict__,
 			{'expiry': 150, 'swapBillDeposit': 1375000, 'ltc': 9899999, 'ltcReceiveAddress': 'd_receive_ltc', 'swapBillAmount': 22000000, 'buyerAddress': 'd', 'sellerReceivingAccount': 'c'})
 
+	def SellOffer(self, state, source, swapBillDesired, exchangeRate):
+		details = {'sourceAccount':source, 'changeAccount':source, 'receivingAccount':source, 'swapBillDesired':swapBillDesired, 'exchangeRate':exchangeRate, 'maxBlockOffset':0, 'maxBlock':200}
+		self.Apply_AssertSucceeds(state, 'LTCSellOffer', **details)
+	def BuyOffer(self, state, source, swapBillOffered, exchangeRate):
+		details = {'sourceAccount':source, 'changeAccount':source, 'refundAccount':source, 'receivingAccount':source + '_receive_ltc', 'swapBillOffered':swapBillOffered, 'exchangeRate':exchangeRate, 'maxBlockOffset':0, 'maxBlock':200}
+		self.Apply_AssertSucceeds(state, 'LTCBuyOffer', **details)
+	def Completion(self, state, pendingExchangeIndex, destinationAccount, destinationAmount):
+		details = {'pendingExchangeIndex':pendingExchangeIndex, 'destinationAccount':destinationAccount, 'destinationAmount':destinationAmount}
+		self.Apply_AssertSucceeds(state, 'LTCExchangeCompletion', **details)
+
 	def test_small_sell_remainder_refunded(self):
 		state = State.State(100, 'starthash')
-		state.apply_Burn(10000000, 'b')
-		state.apply_LTCSellOffer(sourceAccount='b', changeAccount='b', receivingAccount='b', swapBillDesired=10000000, exchangeRate=0x80000000, maxBlockOffset=0, maxBlock=200)
+		state.applyTransaction('Burn', {'amount':10000000, 'destinationAccount':'b'})
+		#state.apply_LTCSellOffer(sourceAccount='b', changeAccount='b', receivingAccount='b', swapBillDesired=10000000, exchangeRate=0x80000000, maxBlockOffset=0, maxBlock=200)
+		self.SellOffer(state, 'b', swapBillDesired=10000000, exchangeRate=0x80000000)
 		self.assertEqual(state.totalAccountedFor(), state._totalCreated)
 		# deposit is 10000000 // 16 = 625000
 		self.assertEqual(state._balances, {'b': 9375000})
-		state.apply_Burn(9900000, 'a')
-		state.apply_LTCBuyOffer(sourceAccount='a', changeAccount='a', refundAccount='a', swapBillOffered=9900000, exchangeRate=0x80000000, maxBlockOffset=0, receivingAccount='a_receive_ltc', maxBlock=200)
+		state.applyTransaction('Burn', {'amount':9900000, 'destinationAccount':'a'})
+		#state.apply_LTCBuyOffer(sourceAccount='a', changeAccount='a', refundAccount='a', swapBillOffered=9900000, exchangeRate=0x80000000, maxBlockOffset=0, receivingAccount='a_receive_ltc', maxBlock=200)
+		self.BuyOffer(state, 'a', swapBillOffered=9900000, exchangeRate=0x80000000)
 		self.assertEqual(state.totalAccountedFor(), state._totalCreated)
 		# b should be refunded 100000 // 10000000 of his depost = 6250
 		# balance is the 9375000 + 6250
 		self.assertEqual(state._balances, {'b': 9381250})
 		self.assertEqual(len(state._pendingExchanges), 1)
-		state.apply_LTCExchangeCompletion(0, 'a_receive_ltc', 5000000)
+		#state.applyTransaction('LTCExchangeCompletion', 0, 'a_receive_ltc', 5000000)
+		self.Completion(state, 0, 'a_receive_ltc', 9900000 // 2)
 		self.assertEqual(state.totalAccountedFor(), state._totalCreated)
 		self.assertEqual(len(state._pendingExchanges), 0)
 		self.assertEqual(state._balances, {'b': 19900000})
 
 	def test_small_buy_remainder_refunded(self):
 		state = State.State(100, 'starthash')
-		state.apply_Burn(10000000, 'b')
-		state.apply_LTCSellOffer(sourceAccount='b', changeAccount='b', receivingAccount='b', swapBillDesired=10000000, exchangeRate=0x80000000, maxBlockOffset=0, maxBlock=200)
+		state.applyTransaction('Burn', {'amount':10000000, 'destinationAccount':'b'})
+		#state.apply_LTCSellOffer(sourceAccount='b', changeAccount='b', receivingAccount='b', swapBillDesired=10000000, exchangeRate=0x80000000, maxBlockOffset=0, maxBlock=200)
+		self.SellOffer(state, 'b', swapBillDesired=10000000, exchangeRate=0x80000000)
 		self.assertEqual(state.totalAccountedFor(), state._totalCreated)
 		# deposit is 10000000 // 16 = 625000
 		self.assertEqual(state._balances, {'b': 9375000})
-		state.apply_Burn(10100000, 'a')
-		state.apply_LTCBuyOffer(sourceAccount='a', changeAccount='a', refundAccount='a', swapBillOffered=10100000, exchangeRate=0x80000000, maxBlockOffset=0, receivingAccount='a_receive_ltc', maxBlock=200)
+		state.applyTransaction('Burn', {'amount':10100000, 'destinationAccount':'a'})
+		#state.apply_LTCBuyOffer(sourceAccount='a', changeAccount='a', refundAccount='a', swapBillOffered=10100000, exchangeRate=0x80000000, maxBlockOffset=0, receivingAccount='a_receive_ltc', maxBlock=200)
+		self.BuyOffer(state, 'a', swapBillOffered=10100000, exchangeRate=0x80000000)
 		self.assertEqual(state.totalAccountedFor(), state._totalCreated)
 		# a should be refunded 100000 remainder from buy offer
 		self.assertEqual(state._balances, {'a': 100000, 'b': 9375000})
 		self.assertEqual(len(state._pendingExchanges), 1)
-		state.apply_LTCExchangeCompletion(0, 'a_receive_ltc', 5000000)
+		#state.apply_LTCExchangeCompletion(0, 'a_receive_ltc', 5000000)
+		self.Completion(state, 0, 'a_receive_ltc', 10000000 // 2)
 		self.assertEqual(state.totalAccountedFor(), state._totalCreated)
 		self.assertEqual(len(state._pendingExchanges), 0)
 		self.assertEqual(state._balances, {'a': 100000, 'b': 20000000})
 
 	def test_exact_match(self):
 		state = State.State(100, 'starthash')
-		state.apply_Burn(10000000, 'b')
-		state.apply_LTCSellOffer(sourceAccount='b', changeAccount='b', receivingAccount='b', swapBillDesired=10000000, exchangeRate=0x80000000, maxBlockOffset=0, maxBlock=200)
+		state.applyTransaction('Burn', {'amount':10000000, 'destinationAccount':'b'})
+		#state.apply_LTCSellOffer(sourceAccount='b', changeAccount='b', receivingAccount='b', swapBillDesired=10000000, exchangeRate=0x80000000, maxBlockOffset=0, maxBlock=200)
+		self.SellOffer(state, 'b', swapBillDesired=10000000, exchangeRate=0x80000000)
 		self.assertEqual(state.totalAccountedFor(), state._totalCreated)
 		# deposit is 10000000 // 16 = 625000
 		self.assertEqual(state._balances, {'b': 9375000})
-		state.apply_Burn(10000000, 'a')
-		state.apply_LTCBuyOffer(sourceAccount='a', changeAccount='a', refundAccount='a', swapBillOffered=10000000, exchangeRate=0x80000000, maxBlockOffset=0, receivingAccount='a_receive_ltc', maxBlock=200)
+		state.applyTransaction('Burn', {'amount':10000000, 'destinationAccount':'a'})
+		#state.apply_LTCBuyOffer(sourceAccount='a', changeAccount='a', refundAccount='a', swapBillOffered=10000000, exchangeRate=0x80000000, maxBlockOffset=0, receivingAccount='a_receive_ltc', maxBlock=200)
+		self.BuyOffer(state, 'a', swapBillOffered=10000000, exchangeRate=0x80000000)
 		self.assertEqual(state.totalAccountedFor(), state._totalCreated)
 		# nothing refunded, no change to balances
 		self.assertEqual(state._balances, {'b': 9375000})
 		self.assertEqual(len(state._pendingExchanges), 1)
-		state.apply_LTCExchangeCompletion(0, 'a_receive_ltc', 5000000)
+		#state.apply_LTCExchangeCompletion(0, 'a_receive_ltc', 5000000)
+		self.Completion(state, 0, 'a_receive_ltc', 10000000 // 2)
 		self.assertEqual(state.totalAccountedFor(), state._totalCreated)
 		self.assertEqual(len(state._pendingExchanges), 0)
 		self.assertEqual(state._balances, {'b': 20000000})
 
 	def test_sell_remainder_outstanding(self):
 		state = State.State(100, 'starthash')
-		state.apply_Burn(20000000, 'b')
-		state.apply_LTCSellOffer(sourceAccount='b', changeAccount='b', receivingAccount='b', swapBillDesired=20000000, exchangeRate=0x80000000, maxBlockOffset=0, maxBlock=200)
+		state.applyTransaction('Burn', {'amount':20000000, 'destinationAccount':'b'})
+		#state.apply_LTCSellOffer(sourceAccount='b', changeAccount='b', receivingAccount='b', swapBillDesired=20000000, exchangeRate=0x80000000, maxBlockOffset=0, maxBlock=200)
+		self.SellOffer(state, 'b', swapBillDesired=20000000, exchangeRate=0x80000000)
 		self.assertEqual(state.totalAccountedFor(), state._totalCreated)
 		# deposit is 20000000 // 16 = 1250000
 		self.assertEqual(state._balances, {'b': 18750000})
-		state.apply_Burn(10000000, 'a')
-		state.apply_LTCBuyOffer(sourceAccount='a', changeAccount='a', refundAccount='a', swapBillOffered=10000000, exchangeRate=0x80000000, maxBlockOffset=0, receivingAccount='a_receive_ltc', maxBlock=200)
+		state.applyTransaction('Burn', {'amount':10000000, 'destinationAccount':'a'})
+		#state.apply_LTCBuyOffer(sourceAccount='a', changeAccount='a', refundAccount='a', swapBillOffered=10000000, exchangeRate=0x80000000, maxBlockOffset=0, receivingAccount='a_receive_ltc', maxBlock=200)
+		self.BuyOffer(state, 'a', swapBillOffered=10000000, exchangeRate=0x80000000)
 		self.assertEqual(state.totalAccountedFor(), state._totalCreated)
 		# nothing refunded, no change to balances
 		self.assertEqual(state._balances, {'b': 18750000})
 		self.assertEqual(len(state._pendingExchanges), 1)
 		self.assertEqual(state._LTCBuys.size(), 0)
 		self.assertEqual(state._LTCSells.size(), 1) ## half of sell offer is left outstanding
-		state.apply_LTCExchangeCompletion(0, 'a_receive_ltc', 5000000)
+		#state.apply_LTCExchangeCompletion(0, 'a_receive_ltc', 5000000)
+		self.Completion(state, 0, 'a_receive_ltc', 10000000 // 2)
 		self.assertEqual(state.totalAccountedFor(), state._totalCreated)
 		self.assertEqual(len(state._pendingExchanges), 0)
 		# b should be refunded half his deposit, remaining deposit = 625000
 		# and b now has all swapbill except deposit for outstanding sell offer
 		self.assertEqual(state._balances, {'b': 29375000})
 		# a goes on to buy the rest
-		state.apply_Burn(10000000, 'a')
-		state.apply_LTCBuyOffer(sourceAccount='a', changeAccount='a', refundAccount='a', swapBillOffered=10000000, exchangeRate=0x80000000, maxBlockOffset=0, receivingAccount='a_receive_ltc', maxBlock=200)
+		state.applyTransaction('Burn', {'amount':10000000, 'destinationAccount':'a'})
+		#state.apply_LTCBuyOffer(sourceAccount='a', changeAccount='a', refundAccount='a', swapBillOffered=10000000, exchangeRate=0x80000000, maxBlockOffset=0, receivingAccount='a_receive_ltc', maxBlock=200)
+		self.BuyOffer(state, 'a', swapBillOffered=10000000, exchangeRate=0x80000000)
 		self.assertEqual(state.totalAccountedFor(), state._totalCreated)
-		state.apply_LTCExchangeCompletion(1, 'a_receive_ltc', 5000000)
+		#state.apply_LTCExchangeCompletion(1, 'a_receive_ltc', 5000000)
+		self.Completion(state, 1, 'a_receive_ltc', 10000000 // 2)
 		self.assertEqual(state.totalAccountedFor(), state._totalCreated)
 		self.assertEqual(state._balances, {'b': 40000000})
 
 	def test_buy_remainder_outstanding(self):
 		state = State.State(100, 'starthash')
-		state.apply_Burn(20000000, 'b')
-		state.apply_LTCSellOffer(sourceAccount='b', changeAccount='b', receivingAccount='b', swapBillDesired=20000000, exchangeRate=0x80000000, maxBlockOffset=0, maxBlock=200)
+		state.applyTransaction('Burn', {'amount':20000000, 'destinationAccount':'b'})
+		#state.apply_LTCSellOffer(sourceAccount='b', changeAccount='b', receivingAccount='b', swapBillDesired=20000000, exchangeRate=0x80000000, maxBlockOffset=0, maxBlock=200)
+		self.SellOffer(state, 'b', swapBillDesired=20000000, exchangeRate=0x80000000)
 		self.assertEqual(state.totalAccountedFor(), state._totalCreated)
 		# deposit is 20000000 // 16 = 1250000
 		self.assertEqual(state._balances, {'b': 18750000})
-		state.apply_Burn(30000000, 'a')
-		state.apply_LTCBuyOffer(sourceAccount='a', changeAccount='a', refundAccount='a', swapBillOffered=30000000, exchangeRate=0x80000000, maxBlockOffset=0, receivingAccount='a_receive_ltc', maxBlock=200)
+		state.applyTransaction('Burn', {'amount':30000000, 'destinationAccount':'a'})
+		#state.apply_LTCBuyOffer(sourceAccount='a', changeAccount='a', refundAccount='a', swapBillOffered=30000000, exchangeRate=0x80000000, maxBlockOffset=0, receivingAccount='a_receive_ltc', maxBlock=200)
+		self.BuyOffer(state, 'a', swapBillOffered=30000000, exchangeRate=0x80000000)
 		self.assertEqual(state.totalAccountedFor(), state._totalCreated)
 		# nothing refunded, no change to balances
 		self.assertEqual(state._balances, {'b': 18750000})
 		self.assertEqual(len(state._pendingExchanges), 1)
 		self.assertEqual(state._LTCBuys.size(), 1) ## half of buy offer is left outstanding
 		self.assertEqual(state._LTCSells.size(), 0)
-		state.apply_LTCExchangeCompletion(0, 'a_receive_ltc', 10000000)
+		#state.apply_LTCExchangeCompletion(0, 'a_receive_ltc', 10000000)
+		self.Completion(state, 0, 'a_receive_ltc', 20000000 // 2)
 		self.assertEqual(state.totalAccountedFor(), state._totalCreated)
 		self.assertEqual(len(state._pendingExchanges), 0)
 		# b should be refunded all his deposit, and receives payment in swapbill
 		self.assertEqual(state._balances, {'b': 40000000})
 		# b goes on to sell the rest
-		state.apply_Burn(10000000, 'b')
-		state.apply_LTCSellOffer(sourceAccount='b', changeAccount='b', receivingAccount='b', swapBillDesired=10000000, exchangeRate=0x80000000, maxBlockOffset=0, maxBlock=200)
+		state.applyTransaction('Burn', {'amount':10000000, 'destinationAccount':'b'})
+		#state.apply_LTCSellOffer(sourceAccount='b', changeAccount='b', receivingAccount='b', swapBillDesired=10000000, exchangeRate=0x80000000, maxBlockOffset=0, maxBlock=200)
+		self.SellOffer(state, 'b', swapBillDesired=10000000, exchangeRate=0x80000000)
 		self.assertEqual(state.totalAccountedFor(), state._totalCreated)
-		state.apply_LTCExchangeCompletion(1, 'a_receive_ltc', 10000000)
+		self.assertEqual(len(state._pendingExchanges), 1)
+		#state.apply_LTCExchangeCompletion(1, 'a_receive_ltc', 10000000)
+		self.Completion(state, 1, 'a_receive_ltc', 10000000 // 2)
 		self.assertEqual(state.totalAccountedFor(), state._totalCreated)
+		self.assertEqual(len(state._pendingExchanges), 0)
 		self.assertEqual(state._balances, {'b': 60000000})
 
 	def test_state_transaction(self):
@@ -378,6 +409,7 @@ class Test(unittest.TestCase):
 	def test_max_block_limit(self):
 		state = State.State(100, 'starthash')
 		maxBlock = 200
+		##.. fill in or remove!
 		#transactionType = 'Burneeheeyooo'
 		#transactionDetails = {'amount':1000, 'destinationAccount':'burnDestination'}
 		#self.assertRaises(State.InvalidTransactionType, state.checkTransaction, transactionType, transactionDetails)

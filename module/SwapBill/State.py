@@ -99,18 +99,18 @@ class State(object):
 					self._addToBalance(sellDetails.receivingAccount, sellDetails.swapBillDeposit)
 			return # break out of while loop
 
-	def check_Burn(self, amount, destinationAccount):
+	def _check_Burn(self, amount, destinationAccount):
 		assert type(amount) is int
 		assert amount > 0
 		return True, ''
-	def apply_Burn(self, amount, destinationAccount):
+	def _apply_Burn(self, amount, destinationAccount):
 		self._totalCreated += amount
 		if destinationAccount in self._balances:
 			self._balances[destinationAccount] += amount
 		else:
 			self._balances[destinationAccount] = amount
 
-	def check_Pay(self, sourceAccount, changeAccount, amount, destinationAccount, maxBlock):
+	def _check_Pay(self, sourceAccount, changeAccount, amount, destinationAccount, maxBlock):
 		assert type(amount) is int
 		assert amount > 0
 		if maxBlock < self._currentBlockIndex:
@@ -119,14 +119,14 @@ class State(object):
 		if available < amount:
 			return False, 'insufficient balance in source account (transaction ignored)'
 		return True, ''
-	def apply_Pay(self, sourceAccount, changeAccount, amount, destinationAccount, maxBlock):
+	def _apply_Pay(self, sourceAccount, changeAccount, amount, destinationAccount, maxBlock):
 		available = self._balances.get(sourceAccount, 0)
 		self._subtractFromBalance(sourceAccount, available)
 		self._addToBalance(destinationAccount, amount)
 		if available > amount:
 			self._addToBalance(changeAccount, available - amount)
 
-	def check_LTCBuyOffer(self, sourceAccount, changeAccount, swapBillOffered, exchangeRate, maxBlockOffset, receivingAccount, refundAccount, maxBlock):
+	def _check_LTCBuyOffer(self, sourceAccount, changeAccount, swapBillOffered, exchangeRate, maxBlockOffset, receivingAccount, refundAccount, maxBlock):
 		assert type(swapBillOffered) is int
 		assert swapBillOffered > 0
 		assert type(exchangeRate) is int
@@ -141,7 +141,7 @@ class State(object):
 		if not LTCTrading.SatisfiesMinimumExchange(exchangeRate, swapBillOffered):
 			return False, 'does not satisfy minimum exchange amount (offer not posted)'
 		return True, ''
-	def apply_LTCBuyOffer(self, sourceAccount, changeAccount, swapBillOffered, exchangeRate, maxBlockOffset, receivingAccount, refundAccount, maxBlock):
+	def _apply_LTCBuyOffer(self, sourceAccount, changeAccount, swapBillOffered, exchangeRate, maxBlockOffset, receivingAccount, refundAccount, maxBlock):
 		available = self._balances.get(sourceAccount, 0)
 		self._subtractFromBalance(sourceAccount, available)
 		if available > swapBillOffered:
@@ -156,7 +156,7 @@ class State(object):
 		self._LTCBuys.addOffer(exchangeRate, expiry, buyDetails)
 		self._matchLTC()
 
-	def check_LTCSellOffer(self, sourceAccount, changeAccount, swapBillDesired, exchangeRate, maxBlockOffset, receivingAccount, maxBlock):
+	def _check_LTCSellOffer(self, sourceAccount, changeAccount, swapBillDesired, exchangeRate, maxBlockOffset, receivingAccount, maxBlock):
 		assert type(swapBillDesired) is int
 		assert swapBillDesired > 0
 		assert type(exchangeRate) is int
@@ -172,7 +172,7 @@ class State(object):
 		if not LTCTrading.SatisfiesMinimumExchange(exchangeRate, swapBillDesired):
 			return False, 'does not satisfy minimum exchange amount (offer not posted)'
 		return True, ''
-	def apply_LTCSellOffer(self, sourceAccount, changeAccount, swapBillDesired, exchangeRate, maxBlockOffset, receivingAccount, maxBlock):
+	def _apply_LTCSellOffer(self, sourceAccount, changeAccount, swapBillDesired, exchangeRate, maxBlockOffset, receivingAccount, maxBlock):
 		swapBillDeposit = swapBillDesired // LTCTrading.depositDivisor
 		available = self._balances.get(sourceAccount, 0)
 		self._subtractFromBalance(sourceAccount, available)
@@ -188,7 +188,7 @@ class State(object):
 		self._LTCSells.addOffer(exchangeRate, expiry, sellDetails)
 		self._matchLTC()
 
-	def check_LTCExchangeCompletion(self, pendingExchangeIndex, destinationAccount, destinationAmount):
+	def _check_LTCExchangeCompletion(self, pendingExchangeIndex, destinationAccount, destinationAmount):
 		assert type(destinationAmount) is int
 		if not pendingExchangeIndex in self._pendingExchanges:
 			return False, 'no pending exchange with the specified index (transaction ignored)'
@@ -200,14 +200,14 @@ class State(object):
 		if destinationAmount > exchangeDetails.ltc:
 			return True, 'amount is greater than required payment amount (exchange completes, but with ltc overpay)'
 		return True, ''
-	def apply_LTCExchangeCompletion(self, pendingExchangeIndex, destinationAccount, destinationAmount):
+	def _apply_LTCExchangeCompletion(self, pendingExchangeIndex, destinationAccount, destinationAmount):
 		exchangeDetails = self._pendingExchanges[pendingExchangeIndex]
 		## the seller completed his side of the exchange, so credit them the buyers swapbill
 		## and the seller is also refunded their deposit here
 		self._addToBalance(exchangeDetails.sellerReceivingAccount, exchangeDetails.swapBillAmount + exchangeDetails.swapBillDeposit)
 		self._pendingExchanges.pop(pendingExchangeIndex)
 
-	def check_ForwardToFutureNetworkVersion(self, sourceAccount, amount, maxBlock):
+	def _check_ForwardToFutureNetworkVersion(self, sourceAccount, amount, maxBlock):
 		assert type(amount) is int
 		assert amount > 0
 		if maxBlock < self._currentBlockIndex:
@@ -218,7 +218,7 @@ class State(object):
 		if available > 0:
 			return False, 'insufficient balance in source account (amount capped)'
 		return False, 'source account balance is 0'
-	def apply_ForwardToFutureNetworkVersion(self, sourceAccount, amount, maxBlock):
+	def _apply_ForwardToFutureNetworkVersion(self, sourceAccount, amount, maxBlock):
 		available = self._balances.get(sourceAccount, 0)
 		if amount > available:
 			amount = available
@@ -226,7 +226,7 @@ class State(object):
 		self._totalForwarded += amount
 
 	def checkTransaction(self, transactionType, transactionDetails):
-		methodName = 'check_' + transactionType
+		methodName = '_check_' + transactionType
 		try:
 			method = getattr(self, methodName)
 		except AttributeError as e:
@@ -237,7 +237,7 @@ class State(object):
 			raise InvalidTransactionParameters(e)
 	def applyTransaction(self, transactionType, transactionDetails):
 		assert self.checkTransaction(transactionType, transactionDetails)[0] == True
-		methodName = 'apply_' + transactionType
+		methodName = '_apply_' + transactionType
 		method = getattr(self, methodName)
 		method(**transactionDetails)
 		assert self.totalAccountedFor() == self._totalCreated
