@@ -215,7 +215,7 @@ class Test(unittest.TestCase):
 		self.assertEqual(state._LTCSells.size(), 2)
 		self.assertEqual(len(state._pendingExchanges), 1)
 		self.assertEqual(state._pendingExchanges[0].__dict__,
-			{'expiry': 150, 'swapBillDeposit': 625000, 'ltc': 5499999, 'ltcReceiveAddress': 'a_receive_ltc', 'swapBillAmount': 10000000, 'buyerAddress': 'a', 'sellerAddress': 'c'})
+			{'expiry': 150, 'swapBillDeposit': 625000, 'ltc': 5499999, 'ltcReceiveAddress': 'a_receive_ltc', 'swapBillAmount': 10000000, 'buyerAddress': 'a', 'sellerReceivingAccount': 'c'})
 
 		state.apply_Burn(500 * milliCoin, 'd')
 		self.assertEqual(state.totalAccountedFor(), state._totalCreated)
@@ -224,7 +224,7 @@ class Test(unittest.TestCase):
 		self.assertEqual(state.totalAccountedFor(), state._totalCreated)
 		self.assertEqual(len(state._pendingExchanges), 3)
 		self.assertEqual(state._pendingExchanges[1].__dict__,
-			{'expiry': 150, 'swapBillDeposit': 1375000, 'ltc': 9899999, 'ltcReceiveAddress': 'd_receive_ltc', 'swapBillAmount': 22000000, 'buyerAddress': 'd', 'sellerAddress': 'c'})
+			{'expiry': 150, 'swapBillDeposit': 1375000, 'ltc': 9899999, 'ltcReceiveAddress': 'd_receive_ltc', 'swapBillAmount': 22000000, 'buyerAddress': 'd', 'sellerReceivingAccount': 'c'})
 
 	def test_small_sell_remainder_refunded(self):
 		state = State.State(100, 'starthash')

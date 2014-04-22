@@ -50,12 +50,15 @@ class MockHost(object):
 	def getUnspent(self):
 		return self._unspent
 
-	def getNewChangeAddress(self):
+	def getNewNonSwapBillAddress(self):
 		self._nextChange += 1
-		return TextAsPubKeyHash('change' + str(self._nextChange))
+		return TextAsPubKeyHash('nonswapbill' + str(self._nextChange))
 	def getNewSwapBillAddress(self):
 		self._nextSwapBill += 1
 		return TextAsPubKeyHash('swapbill' + str(self._nextSwapBill))
+	def addressIsMine(self, pubKeyHash):
+		asText = PubKeyHashAsText(pubKeyHash)
+		return asText.startswith('nonswapbill') or asText.startswith('swapbill')
 
 	def _consumeUnspent(self, txID, vOut, scriptPubKey):
 		unspentAfter = []

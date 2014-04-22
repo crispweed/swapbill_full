@@ -88,7 +88,7 @@ class State(object):
 				else:
 					## small remaining buy offer is discarded
 					## refund swapbill amount left in this buy offer
-					self._addToBalance(buyDetails.swapBillAddress, buyDetails.swapBillAmount)
+					self._addToBalance(buyDetails.refundAccount, buyDetails.swapBillAmount)
 			if not sellDetails is None:
 				if LTCTrading.SatisfiesMinimumExchange(sellRate, sellDetails.swapBillAmount):
 					self._LTCSells.addOffer(sellRate, sellExpiry, sellDetails)
@@ -96,7 +96,7 @@ class State(object):
 				else:
 					## small remaining sell offer is discarded
 					## refund swapbill amount left in this buy offer
-					self._addToBalance(sellDetails.swapBillAddress, sellDetails.swapBillDeposit)
+					self._addToBalance(sellDetails.receivingAccount, sellDetails.swapBillDeposit)
 			return # break out of while loop
 
 	def checkWouldApplySuccessfully_Burn(self, amount, destinationAccount):
@@ -177,9 +177,8 @@ class State(object):
 		if available > swapBillOffered:
 			self._addToBalance(changeAccount, available - swapBillOffered)
 		buyDetails = BuyDetails()
-		buyDetails.swapBillAddress = sourceAccount
 		buyDetails.swapBillAmount = swapBillOffered
-		buyDetails.ltcReceiveAddress = receivingAccount
+		buyDetails.receivingAccount = receivingAccount
 		buyDetails.refundAccount = refundAccount
 		expiry = maxBlock + maxBlockOffset
 		if expiry > 0xffffffff:
@@ -216,10 +215,9 @@ class State(object):
 		if available > swapBillDeposit:
 			self._addToBalance(changeAccount, available - swapBillDeposit)
 		sellDetails = SellDetails()
-		sellDetails.swapBillAddress = sourceAccount
 		sellDetails.swapBillAmount = swapBillDesired
 		sellDetails.swapBillDeposit = swapBillDeposit
-		sellDetails.refundAccount = receivingAccount
+		sellDetails.receivingAccount = receivingAccount
 		expiry = maxBlock + maxBlockOffset
 		if expiry > 0xffffffff:
 			expiry = 0xffffffff
@@ -252,7 +250,7 @@ class State(object):
 		## the seller completed his side of the exchange, so credit them the buyers swapbill
 		## and the seller is also refunded their deposit here
 		## TODO don't reuse seller address, need a separate address for this completion credit!
-		self._addToBalance(exchangeDetails.sellerAddress, exchangeDetails.swapBillAmount + exchangeDetails.swapBillDeposit)
+		self._addToBalance(exchangeDetails.sellerReceivingAccount, exchangeDetails.swapBillAmount + exchangeDetails.swapBillDeposit)
 		self._pendingExchanges.pop(pendingExchangeIndex)
 
 	def checkWouldApplySuccessfully_ForwardToFutureNetworkVersion(self, sourceAccount, amount, maxBlock):

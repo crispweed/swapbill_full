@@ -34,29 +34,21 @@ sp = subparsers.add_parser('burn', help='destroy litecoin to create swapbill')
 sp.add_argument('--quantity', required=True, help='quantity of LTC to be destroyed (in LTC satoshis)')
 
 sp = subparsers.add_parser('pay', help='make a swapbill payment')
-sp.add_argument('--fromAddress', required=True, help='pay from this address')
 sp.add_argument('--quantity', required=True, help='quantity of swapbill to be paid (in swapbill satoshis)')
 sp.add_argument('--toAddress', required=True, help='pay to this address')
-sp.add_argument('--changeAddress', required=True, help='change from the payment is sent here')
 
 sp = subparsers.add_parser('post_ltc_buy', help='make an offer to buy litecoin with swapbill')
-sp.add_argument('--fromAddress', required=True, help='the address to fund the offer')
 sp.add_argument('--quantity', required=True, help='amount of swapbill offered')
 sp.add_argument('--exchangeRate', required=True, help='the exchange rate (positive integer, SWP/LTC * 0x100000000, must be less than 0x100000000)')
-#sp.add_argument('--offerDuration', required=True, help='the number of blocks (from transaction maxBlock) for which the offer should remain valid')
 
 sp = subparsers.add_parser('post_ltc_sell', help='make an offer to sell litecoin for swapbill')
-sp.add_argument('--fromAddress', required=True, help='the address to fund the offer')
 sp.add_argument('--quantity', required=True, help='amount of swapbill to buy (deposit of 1/16 of this amount will be paid in to the offer)')
 sp.add_argument('--exchangeRate', required=True, help='the exchange rate SWP/LTC (must be greater than 0 and less than 1)')
-#sp.add_argument('--offerDuration', required=True, help='the number of blocks (from transaction maxBlock) for which the offer should remain valid')
 
 sp = subparsers.add_parser('complete_ltc_sell', help='complete an ltc exchange by fulfilling a pending exchange payment')
 sp.add_argument('--pending_exchange_id', required=True, help='the id of the pending exchange payment to fulfill')
 
-subparsers.add_parser('show_balances', help='show current SwapBill balances')
-subparsers.add_parser('show_my_balances', help='show current SwapBill balances owned by server wallet')
-#subparsers.add_parser('show_balances_no_update', help='show current SwapBill balances (without initial sync)')
+subparsers.add_parser('show_balance', help='show current SwapBill balance')
 subparsers.add_parser('show_offers', help='show current SwapBill exchange offers')
 subparsers.add_parser('show_pending_exchanges', help='show current SwapBill pending exchange payments')
 subparsers.add_parser('print_state_info_json', help='outpt some state information in JSON format')
@@ -75,14 +67,6 @@ def Main(startBlockIndex, startBlockHash, commandLineArgs=sys.argv[1:], host=Non
 		for pubKeyHash in state._balances:
 			address = host.formatAddressForEndUser(pubKeyHash)
 			balancesByAddress[address] = state._balances[pubKeyHash]
-		#buyOffers = state._LTCBuys.getSortedExchangeRateAndDetails()
-		#for exchangeRate, buyDetails in buyOffers:
-			#pubKeyHash = buyDetails.swapBillAddress
-			#buyDetails.swapBillAddress = host.formatAddressForEndUser(pubKeyHash)
-		#sellOffers = state._LTCSells.getSortedExchangeRateAndDetails()
-		#for exchangeRate, sellDetails in sellOffers:
-			#pubKeyHash = sellDetails.swapBillAddress
-			#sellDetails.swapBillAddress = host.formatAddressForEndUser(pubKeyHash)
 		info = {
 		    'atEndOfBlock':state._currentBlockIndex - 1, 'balances':balancesByAddress, 'syncOutput':syncOut.getvalue(),
 		    'numberOfLTCBuyOffers':state._LTCBuys.size(),
@@ -98,7 +82,7 @@ def Main(startBlockIndex, startBlockHash, commandLineArgs=sys.argv[1:], host=Non
 	transactionBuildLayer = TransactionBuildLayer.TransactionBuildLayer(host)
 
 	def SetFeeAndSend(sourceLookup, baseTX, unspent):
-		change = host.getNewChangeAddress()
+		change = host.getNewNonSwapBillAddress()
 		transactionFee = TransactionFee.baseFee
 		#if hasattr(sourceLookup, '_asInput'):
 			#print(sourceLookup._asInput)
@@ -122,7 +106,7 @@ def Main(startBlockIndex, startBlockHash, commandLineArgs=sys.argv[1:], host=Non
 		wouldSucceed, failReason = state.checkTransactionWouldApplySuccessfully(transactionType, details)
 		if not wouldSucceed:
 			raise TransactionNotSuccessfulAgainstCurrentState('Transaction would not complete successfully against current state:', failReason)
-		change = host.getNewChangeAddress()
+		change = host.getNewNonSwapBillAddress()
 		print('attempting to send ' + FormatTransactionForUserDisplay.Format(host, transactionType, details), file=out)
 		unspent, sourceLookup = GetUnspent.GetUnspent(transactionBuildLayer, state._balances)
 		#print(FormatTransactionForUserDisplay.Format(host, tx), file=out)
@@ -141,6 +125,18 @@ def Main(startBlockIndex, startBlockHash, commandLineArgs=sys.argv[1:], host=Non
 			raise BadAddressArgument(address)
 		return pubKeyHash
 
+	def GetActiveAccount():
+		result = None
+		unspent, sourceLookup = GetUnspent.GetUnspent(transactionBuildLayer, state._balances)
+		for pubKeyHash in state._balances:
+			if not host.addressIsMine(pubKeyHash):
+				continue
+			if not sourceLookup.addressIsSeeded(pubKeyHash):
+				continue
+			if result is None or state._balances[pubKeyHash] > state._balances[result]:
+				result = pubKeyHash
+		return result
+
 	if args.action == 'burn':
 		transactionType = 'Burn'
 		details = {'amount':int(args.quantity), 'destinationAccount':host.getNewSwapBillAddress()}
@@ -149,8 +145,8 @@ def Main(startBlockIndex, startBlockHash, commandLineArgs=sys.argv[1:], host=Non
 	elif args.action == 'pay':
 		transactionType = 'Pay'
 		details = {
-		    'sourceAccount':CheckAndReturnPubKeyHash(args.fromAddress),
-		    'changeAccount':CheckAndReturnPubKeyHash(args.changeAddress),
+		    'sourceAccount':GetActiveAccount(),
+		    'changeAccount':host.getNewSwapBillAddress(),
 		    'amount':int(args.quantity),
 		    'destinationAccount':CheckAndReturnPubKeyHash(args.toAddress),
 		    'maxBlock':0xffffffff
@@ -159,14 +155,13 @@ def Main(startBlockIndex, startBlockHash, commandLineArgs=sys.argv[1:], host=Non
 
 	elif args.action == 'post_ltc_buy':
 		transactionType = 'LTCBuyOffer'
-		source = CheckAndReturnPubKeyHash(args.fromAddress)
 		details = {
-		    'sourceAccount':source,
-		    'changeAccount':source,
-		    'refundAccount':source,
+		    'sourceAccount':GetActiveAccount(),
+		    'changeAccount':host.getNewSwapBillAddress(),
+		    'refundAccount':host.getNewSwapBillAddress(),
 		    'swapBillOffered':int(args.quantity),
 		    'exchangeRate':int(float(args.exchangeRate) * 0x100000000),
-		    'receivingAccount':host.getNewChangeAddress(), ## TODO - this is not actually a change address, rename or add a separate call for this
+		    'receivingAccount':host.getNewNonSwapBillAddress(),
 		    'maxBlock':0xffffffff,
 		    'maxBlockOffset':0
 		}
@@ -174,13 +169,12 @@ def Main(startBlockIndex, startBlockHash, commandLineArgs=sys.argv[1:], host=Non
 
 	elif args.action == 'post_ltc_sell':
 		transactionType = 'LTCSellOffer'
-		source = CheckAndReturnPubKeyHash(args.fromAddress)
 		details = {
-		    'sourceAccount':source,
-		    'changeAccount':source,
+		    'sourceAccount':GetActiveAccount(),
+		    'changeAccount':host.getNewSwapBillAddress(),
 		    'swapBillDesired':int(args.quantity),
 		    'exchangeRate':int(float(args.exchangeRate) * 0x100000000),
-		    'receivingAccount':source,
+		    'receivingAccount':host.getNewSwapBillAddress(),
 		    'maxBlock':0xffffffff,
 		    'maxBlockOffset':0
 		}
@@ -199,33 +193,25 @@ def Main(startBlockIndex, startBlockHash, commandLineArgs=sys.argv[1:], host=Non
 		}
 		CheckAndSend(transactionType, details)
 
-	elif args.action == 'show_balances':
-		print('all balances:')
-		totalSpendable = 0
-		for pubKeyHash in state._balances:
-			address = Address.FromPubKeyHash(host._addressVersion, pubKeyHash)
-			balance = state._balances[pubKeyHash]
-			print(address + ': ' + str(balance))
-			totalSpendable += balance
-		print('total spendable swap bill satoshis: ' + str(totalSpendable))
-		print('total swap bill satoshis created:   ' + str(state._totalCreated))
-
-	elif args.action == 'show_my_balances':
-		#print(transactionBuildLayer.getUnspent())
+	elif args.action == 'show_balance':
 		unspent, sourceLookup = GetUnspent.GetUnspent(transactionBuildLayer, state._balances)
-		print('my balances:')
+		totalOwned = 0
 		totalSpendable = 0
+		largestSpendable = 0
 		for pubKeyHash in state._balances:
-			address = Address.FromPubKeyHash(host._addressVersion, pubKeyHash)
-			validateResults = host._rpcHost.call('validateaddress', address)
-			if validateResults['ismine'] == True:
-				balance = state._balances[pubKeyHash]
-				line = address + ': ' + str(balance)
-				if not sourceLookup.addressIsSeeded(pubKeyHash):
-					line += ' (needs seeding)'
-				print(line)
-				totalSpendable += balance
-		print('total spendable swap bill satoshis: ' + str(totalSpendable))
+			if not host.addressIsMine(pubKeyHash):
+				continue
+			balance = state._balances[pubKeyHash]
+			totalOwned += balance
+			if not sourceLookup.addressIsSeeded(pubKeyHash):
+				continue
+			totalSpendable += balance
+			if balance > largestSpendable:
+				largestSpendable = balance
+		print('(in swap bill satoshis): ', file=out)
+		print('total owned =', totalOwned, file=out)
+		print('total spendable =', totalSpendable, file=out)
+		print('current active balance =', totalSpendable, file=out)
 
 	elif args.action == 'show_offers':
 		print('Buy offers:')
@@ -233,7 +219,7 @@ def Main(startBlockIndex, startBlockHash, commandLineArgs=sys.argv[1:], host=Non
 		if len(offers) == 0:
 			print('  (no buy offers)')
 		for exchangeRate, buyDetails in offers:
-			pubKeyHash = buyDetails.swapBillAddress
+			pubKeyHash = buyDetails.refundAccount
 			exchangeAmount = buyDetails.swapBillAmount
 			rate_Double = float(exchangeRate) / 0x100000000
 			ltc = int(exchangeAmount * rate_Double)
@@ -248,7 +234,7 @@ def Main(startBlockIndex, startBlockHash, commandLineArgs=sys.argv[1:], host=Non
 		if len(offers) == 0:
 			print('  (no sell offers)')
 		for exchangeRate, sellDetails in offers:
-			pubKeyHash = sellDetails.swapBillAddress
+			pubKeyHash = sellDetails.receivingAccount
 			exchangeAmount = sellDetails.swapBillAmount
 			depositAmount = sellDetails.swapBillDeposit
 			rate_Double = float(exchangeRate) / 0x100000000

@@ -48,7 +48,7 @@ def CheckAndSend_FromAddress(tx):
 		exit()
 	backerUnspent = host.getNonSwapBillUnspent(state._balances)
 	scriptPubKeyLookup = ScriptPubKeyLookup.Lookup(backerUnspent[1], sourceSingleUnspent[1])
-	change = host.getNewChangeAddress()
+	change = host.getNewNonSwapBillAddress()
 	print('attempting to send swap bill transaction:', tx)
 	transactionFee = TransactionFee.baseFee
 	try:
@@ -82,7 +82,7 @@ CheckAndSend_FromAddress(tx)
 #target = host.getNewSwapBillAddress()
 #burnTX = TransactionTypes.Burn()
 #burnTX.init_FromUserRequirements(burnAmount=100000, target=target)
-#change = host.getNewChangeAddress()
+#change = host.getNewNonSwapBillAddress()
 #print('attempting to send swap bill transaction:', burnTX)
 #transactionFee = TransactionFee.baseFee
 #try:

@@ -59,10 +59,17 @@ class Host(object):
 			result.append(filtered)
 		return result
 
-	def getNewChangeAddress(self):
+	def getNewNonSwapBillAddress(self):
 		return Address.ToPubKeyHash(self._addressVersion, self._rpcHost.call('getnewaddress'))
 	def getNewSwapBillAddress(self):
 		return Address.ToPubKeyHash(self._addressVersion, self._rpcHost.call('getnewaddress', 'SwapBill'))
+
+	def addressIsMine(self, pubKeyHash):
+		address = Address.FromPubKeyHash(_addressVersion, pubKeyHash)
+		validateResults = _rpcHost.call('validateaddress', address)
+		result = validateResults['ismine']
+		assert result in (True, False)
+		return result
 
 	def signAndSend(self, unsignedTransactionHex):
 		## lowest level transaction send interface
