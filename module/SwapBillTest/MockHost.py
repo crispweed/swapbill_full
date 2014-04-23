@@ -53,10 +53,10 @@ class MockHost(object):
 		self._sourceLookup[(txid, vout)] = pubKeyHash
 		self._unspent.append(toAdd)
 
-	def addTransaction(self, unsignedTransactionHex):
+	def addTransaction(self, txid, unsignedTransactionHex):
 		if not self._nextBlock in self._transactionsByBlock:
 			self._transactionsByBlock[self._nextBlock] = []
-		self._transactionsByBlock[self._nextBlock].append(unsignedTransactionHex)
+		self._transactionsByBlock[self._nextBlock].append((txid, unsignedTransactionHex))
 
 	def getBlockHash(self, blockIndex):
 		assert blockIndex < self._nextBlock
@@ -99,6 +99,8 @@ class MockHost(object):
 			# control address
 			return False
 		return asText.startswith(self._id + '_')
+	def accountIsMine(self, pubKeyHash):
+		pass
 
 	def _consumeUnspent(self, txID, vOut, scriptPubKey):
 		unspentAfter = []
@@ -122,11 +124,11 @@ class MockHost(object):
 		sumOfInputs = 0
 		for entry in decoded['vin']:
 			sumOfInputs += self._consumeUnspent(entry['txid'], entry['vout'], entry['scriptPubKey'])
+		self._nextTXID += 1
+		txid = MakeTXID(self._nextTXID)
 		outputAmounts = []
 		for vout in range(len(decoded['vout'])):
 			entry = decoded['vout'][vout]
-			self._nextTXID += 1
-			txid = MakeTXID(self._nextTXID)
 			toAdd = {'txid':txid, 'vout':vout}
 			scriptPubKey = entry['scriptPubKey']
 			pubKeyHash = binascii.unhexlify(entry['pubKeyHash'].encode('ascii'))
@@ -152,7 +154,7 @@ class MockHost(object):
 			print('transactionFee:', transactionFee)
 			print('feeRequired:', feeRequired)
 		assert transactionFee < feeRequired + TransactionFee.dustLimit ## can potentially overspend, in theory, but will be nice to see the actual test case info that causes this
-		self.addTransaction(unsignedTransactionHex)
+		self.addTransaction(txid, unsignedTransactionHex)
 
 	def getSourceFor(self, txID, vOut):
 		return self._sourceLookup[(txID, vOut)]
@@ -162,3 +164,6 @@ class MockHost(object):
 	def addressFromEndUserFormat(self,  address):
 		return TextAsPubKeyHash(address)
 
+	def formatAccountForEndUser(self, account):
+		txID, vOut = account
+		return txID[-2:] + ':' + str(vOut)

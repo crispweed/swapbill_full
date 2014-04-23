@@ -49,18 +49,18 @@ def _save(blockIndex, blockHash, state, cacheFile):
 
 def _processBlock(host, state, blockHash, out):
 	transactions = host.getBlockTransactions(blockHash)
-	for litecoinTXHex in transactions:
+	for txID, litecoinTXHex in transactions:
 		hostTX = DecodeTransaction.Decode(litecoinTXHex)
 		if hostTX == None:
 			continue
 		try:
-			transactionType, transactionDetails = TransactionTypes.ToStateTransaction(host, hostTX)
+			transactionType, outputs, outputPubKeyHashes, transactionDetails = TransactionTypes.ToStateTransaction(hostTX)
 		except TransactionTypes.NotValidSwapBillTransaction:
 			continue
 		except TransactionTypes.UnsupportedTransaction:
 			continue
-		state.applyTransaction(transactionType, transactionDetails)
-		print('applied ' + FormatTransactionForUserDisplay.Format(host, transactionType, transactionDetails), file=out)
+		state.applyTransaction(transactionType, txID, outputs, transactionDetails)
+		print('applied ' + FormatTransactionForUserDisplay.Format(host, transactionType, outputs, outputPubKeyHashes, transactionDetails), file=out)
 	state.advanceToNextBlock()
 
 def SyncAndReturnState(cacheFile, startBlockIndex, startBlockHash, host, out):

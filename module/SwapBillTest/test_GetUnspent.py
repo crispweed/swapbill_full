@@ -21,64 +21,33 @@ class Test(unittest.TestCase):
 		balances = {'a':11}
 
 		# behaviour with no unspent available
-		unspent, sourceLookup = GetUnspent.GetUnspent(buildLayer, {})
+		unspent, swapBillUnspent = GetUnspent.GetUnspent(buildLayer, {})
 		self.assertTupleEqual(unspent, ([], []))
+		self.assertDictEqual(swapBillUnspent, {})
 				
-		#self.assertRaises(AssertionError, GetUnspent.GetUnspent_WithSingleSource, buildLayer, balances, 'b')
-		#unspent, singleSourceUnspent = GetUnspent.GetUnspent_WithSingleSource(buildLayer, balances, 'a')
-		#self.assertTupleEqual(unspent, ([], []))
-		#self.assertIsNone(singleSourceUnspent)
-		#seeded = GetUnspent.AddressesWithUnspent(buildLayer, {})
-		#self.assertSetEqual(seeded, set())
-
 		# add one non swapbill unspent
 		buildLayer._add('nonswapbill', 2, 'input1')
 
-		unspent, sourceLookup = GetUnspent.GetUnspent(buildLayer, {})
+		unspent, swapBillUnspent = GetUnspent.GetUnspent(buildLayer, {})
 		self.assertTupleEqual(unspent, ([2], ['input1']))
-		#unspent, singleSourceUnspent = GetUnspent.GetUnspent_WithSingleSource(buildLayer, balances, 'a')
-		#self.assertTupleEqual(unspent, ([2], ['input1']))
-		#self.assertIsNone(singleSourceUnspent)
-		#seeded = GetUnspent.AddressesWithUnspent(buildLayer, {})
-		#self.assertSetEqual(seeded, set())
+		self.assertDictEqual(swapBillUnspent, {})
 
 		# add one swapbill unspent
 		buildLayer._add('b', 5, 'input2')
 		# (not in balances initially)
-		unspent, sourceLookup = GetUnspent.GetUnspent(buildLayer, balances)
+		unspent, swapBillUnspent = GetUnspent.GetUnspent(buildLayer, balances)
 		self.assertTupleEqual(unspent, ([2, 5], ['input1', 'input2'])) ## don't actually care about order here, currently
+		self.assertDictEqual(swapBillUnspent, {})
 		# (and then added to balances)
-		balances['b'] = 88
-
-		unspent, sourceLookup = GetUnspent.GetUnspent(buildLayer, balances)
+		balances['input2'] = 88
+		unspent, swapBillUnspent = GetUnspent.GetUnspent(buildLayer, balances)
 		self.assertTupleEqual(unspent, ([2], ['input1']))
-		#unspent, singleSourceUnspent = GetUnspent.GetUnspent_WithSingleSource(buildLayer, balances, 'a')
-		#self.assertTupleEqual(unspent, ([2], ['input1']))
-		#self.assertIsNone(singleSourceUnspent)
-		#unspent, singleSourceUnspent = GetUnspent.GetUnspent_WithSingleSource(buildLayer, balances, 'b')
-		#self.assertTupleEqual(unspent, ([2], ['input1']))
-		#self.assertEqual(singleSourceUnspent, (5, 'input2'))
-		#seeded = GetUnspent.AddressesWithUnspent(buildLayer, {})
-		#self.assertSetEqual(seeded, set())
-		#seeded = GetUnspent.AddressesWithUnspent(buildLayer, balances)
-		#self.assertSetEqual(seeded, set('b'))
+		self.assertDictEqual(swapBillUnspent, {'input2': ('b', 5)})
 
 		# add another swapbill unspent
 		buildLayer._add('c', 9, 'input3')
-		balances['c'] = 66
-
-		unspent, sourceLookup = GetUnspent.GetUnspent(buildLayer, balances)
+		balances['input3'] = 66
+		unspent, swapBillUnspent = GetUnspent.GetUnspent(buildLayer, balances)
 		self.assertTupleEqual(unspent, ([2], ['input1']))
-		#unspent, singleSourceUnspent = GetUnspent.GetUnspent_WithSingleSource(buildLayer, balances, 'a')
-		#self.assertTupleEqual(unspent, ([2], ['input1']))
-		#self.assertIsNone(singleSourceUnspent)
-		#unspent, singleSourceUnspent = GetUnspent.GetUnspent_WithSingleSource(buildLayer, balances, 'b')
-		#self.assertTupleEqual(unspent, ([2], ['input1']))
-		#self.assertEqual(singleSourceUnspent, (5, 'input2'))
-		#unspent, singleSourceUnspent = GetUnspent.GetUnspent_WithSingleSource(buildLayer, balances, 'c')
-		#self.assertTupleEqual(unspent, ([2], ['input1']))
-		#self.assertEqual(singleSourceUnspent, (9, 'input3'))
-		#seeded = GetUnspent.AddressesWithUnspent(buildLayer, balances)
-		#self.assertSetEqual(seeded, set('bc'))
+		self.assertDictEqual(swapBillUnspent, {'input2': ('b', 5), 'input3': ('c', 9)})
 
-## TODO - test sourceLookup

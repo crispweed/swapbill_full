@@ -70,6 +70,9 @@ class Host(object):
 		result = validateResults['ismine']
 		assert result in (True, False)
 		return result
+	def accountIsMine(self, pubKeyHash):
+		pass
+		## TODO implement this!
 
 	def signAndSend(self, unsignedTransactionHex):
 		## lowest level transaction send interface
@@ -105,7 +108,7 @@ class Host(object):
 		result = []
 		for txHash in transactions[1:]:
 			txHex = self._rpcHost.call('getrawtransaction', txHash)
-			result.append(txHex)
+			result.append(txHash, txHex)
 		return result
 
 	def getSourceFor(self, txID, vOut):
@@ -127,3 +130,7 @@ class Host(object):
 		return Address.FromPubKeyHash(self._addressVersion, pubKeyHash)
 	def addressFromEndUserFormat(self,  address):
 		return Address.ToPubKeyHash(self._addressVersion, address)
+
+	def formatAccountForEndUser(self, account):
+		txID, vOut = account
+		return txID + ':' + str(vOut)

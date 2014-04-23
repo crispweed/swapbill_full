@@ -6,7 +6,7 @@ from SwapBill.ExceptionReportedToUser import ExceptionReportedToUser
 class InsufficientFunds(ExceptionReportedToUser):
 	pass
 
-def AddPaymentFeesAndChange(baseTX, sourceLookup, dustLimit, transactionFee, unspent, changePubKeyHash):
+def AddPaymentFeesAndChange(baseTX, baseInputAmount, dustLimit, transactionFee, unspent, changePubKeyHash):
 	unspentAmounts, unspentAsInputs = unspent
 
 	filledOutTX = HostTransaction.InMemoryTransaction()
@@ -17,11 +17,9 @@ def AddPaymentFeesAndChange(baseTX, sourceLookup, dustLimit, transactionFee, uns
 			amount = dustLimit
 		filledOutTX.addOutput(baseTX.outputPubKeyHash(i), amount)
 
-	baseInputAmount = 0
 	for i in range(baseTX.numberOfInputs()):
 		txID = baseTX.inputTXID(i)
 		vOut = baseTX.inputVOut(i)
-		baseInputAmount += sourceLookup.lookupAmountForTXInput(txID, vOut)
 		filledOutTX.addInput(txID, vOut)
 		
 	totalRequired = filledOutTX.sumOfOutputs() + transactionFee

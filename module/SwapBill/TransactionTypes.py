@@ -83,6 +83,10 @@ def ToStateTransaction(tx):
 	if amountMapping is not None:
 		details[amountMapping] = tx.outputAmount(0)
 	outputs = mapping[3]
+	outputPubKeyHashes = []
+	for i in range(len(outputs)):
+		outputPubKeyHashes.append(tx.outputPubKeyHash(1 + i))
+	outputPubKeyHashes = tuple(outputPubKeyHashes)
 	destinations = mapping[4]
 	for i in range(len(destinations)):
 		addressMapping, amountMapping = destinations[i]
@@ -91,7 +95,7 @@ def ToStateTransaction(tx):
 			details[addressMapping] = tx.outputPubKeyHash(1 + len(outputs) + i)
 		if amountMapping is not None:
 			details[amountMapping] = tx.outputAmount(1 + len(outputs) + i)
-	return transactionType, outputs, details
+	return transactionType, outputs, outputPubKeyHashes, details
 
 def FromStateTransaction(transactionType, outputs, outputPubKeyHashes, details):
 	assert len(outputs) == len(outputPubKeyHashes)
@@ -125,8 +129,12 @@ def FromStateTransaction(transactionType, outputs, outputPubKeyHashes, details):
 		assert addressMapping is not None
 		amount = details[amountMapping] if amountMapping is not None else 0
 		tx.addOutput(details[addressMapping], amount)
-	transactionType_Check, outputs_Check, details_Check = ToStateTransaction(tx)
+	transactionType_Check, outputs_Check, outputPubKeyHashes_Check, details_Check = ToStateTransaction(tx)
 	assert transactionType_Check == transactionType
 	assert outputs_Check == outputs
+	#if outputPubKeyHashes_Check != outputPubKeyHashes:
+		#print('outputPubKeyHashes:', outputPubKeyHashes)
+		#print('outputPubKeyHashes_Check:', outputPubKeyHashes_Check)
+	assert outputPubKeyHashes_Check == outputPubKeyHashes
 	assert details_Check == details
 	return tx

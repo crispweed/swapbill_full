@@ -63,12 +63,12 @@ def Main(startBlockIndex, startBlockHash, commandLineArgs=sys.argv[1:], host=Non
 	if args.action == 'print_state_info_json':
 		syncOut = io.StringIO()
 		state = SyncAndReturnState(args.cache_file, startBlockIndex, startBlockHash, host, out=syncOut)
-		balancesByAddress = {}
-		for pubKeyHash in state._balances:
-			address = host.formatAddressForEndUser(pubKeyHash)
-			balancesByAddress[address] = state._balances[pubKeyHash]
+		formattedBalances = {}
+		for account in state._balances:
+			key = host.formatAccountForEndUser(account)
+			formattedBalances[key] = state._balances[account]
 		info = {
-		    'atEndOfBlock':state._currentBlockIndex - 1, 'balances':balancesByAddress, 'syncOutput':syncOut.getvalue(),
+		    'atEndOfBlock':state._currentBlockIndex - 1, 'balances':formattedBalances, 'syncOutput':syncOut.getvalue(),
 		    'numberOfLTCBuyOffers':state._LTCBuys.size(),
 		    'numberOfLTCSellOffers':state._LTCSells.size(),
 		    'numberOfPendingExchanges':len(state._pendingExchanges)
@@ -81,41 +81,36 @@ def Main(startBlockIndex, startBlockHash, commandLineArgs=sys.argv[1:], host=Non
 
 	transactionBuildLayer = TransactionBuildLayer.TransactionBuildLayer(host)
 
-	def SetFeeAndSend(sourceLookup, baseTX, unspent):
+	def SetFeeAndSend(baseTX, baseTXInputsAmount, unspent):
 		change = host.getNewNonSwapBillAddress()
 		transactionFee = TransactionFee.baseFee
-		#if hasattr(sourceLookup, '_asInput'):
-			#print(sourceLookup._asInput)
-			#print(sourceLookup._amount)
-		#print(unspent)
-		#print(baseTX.__dict__)
 		try:
-			filledOutTX = BuildHostedTransaction.AddPaymentFeesAndChange(baseTX, sourceLookup, TransactionFee.dustLimit, transactionFee, unspent, change)
-			#print(filledOutTX.__dict__)
+			filledOutTX = BuildHostedTransaction.AddPaymentFeesAndChange(baseTX, baseTXInputsAmount, TransactionFee.dustLimit, transactionFee, unspent, change)
 			return transactionBuildLayer.sendTransaction(filledOutTX)
 		except Host.InsufficientTransactionFees:
 			print("Transaction fee increased.")
 			try:
 				transactionFee += TransactionFee.feeIncrement
-				filledOutTX = BuildHostedTransaction.AddPaymentFeesAndChange(baseTX, sourceLookup, TransactionFee.dustLimit, transactionFee, unspent, change)
+				filledOutTX = BuildHostedTransaction.AddPaymentFeesAndChange(baseTX, baseTXInputsAmount, TransactionFee.dustLimit, transactionFee, unspent, change)
 				return transactionBuildLayer.sendTransaction(filledOutTX)
 			except Host.InsufficientTransactionFees:
 				raise Exception("Failed: Unexpected failure to meet transaction fee requirement. (Lots of dust inputs?)")
 
-	def CheckAndSend(transactionType, details):
-		canApply, errorText = state.checkTransaction(transactionType, details)
+	def CheckAndSend(transactionType, outputs, outputPubKeys, details):
+		canApply, errorText = state.checkTransaction(transactionType, outputs, details)
 		if errorText != '':
 			raise TransactionNotSuccessfulAgainstCurrentState('Transaction would not complete successfully against current state:', errorText)
 		assert canApply
 		change = host.getNewNonSwapBillAddress()
-		print('attempting to send ' + FormatTransactionForUserDisplay.Format(host, transactionType, details), file=out)
-		unspent, sourceLookup = GetUnspent.GetUnspent(transactionBuildLayer, state._balances)
-		#print(FormatTransactionForUserDisplay.Format(host, tx), file=out)
-		baseTX = TransactionTypes.FromStateTransaction(transactionType, details, sourceLookup)
-		decodedType, decodedDetails = TransactionTypes.ToStateTransaction(sourceLookup, baseTX)
-		assert decodedType == transactionType
-		assert decodedDetails == details
-		txID = SetFeeAndSend(sourceLookup, baseTX, unspent)
+		print('attempting to send ' + FormatTransactionForUserDisplay.Format(host, transactionType, outputs, outputPubKeys, details), file=out)
+		backingUnspent, swapBillUnspent = GetUnspent.GetUnspent(transactionBuildLayer, state._balances)
+		baseTX = TransactionTypes.FromStateTransaction(transactionType, outputs, outputPubKeyHashes, details)
+		baseInputsAmount = 0
+		for i in range(baseTX.numberOfInputs()):
+			txID = baseTX.inputTXID(i)
+			vout = baseTX.inputVOut(i)
+			baseInputsAmount += swapBillUnspent[(txID, vOut)][1]
+		txID = SetFeeAndSend(baseTX, baseInputsAmount, backingUnspent)
 		print('Transaction sent with transactionID:', file=out)
 		print(txID, file=out)
 
@@ -140,46 +135,48 @@ def Main(startBlockIndex, startBlockHash, commandLineArgs=sys.argv[1:], host=Non
 
 	if args.action == 'burn':
 		transactionType = 'Burn'
-		details = {'amount':int(args.quantity), 'destinationAccount':host.getNewSwapBillAddress()}
-		CheckAndSend(transactionType, details)
+		outputs = ('destination',)
+		outputPubKeyHashes = (host.getNewSwapBillAddress(),)
+		details = {'amount':int(args.quantity)}
+		CheckAndSend(transactionType, outputs, outputPubKeyHashes, details)
 
 	elif args.action == 'pay':
 		transactionType = 'Pay'
+		outputs = ('change', 'destination')
+		outputPubKeyHashes = (host.getNewSwapBillAddress(), CheckAndReturnPubKeyHash(args.toAddress))
 		details = {
 		    'sourceAccount':GetActiveAccount(),
-		    'changeAccount':host.getNewSwapBillAddress(),
 		    'amount':int(args.quantity),
-		    'destinationAccount':CheckAndReturnPubKeyHash(args.toAddress),
 		    'maxBlock':0xffffffff
 		}
-		CheckAndSend(transactionType, details)
+		CheckAndSend(transactionType, outputs, outputPubKeyHashes, details)
 
 	elif args.action == 'post_ltc_buy':
 		transactionType = 'LTCBuyOffer'
+		outputs = ('change', 'refund')
+		outputPubKeyHashes = (host.getNewSwapBillAddress(), host.getNewSwapBillAddress())
 		details = {
 		    'sourceAccount':GetActiveAccount(),
-		    'changeAccount':host.getNewSwapBillAddress(),
-		    'refundAccount':host.getNewSwapBillAddress(),
 		    'swapBillOffered':int(args.quantity),
 		    'exchangeRate':int(float(args.exchangeRate) * 0x100000000),
-		    'receivingAccount':host.getNewNonSwapBillAddress(),
+		    'receivingAddress':host.getNewNonSwapBillAddress(),
 		    'maxBlock':0xffffffff,
 		    'maxBlockOffset':0
 		}
-		CheckAndSend(transactionType, details)
+		CheckAndSend(transactionType, outputs, outputPubKeyHashes, details)
 
 	elif args.action == 'post_ltc_sell':
 		transactionType = 'LTCSellOffer'
+		outputs = ('change', 'receiving')
+		outputPubKeyHashes = (host.getNewSwapBillAddress(), host.getNewSwapBillAddress())
 		details = {
 		    'sourceAccount':GetActiveAccount(),
-		    'changeAccount':host.getNewSwapBillAddress(),
 		    'swapBillDesired':int(args.quantity),
 		    'exchangeRate':int(float(args.exchangeRate) * 0x100000000),
-		    'receivingAccount':host.getNewSwapBillAddress(),
 		    'maxBlock':0xffffffff,
 		    'maxBlockOffset':0
 		}
-		CheckAndSend(transactionType, details)
+		CheckAndSend(transactionType, outputs, outputPubKeyHashes, details)
 
 	elif args.action == 'complete_ltc_sell':
 		transactionType = 'LTCExchangeCompletion'
@@ -189,10 +186,10 @@ def Main(startBlockIndex, startBlockHash, commandLineArgs=sys.argv[1:], host=Non
 		exchange = state._pendingExchanges[pendingExchangeID]
 		details = {
 		    'pendingExchangeIndex':pendingExchangeID,
-		    'destinationAccount':exchange.ltcReceiveAddress,
+		    'destinationAddress':exchange.ltcReceiveAddress,
 		    'destinationAmount':exchange.ltc
 		}
-		CheckAndSend(transactionType, details)
+		CheckAndSend(transactionType, (), (), details)
 
 	elif args.action == 'show_balance':
 		unspent, sourceLookup = GetUnspent.GetUnspent(transactionBuildLayer, state._balances)
