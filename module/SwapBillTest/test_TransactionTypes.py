@@ -1,6 +1,7 @@
 from __future__ import print_function
 import unittest, binascii
 from SwapBill import TransactionTypes
+from SwapBill.TransactionTypes import FromStateTransaction, ToStateTransaction
 
 class MockInputProvider(object):
 	def __init__(self):
@@ -55,7 +56,41 @@ class Test(unittest.TestCase):
 		self.assertEqual(self.EncodeInt_CheckDecode(256, 2), b'\x00\x01')
 		self.assertEqual(self.EncodeInt_CheckDecode(258, 2), b'\x02\x01')
 
-	def test(self):
+	def test_bad_state_transactions(self):
+		## outputs don't match spec
+		self.assertRaises(AssertionError, FromStateTransaction, 'Burn', (), (), {'amount':10})
+		## outputs don't match spec
+		self.assertRaises(AssertionError, FromStateTransaction, 'Burn', ('dostination',), ('_pkh',), {'amount':10})
+		## lengths of keys and outputs spec don't match
+		self.assertRaises(AssertionError, FromStateTransaction, 'Pay', ('change','destination'), ('changePKH'), {'sourceAccount':('sourceTXID',4), 'amount':20, 'maxBlock':100})
+
+	def test_types(self):
+		tx = FromStateTransaction('Burn', ('destination',), ('_pkh',), {'amount':10})
+		self.assertDictEqual(tx.__dict__, {'_inputs': [], '_outputs': [(b'SWP\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00', 10), ('_pkh', 0)]})
+		tx = FromStateTransaction('Pay', ('change','destination'), ('changePKH','destinationPKH'), {'sourceAccount':('sourceTXID',4), 'amount':20, 'maxBlock':100})
+		self.assertDictEqual(tx.__dict__, {'_inputs': [('sourceTXID', 4)], '_outputs': [(b'SWP\x01\x14\x00\x00\x00\x00\x00d\x00\x00\x00\x00\x00\x00\x00\x00\x00', 0), ('changePKH', 0), ('destinationPKH', 0)]})
+		tx = FromStateTransaction(
+		    'LTCBuyOffer', ('change','refund'), ('changePKH','refundPKH'),
+		    {'sourceAccount':('sourceTXID',5), 'receivingAddress':'receivingPKH', 'swapBillOffered':22, 'maxBlock':0, 'exchangeRate':123, 'maxBlockOffset':345}
+		)
+		self.assertDictEqual(tx.__dict__, {'_outputs': [(b'SWP\x02\x16\x00\x00\x00\x00\x00\x00\x00\x00\x00{\x00\x00\x00Y\x01', 0), ('changePKH', 0), ('refundPKH', 0), ('receivingPKH', 0)], '_inputs': [('sourceTXID', 5)]} )
+		tx = FromStateTransaction(
+		    'LTCSellOffer', ('change','receiving'), ('changePKH','receivingPKH'),
+		    {'sourceAccount':('sourceTXID',3), 'swapBillDesired':22, 'maxBlock':0, 'exchangeRate':123, 'maxBlockOffset':345}
+		)
+		self.assertDictEqual(tx.__dict__, {'_inputs': [('sourceTXID', 3)], '_outputs': [(b'SWP\x03\x16\x00\x00\x00\x00\x00\x00\x00\x00\x00{\x00\x00\x00Y\x01', 0), ('changePKH', 0), ('receivingPKH', 0)]} )
+		tx = FromStateTransaction(
+		    'LTCExchangeCompletion', (), (),
+		    {'pendingExchangeIndex':32, 'destinationAddress':'destinationPKH', 'destinationAmount':999}
+		)
+		#print('\t\tself.assertDictEqual(tx.__dict__,', tx.__dict__, ')')
+		self.assertDictEqual(tx.__dict__, {'_inputs': [], '_outputs': [(b'SWP\x04 \x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00', 0), ('destinationPKH', 999)]} )
+
+## TODO - check that stuff after end of encoded bytes in control address is ignored
+## TOTO - check forwarding to future network version
+
+
+	def not_test(self):
 		bob = binascii.unhexlify(b'0b0b')
 		bob2 = binascii.unhexlify(b'b0b2')
 		bob3 = binascii.unhexlify(b'b0b3')

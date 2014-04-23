@@ -8,22 +8,36 @@ class NotValidSwapBillTransaction(Exception):
 	pass
 
 _mappingByTypeCode = (
-    ('Burn', None, ((0, 16), 'amount'), ('destinationAccount', None)),
-    ('Pay', 'sourceAccount', (('amount', 6, 'maxBlock', 4, None, 6), None), ('changeAccount', None), ('destinationAccount', None)),
+    ('Burn', None, ((0, 16), 'amount'), ('destination',), ()),
+    ('Pay', 'sourceAccount', (('amount', 6, 'maxBlock', 4, None, 6), None), ('change','destination'), ()),
     ('LTCBuyOffer',
      'sourceAccount',
      (('swapBillOffered', 6, 'maxBlock', 4, 'exchangeRate', 4, 'maxBlockOffset', 2), None),
-     ('changeAccount', None), ('receivingAccount', None), ('refundAccount', None)
+     ('change', 'refund'),
+     (('receivingAddress', None),)
 	),
     ('LTCSellOffer',
      'sourceAccount',
      (('swapBillDesired', 6, 'maxBlock', 4, 'exchangeRate', 4, 'maxBlockOffset', 2), None),
-     ('changeAccount', None), ('receivingAccount', None)
+     ('change', 'receiving'),
+     ()
 	),
-    ('LTCExchangeCompletion', None, (('pendingExchangeIndex', 6, None, 10), None), ('destinationAccount', 'destinationAmount')),
+    ('LTCExchangeCompletion', None, (('pendingExchangeIndex', 6, None, 10), None), (), (('destinationAddress', 'destinationAmount'),)),
 	)
 
-_forwardCompatibilityMapping = ('ForwardToFutureNetworkVersion', None, (('amount', 6, 'maxBlock', 4, None, 6), None), ('changeAccount', None))
+_forwardCompatibilityMapping = ('ForwardToFutureNetworkVersion', None, (('amount', 6, 'maxBlock', 4, None, 6), None), ('change',), ())
+
+def _mappingFromTypeString(transactionType):
+	for i in range(len(_mappingByTypeCode)):
+		if transactionType == _mappingByTypeCode[i][0]:
+			return i, _mappingByTypeCode[i]
+	raise Exception('Unknown transaction type string', transactionType)
+def _mappingFromTypeCode(typeCode):
+	if typeCode < len(_mappingByTypeCode):
+		return _mappingByTypeCode[typeCode]
+	if typeCode < 128:
+		return _forwardCompatibilityMapping
+	raise UnsupportedTransaction()
 
 def _decodeInt(data):
 	multiplier = 1
@@ -43,26 +57,16 @@ def _encodeInt(value, numberOfBytes):
 	assert value == 0
 	return result
 
-def _firstSource(sourceLookup, tx):
-	txID = tx.inputTXID(0)
-	vOut = tx.inputVOut(0)
-	return sourceLookup.getSourceFor(txID, vOut)
-
-def ToStateTransaction(sourceLookup, tx):
+def ToStateTransaction(tx):
 	controlAddressData = tx.outputPubKeyHash(0)
 	assert controlAddressData.startswith(ControlAddressPrefix.prefix)
 	assert len(ControlAddressPrefix.prefix) == 3
 	typeCode = _decodeInt(controlAddressData[3:4])
-	if typeCode < len(_mappingByTypeCode):
-		mapping = _mappingByTypeCode[typeCode]
-	elif typeCode < 128:
-		mapping = _forwardCompatibilityMapping
-	else:
-		raise UnsupportedTransaction()
+	mapping = _mappingFromTypeCode(typeCode)
 	transactionType = mapping[0]
 	details = {}
 	if mapping[1] is not None:
-		details[mapping[1]] = _firstSource(sourceLookup, tx)
+		details[mapping[1]] = (tx.inputTXID(0), tx.inputVOut(0))
 	controlAddressMapping, amountMapping = mapping[2]
 	pos = 4
 	for i in range(len(controlAddressMapping) // 2):
@@ -78,29 +82,22 @@ def ToStateTransaction(sourceLookup, tx):
 	assert pos == 20
 	if amountMapping is not None:
 		details[amountMapping] = tx.outputAmount(0)
-	for i in range(len(mapping) - 3):
-		addressMapping, amountMapping = mapping[3 + i]
+	outputs = mapping[3]
+	destinations = mapping[4]
+	for i in range(len(destinations)):
+		addressMapping, amountMapping = destinations[i]
 		assert addressMapping is not None
 		if addressMapping is not None:
-			details[addressMapping] = tx.outputPubKeyHash(1 + i)
+			details[addressMapping] = tx.outputPubKeyHash(1 + len(outputs) + i)
 		if amountMapping is not None:
-			details[amountMapping] = tx.outputAmount(1 + i)
-	return transactionType, details
+			details[amountMapping] = tx.outputAmount(1 + len(outputs) + i)
+	return transactionType, outputs, details
 
-#def _addInput(tx, inputProvider, sourceAccount):
-	#txID, vOut = inputProvider.getTXInputForAddress(sourceAccount)
-	#tx.addInput(txID, vOut)
-
-#def FromStateTransaction(transactionType, details, inputProvider):
-def FromStateTransaction(transactionType, details):
+def FromStateTransaction(transactionType, outputs, outputPubKeyHashes, details):
+	assert len(outputs) == len(outputPubKeyHashes)
+	typeCode, mapping = _mappingFromTypeString(transactionType)
 	tx = HostTransaction.InMemoryTransaction()
-	for i in range(len(_mappingByTypeCode)):
-		if transactionType == _mappingByTypeCode[i][0]:
-			mapping = _mappingByTypeCode[i]
-			typeCode = i
-			break
 	if mapping[1] is not None:
-		#_addInput(tx, inputProvider, details[mapping[1]])
 		txID, vout = details[mapping[1]]
 		tx.addInput(txID, vout)
 	controlAddressMapping, amountMapping = mapping[2]
@@ -119,10 +116,17 @@ def FromStateTransaction(transactionType, details):
 	else:
 		amount = details[amountMapping]
 	tx.addOutput(controlAddressData, amount)
-	for i in range(len(mapping) - 3):
-		addressMapping, amountMapping = mapping[3 + i]
+	expectedOutputs = mapping[3]
+	assert expectedOutputs == outputs
+	for pubKeyHash in outputPubKeyHashes:
+		tx.addOutput(pubKeyHash, 0)
+	destinations = mapping[4]
+	for addressMapping, amountMapping in destinations:
 		assert addressMapping is not None
 		amount = details[amountMapping] if amountMapping is not None else 0
 		tx.addOutput(details[addressMapping], amount)
+	transactionType_Check, outputs_Check, details_Check = ToStateTransaction(tx)
+	assert transactionType_Check == transactionType
+	assert outputs_Check == outputs
+	assert details_Check == details
 	return tx
-
