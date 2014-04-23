@@ -108,7 +108,7 @@ def Main(startBlockIndex, startBlockHash, commandLineArgs=sys.argv[1:], host=Non
 		baseInputsAmount = 0
 		for i in range(baseTX.numberOfInputs()):
 			txID = baseTX.inputTXID(i)
-			vout = baseTX.inputVOut(i)
+			vOut = baseTX.inputVOut(i)
 			baseInputsAmount += swapBillUnspent[(txID, vOut)][1]
 		txID = SetFeeAndSend(baseTX, baseInputsAmount, backingUnspent)
 		print('Transaction sent with transactionID:', file=out)
@@ -122,16 +122,21 @@ def Main(startBlockIndex, startBlockHash, commandLineArgs=sys.argv[1:], host=Non
 		return pubKeyHash
 
 	def GetActiveAccount():
-		result = None
-		unspent, sourceLookup = GetUnspent.GetUnspent(transactionBuildLayer, state._balances)
-		for pubKeyHash in state._balances:
-			if not host.addressIsMine(pubKeyHash):
-				continue
-			if not sourceLookup.addressIsSeeded(pubKeyHash):
-				continue
-			if result is None or state._balances[pubKeyHash] > state._balances[result]:
-				result = pubKeyHash
-		return result
+		best = None
+		backingUnspent, swapBillUnspent = GetUnspent.GetUnspent(transactionBuildLayer, state._balances)
+		for key in swapBillUnspent:
+			address, dustAmount = swapBillUnspent[key]
+			if not host.addressIsMine(address):
+				#print('not mine:', address)
+				continue			
+			#print('mine:', address)
+			amount = state._balances[key]
+			if best is None or amount > bestAmount:
+				best = key
+				bestAmount = amount
+		#print('GetActiveAccount() returns:', best)
+		#print('bestAmount was:', bestAmount)
+		return best
 
 	if args.action == 'burn':
 		transactionType = 'Burn'

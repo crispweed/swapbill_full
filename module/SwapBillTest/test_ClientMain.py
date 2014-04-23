@@ -28,6 +28,17 @@ def GetStateInfo(host):
 	output = RunClient(host, ['print_state_info_json'])
 	return json.loads(output)
 
+def GetAddressForUnspent(host, formattedAccount):
+	print('trying to match', formattedAccount)
+	for entry in host.getUnspent():
+		txID = entry['txid']
+		vOut = entry['vout']
+		formattedAccountForEntry = host.formatAccountForEndUser((txID, vOut))
+		print(formattedAccountForEntry)
+		if formattedAccountForEntry == formattedAccount:
+			return entry['address']
+	raise Exception('not found')
+
 class Test(unittest.TestCase):
 	def test(self):
 		host = MockHost()
@@ -41,20 +52,22 @@ class Test(unittest.TestCase):
 
 		RunClient(host, ['burn', '--quantity', '1000000'])
 
+		#print('unspent after burn:')
+		#print(host.getUnspent())
+
 		info = GetStateInfo(host)
-		## TODO - would be nicer if the client reused address "swapbill2", from the first burn
-		self.assertEqual(info['balances'], {"02:0": 1000000})
+		self.assertEqual(info['balances'], {"02:1": 1000000})
 
 		output = RunClient(host, ['burn', '--quantity', '2000000'])
 		#print(output)
 
 		info = GetStateInfo(host)
-		self.assertEqual(info['balances'], {"02:0": 1000000, "03:0": 2000000})
+		self.assertEqual(info['balances'], {"02:1": 1000000, "03:1": 2000000})
 
 		output = RunClient(host, ['pay', '--quantity', '1', '--toAddress', "_swapbill2"])
 
 		info = GetStateInfo(host)
-		self.assertEqual(info['balances'], {"_swapbill2": 1000001, "_swapbill4":1999999})
+		self.assertEqual(info['balances'], {'02:1': 1000000, '04:2': 1, '04:1': 1999999})
 
 		host._addUnspent(800000000)
 		output = RunClient(host, ['burn', '--quantity', '400000000'])
@@ -62,7 +75,7 @@ class Test(unittest.TestCase):
 		#print(output)
 
 		info = GetStateInfo(host)
-		self.assertEqual(info['balances'], {"_swapbill2": 1000001, "_swapbill4":1999999, "_swapbill5": 400000000, "_swapbill6": 100000000})
+		self.assertEqual(info['balances'], {'02:1': 1000000, '04:2': 1, '04:1': 1999999, '06:1': 400000000, '07:1': 100000000})
 
 		output = RunClient(host, ['post_ltc_buy', '--quantity', '400000000', '--exchangeRate', "0.5"])
 
@@ -99,7 +112,7 @@ class Test(unittest.TestCase):
 		host._addUnspent(300000)
 		RunClient(host, ['burn', '--quantity', '100000'])
 		info = GetStateInfo(host)
-		firstBurnTarget = "04:0" ## couple of addresses got 'wasted'
+		firstBurnTarget = "04:1"
 		self.assertEqual(info['balances'], {firstBurnTarget:100000})
 
 		self.assertRaises(InsufficientFunds, RunClient, host, ['burn', '--quantity', '600000'])
@@ -107,7 +120,7 @@ class Test(unittest.TestCase):
 		RunClient(host, ['burn', '--quantity', '150000'])
 
 		info = GetStateInfo(host)
-		secondBurnTarget = "05:0"
+		secondBurnTarget = "05:1"
 		self.assertEqual(info['balances'], {firstBurnTarget:100000, secondBurnTarget:150000})
 
 		host._addUnspent(600000)
@@ -115,14 +128,25 @@ class Test(unittest.TestCase):
 		RunClient(host, ['burn', '--quantity', '160000'])
 
 		info = GetStateInfo(host)
-		thirdBurnTarget = "07:0"
+		thirdBurnTarget = "07:1"
 		self.assertEqual(info['balances'], {firstBurnTarget:100000, secondBurnTarget:150000, thirdBurnTarget:160000})
 
-		RunClient(host, ['pay', '--quantity', '100', '--toAddress', 'pay_target'])
+		host._setOwner('recipient')
+		payTargetAddress = host.formatAddressForEndUser(host.getNewSwapBillAddress())
+		host._setOwner('')
+		
+		RunClient(host, ['pay', '--quantity', '100', '--toAddress', payTargetAddress])
+		#print('unspent after pay:')
+		#print(host.getUnspent())
 
 		info = GetStateInfo(host)
-		payChange = "07:0"
-		self.assertEqual(info['balances'], {firstBurnTarget:100000, secondBurnTarget:150000, 'pay_target':100, payChange:160000-100})
+		payChange = "08:1"
+		#self.assertEqual(info['balances'], {firstBurnTarget:100000, secondBurnTarget:150000, 'pay_target':100, payChange:160000-100})
+		payTarget = "08:2"
+		self.assertEqual(info['balances'], {firstBurnTarget:100000, secondBurnTarget:150000, payTarget:100, payChange:160000-100})
+		host._setOwner('recipient')
+		self.assertEqual(host.formatAddressForEndUser(GetAddressForUnspent(host, payTarget)), payTargetAddress)
+		host._setOwner('')
 
 		# and this should not submit because there are not enough funds for the payment
 		self.assertRaises(TransactionNotSuccessfulAgainstCurrentState, RunClient, host, ['pay', '--quantity', '160000', '--toAddress', 'pay_target'])
@@ -137,7 +161,7 @@ class Test(unittest.TestCase):
 		host._addUnspent(100000000)
 		RunClient(host, ['burn', '--quantity', '2000000'])
 		info = GetStateInfo(host)
-		self.assertEqual(info['balances'], {'02:0':1000000, '04:0':2000000})
+		self.assertEqual(info['balances'], {'02:1':1000000, '04:1':2000000})
 
 	def test_ltc_trading(self):
 		host = InitHost()

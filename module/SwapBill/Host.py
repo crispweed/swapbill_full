@@ -70,9 +70,6 @@ class Host(object):
 		result = validateResults['ismine']
 		assert result in (True, False)
 		return result
-	def accountIsMine(self, pubKeyHash):
-		pass
-		## TODO implement this!
 
 	def signAndSend(self, unsignedTransactionHex):
 		## lowest level transaction send interface

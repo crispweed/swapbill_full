@@ -35,18 +35,18 @@ class Test(unittest.TestCase):
 		self.assertEqual(succeeds, True)
 		self.assertEqual(reason, '')
 		state.applyTransaction(transactionType='Burn', txID='tx0', outputs=('destination',), transactionDetails={'amount':1})
-		self.assertEqual(state._balances, {('tx0',0):1})
+		self.assertEqual(state._balances, {('tx0',1):1})
 		# state should assert if you try to apply a bad transaction, and exit without any effect
 		self.assertRaises(AssertionError, state.applyTransaction, 'Burn', 'tx1', ('destination',), {'amount':0})
-		self.assertEqual(state._balances, {('tx0',0):1})
+		self.assertEqual(state._balances, {('tx0',1):1})
 		state.applyTransaction(transactionType='Burn', txID='tx1', outputs=('destination',), transactionDetails={'amount':2})
-		self.assertEqual(state._balances, {('tx0',0):1, ('tx1',0):2})
+		self.assertEqual(state._balances, {('tx0',1):1, ('tx1',1):2})
 
 	def Burn(self, amount):
 		self._nextTX += 1
 		txID = 'tx' + str(self._nextTX)
 		self.state.applyTransaction(transactionType='Burn', txID=txID, outputs=('destination',), transactionDetails={'amount':amount})
-		return (txID, 0)
+		return (txID, 1)
 
 	#def Apply_AssertSucceeds(self, state, transactionType, txID, **details):
 		### note that applyTransaction now calls check and asserts success internally

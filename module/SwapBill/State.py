@@ -111,8 +111,8 @@ class State(object):
 		return True, ''
 	def _apply_Burn(self, txID, amount):
 		self._totalCreated += amount
-		assert not (txID, 0) in self._balances
-		self._balances[(txID, 0)] = amount
+		assert not (txID, 1) in self._balances
+		self._balances[(txID, 1)] = amount
 
 	## TODO - split transaction details into inputs and outputs?
 
@@ -130,9 +130,9 @@ class State(object):
 	def _apply_Pay(self, txID, sourceAccount, amount, maxBlock):
 		available = self._balances.get(sourceAccount, 0)
 		self._subtractFromBalance(sourceAccount, available)
-		self._addToBalance((txID, 1), amount)
+		self._addToBalance((txID, 2), amount)
 		if available > amount:
-			self._addToBalance((txID, 0), available - amount)
+			self._addToBalance((txID, 1), available - amount)
 
 	def _check_LTCBuyOffer(self, sourceAccount, swapBillOffered, exchangeRate, maxBlockOffset, receivingAddress, maxBlock):
 		if outputs != ('change', 'refund'):
@@ -155,11 +155,11 @@ class State(object):
 		available = self._balances.get(sourceAccount, 0)
 		self._subtractFromBalance(sourceAccount, available)
 		if available > swapBillOffered:
-			self._addToBalance((txID, 0), available - swapBillOffered)
+			self._addToBalance((txID, 1), available - swapBillOffered)
 		buyDetails = BuyDetails()
 		buyDetails.swapBillAmount = swapBillOffered
 		buyDetails.receivingAccount = receivingAddress
-		buyDetails.refundAccount = (txID, 1) ## TODO - warn or fail if we try to spend this account before exchange completed
+		buyDetails.refundAccount = (txID, 2) ## TODO - warn or fail if we try to spend this account before exchange completed
 		expiry = maxBlock + maxBlockOffset
 		if expiry > 0xffffffff:
 			expiry = 0xffffffff
@@ -189,11 +189,11 @@ class State(object):
 		available = self._balances.get(sourceAccount, 0)
 		self._subtractFromBalance(sourceAccount, available)
 		if available > swapBillDeposit:
-			self._addToBalance((txID, 0), available - swapBillDeposit)
+			self._addToBalance((txID, 1), available - swapBillDeposit)
 		sellDetails = SellDetails()
 		sellDetails.swapBillAmount = swapBillDesired
 		sellDetails.swapBillDeposit = swapBillDeposit
-		sellDetails.receivingAccount = (txID, 1) ## TODO - warn or fail if we try to spend this account before exchange completed
+		sellDetails.receivingAccount = (txID, 2) ## TODO - warn or fail if we try to spend this account before exchange completed
 		expiry = maxBlock + maxBlockOffset
 		if expiry > 0xffffffff:
 			expiry = 0xffffffff

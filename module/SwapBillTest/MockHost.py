@@ -99,8 +99,6 @@ class MockHost(object):
 			# control address
 			return False
 		return asText.startswith(self._id + '_')
-	def accountIsMine(self, pubKeyHash):
-		pass
 
 	def _consumeUnspent(self, txID, vOut, scriptPubKey):
 		unspentAfter = []
@@ -137,6 +135,7 @@ class MockHost(object):
 			toAdd['address'] = pubKeyHash
 			toAdd['amount'] = entry['value']
 			self._sourceLookup[(txid, vout)] = pubKeyHash
+			#print(toAdd)
 			self._unspent.append(toAdd)
 			outputAmounts.append(entry['value'])
 		transactionFee = sumOfInputs - sum(outputAmounts)

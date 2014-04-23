@@ -5,6 +5,7 @@ def GetUnspent(buildLayer, swapBillBalances):
 	swapBillUnspent = {}
 	for i in range(len(addresses)):
 		if asInputs[i] in swapBillBalances:
+			#print("in swapBillBalances:", asInputs[i])
 			assert not asInputs[i] in swapBillUnspent
 			swapBillUnspent[asInputs[i]] = (addresses[i], amounts[i])
 		else:
