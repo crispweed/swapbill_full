@@ -87,11 +87,12 @@ def ToStateTransaction(sourceLookup, tx):
 			details[amountMapping] = tx.outputAmount(1 + i)
 	return transactionType, details
 
-def _addInput(tx, inputProvider, sourceAccount):
-	txID, vOut = inputProvider.getTXInputForAddress(sourceAccount)
-	tx.addInput(txID, vOut)
+#def _addInput(tx, inputProvider, sourceAccount):
+	#txID, vOut = inputProvider.getTXInputForAddress(sourceAccount)
+	#tx.addInput(txID, vOut)
 
-def FromStateTransaction(transactionType, details, inputProvider):
+#def FromStateTransaction(transactionType, details, inputProvider):
+def FromStateTransaction(transactionType, details):
 	tx = HostTransaction.InMemoryTransaction()
 	for i in range(len(_mappingByTypeCode)):
 		if transactionType == _mappingByTypeCode[i][0]:
@@ -99,7 +100,9 @@ def FromStateTransaction(transactionType, details, inputProvider):
 			typeCode = i
 			break
 	if mapping[1] is not None:
-		_addInput(tx, inputProvider, details[mapping[1]])
+		#_addInput(tx, inputProvider, details[mapping[1]])
+		txID, vout = details[mapping[1]]
+		tx.addInput(txID, vout)
 	controlAddressMapping, amountMapping = mapping[2]
 	controlAddressData = ControlAddressPrefix.prefix + _encodeInt(typeCode, 1)
 	for i in range(len(controlAddressMapping) // 2):

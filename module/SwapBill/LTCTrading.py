@@ -18,7 +18,7 @@ def Match(buyRate, buyExpiry, buyDetails, sellRate, sellExpiry, sellDetails):
 	appliedRate = (buyRate + sellRate) // 2
 	exchange = Exchange()
 	exchange.ltcReceiveAddress = buyDetails.receivingAccount
-	exchange.buyerAddress = buyDetails.refundAccount
+	exchange.buyerAddress = buyDetails.refundOutput
 	exchange.sellerReceivingAccount = sellDetails.receivingAccount
 	outstandingBuy = None
 	outstandingSell = None

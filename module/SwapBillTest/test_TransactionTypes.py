@@ -23,8 +23,9 @@ class MockSourceLookup(object):
 class Test(unittest.TestCase):
 
 	def EncodeAndCheck(self, transactionType, details, ignoredBytesAtEnd=0):
-		inputProvider = MockInputProvider()
-		tx = TransactionTypes.FromStateTransaction(transactionType, details, inputProvider)
+		#inputProvider = MockInputProvider()
+		#tx = TransactionTypes.FromStateTransaction(transactionType, details, inputProvider)
+		tx = TransactionTypes.FromStateTransaction(transactionType, details)
 		sourceLookup = MockSourceLookup()
 		decodedType, decodedDetails = TransactionTypes.ToStateTransaction(sourceLookup, tx)
 		self.assertEqual(transactionType, decodedType)
@@ -53,7 +54,7 @@ class Test(unittest.TestCase):
 		self.assertEqual(self.EncodeInt_CheckDecode(255, 2), b'\xff\x00')
 		self.assertEqual(self.EncodeInt_CheckDecode(256, 2), b'\x00\x01')
 		self.assertEqual(self.EncodeInt_CheckDecode(258, 2), b'\x02\x01')
-		
+
 	def test(self):
 		bob = binascii.unhexlify(b'0b0b')
 		bob2 = binascii.unhexlify(b'b0b2')
@@ -74,7 +75,7 @@ class Test(unittest.TestCase):
 		tx._outputs[0] = (b'SWP\x00\x00\x00\x00\x00\x00\x00\x00\x00\x80\x00\x00\x00\x00\x00\x00\x00', 10)
 		self.assertRaises(TransactionTypes.NotValidSwapBillTransaction, TransactionTypes.ToStateTransaction, MockSourceLookup(), tx)
 
-		details = {'sourceAccount':bob, 'amount':10, 'destinationAccount':alice, 'changeAccount':bob2, 'maxBlock':100}
+		details = {'sourceAccount':('bob_tx0',0), 'amount':10, 'destinationAccount':('alice_tx0',0), 'changeAccount':('bob_tx1',0), 'maxBlock':100}
 		tx = self.EncodeAndCheck('Pay', details)
 		self.assertEqual(tx.numberOfInputs(), 1)
 		self.assertEqual(tx.numberOfOutputs(), 3)
