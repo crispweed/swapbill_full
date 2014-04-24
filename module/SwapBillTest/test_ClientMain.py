@@ -12,22 +12,6 @@ from SwapBill.ClientMain import TransactionNotSuccessfulAgainstCurrentState
 
 cacheFile = 'test.cache'
 
-def InitHost():
-	host = MockHost()
-	if os.path.exists(cacheFile):
-		os.remove(cacheFile)
-	return host
-
-def RunClient(host, args):
-	fullArgs = ['--cache-file', cacheFile] + args
-	out = io.StringIO()
-	ClientMain.Main(startBlockIndex=0, startBlockHash=host.getBlockHash(0), commandLineArgs=fullArgs, host=host, out=out)
-	return out.getvalue()
-
-def GetStateInfo(host):
-	output = RunClient(host, ['print_state_info_json'])
-	return json.loads(output)
-
 def GetAddressForUnspent(host, formattedAccount):
 	#print('trying to match', formattedAccount)
 	for entry in host.getUnspent():
@@ -49,11 +33,52 @@ def GetOwnerBalances(host, ownerList, balances):
 		for entry in unspent:
 			account = (entry['txid'], entry['vout'])
 			key = host.formatAccountForEndUser(account)
-			ownerBalance += balances[key]
+			ownerBalance += balances.get(key, 0)
 		if ownerBalance > 0:
 			result[owner] = ownerBalance
 	host._setOwner(ownerAtStart)
 	return result
+
+def CheckEachBalanceHasUnspent(host, balances):
+	for formattedAccount in balances:
+		account = host._accountFromEndUserFormat(formattedAccount)
+		#print(account)
+		host._checkAccountHasUnspent(account)
+
+def GetOwnerBackingAmounts(host, ownerList, balances):
+	result = {}
+	ownerAtStart = host._getOwner()
+	for owner in ownerList:
+		host._setOwner(owner)
+		unspent = host.getUnspent()
+		ownerTotal = 0
+		for entry in unspent:
+			account = (entry['txid'], entry['vout'])
+			key = host.formatAccountForEndUser(account)
+			if not key in balances:
+				ownerTotal += entry['amount']
+		if ownerTotal > 0:
+			result[owner] = ownerTotal
+	host._setOwner(ownerAtStart)
+	return result
+
+def InitHost():
+	host = MockHost()
+	if os.path.exists(cacheFile):
+		os.remove(cacheFile)
+	return host
+
+def RunClient(host, args):
+	fullArgs = ['--cache-file', cacheFile] + args
+	out = io.StringIO()
+	ClientMain.Main(startBlockIndex=0, startBlockHash=host.getBlockHash(0), commandLineArgs=fullArgs, host=host, out=out)
+	return out.getvalue()
+
+def GetStateInfo(host):
+	output = RunClient(host, ['print_state_info_json'])
+	info = json.loads(output)
+	CheckEachBalanceHasUnspent(host, info['balances'])
+	return info
 
 class Test(unittest.TestCase):
 	def test(self):
@@ -97,68 +122,105 @@ class Test(unittest.TestCase):
 
 		info = GetStateInfo(host)
 		#print(info)
-		self.assertEqual(info['balances'], {"_swapbill2": 1000001, "_swapbill4": 1999999, "_swapbill6": 100000000}) # swapbill5 entire balance moved in to buy offer
+		self.assertEqual(info['balances'], {'02:1': 1000000, '04:2': 1, '04:1': 1999999, '07:1': 100000000, '08:2': 0})
 
 		RunClient(host, ['post_ltc_sell', '--quantity', '200000000', '--exchangeRate', "0.5"])
 
 		info = GetStateInfo(host)
-		self.assertEqual(info['balances'], {"_swapbill2": 1000001, "_swapbill4": 1999999, "_swapbill9": 87500000}) # deposit of 12500000 moved in to sell offer
+		# deposit of 12500000 moved in to sell offer, 87500000 change
+		self.assertEqual(info['balances'], {'02:1': 1000000, '04:2': 1, '04:1': 1999999, '09:1': 87500000, '08:2': 0, '09:2': 0})
 
 		output = RunClient(host, ['complete_ltc_sell', '--pending_exchange_id', "0"])
-		#print('complete:')
-		#print(output)
-		#print('end complete')
 
 		info = GetStateInfo(host)
-		#print('get info:')
-		#print(output)
-		#print('end get info')
-		self.assertEqual(info['balances'], {"_swapbill2": 1000001, "_swapbill4": 1999999, "_swapbill9": 87500000, "_swapbill10": 212500000}) # seller gets deposit returned plus payment for ltc
+		# exchange completed successfully
+		# deposit + swapcoin counterparty credited to ltc seller
+		## TODO left over zero balance account should be cleaned up
+		self.assertEqual(info['balances'], {'02:1': 1000000, '04:2': 1, '04:1': 1999999, '09:1': 87500000, '08:2': 0, '09:2': 212500000})
+
+	def test_ltc_sell_missing_unspent_regression(self):
+		host = MockHost()
+		if os.path.exists(cacheFile):
+			os.remove(cacheFile)
+		host._addUnspent(500000000)
+		RunClient(host, ['burn', '--quantity', '100000000'])
+		burnTarget = "02:1"
+		info = GetStateInfo(host)
+		self.assertEqual(info['balances'], {burnTarget:100000000})
+		RunClient(host, ['post_ltc_sell', '--quantity', '30000000', '--exchangeRate', '0.5'])
+		info = GetStateInfo(host)
+		RunClient(host, ['post_ltc_buy', '--quantity', '30000000', '--exchangeRate', '0.5'])
+		info = GetStateInfo(host)
+		#host._logConsumeUnspent = True
+		RunClient(host, ['complete_ltc_sell', '--pending_exchange_id', '0'])
+		info = GetStateInfo(host)
+		#print(host._unspent)
+
+	def test_burn_funding(self):
+		host = MockHost()
+		if os.path.exists(cacheFile):
+			os.remove(cacheFile)
+		dustLimit = 100000
+		transactionFee = 100000
+		# burn requires burnAmount for control + 1 dust for dest + transactionFee
+		# so burn of 1111111 will require 111111 + 100000 + 100000 = 311111
+		self.assertRaises(InsufficientFunds, RunClient, host, ['burn', '--quantity', '111111'])
+		host._addUnspent(100000)
+		self.assertRaises(InsufficientFunds, RunClient, host, ['burn', '--quantity', '111111'])
+		host._addUnspent(100000)
+		self.assertRaises(InsufficientFunds, RunClient, host, ['burn', '--quantity', '111111'])
+		host._addUnspent(100000)
+		self.assertRaises(InsufficientFunds, RunClient, host, ['burn', '--quantity', '111111'])
+		host._addUnspent(11110)
+		self.assertRaises(InsufficientFunds, RunClient, host, ['burn', '--quantity', '111111'])
+		info = GetStateInfo(host)
+		self.assertEqual(info['balances'], {})
+		host._addUnspent(1)
+		RunClient(host, ['burn', '--quantity', '100000'])
+		burnTarget = "06:1"
+		info = GetStateInfo(host)
+		self.assertEqual(info['balances'], {burnTarget:100000})
 
 	def test_burn_and_pay(self):
 		host = MockHost()
 		if os.path.exists(cacheFile):
 			os.remove(cacheFile)
 
-		self.assertRaises(InsufficientFunds, RunClient, host, ['burn', '--quantity', '100000'])
-		host._addUnspent(100000)
-		self.assertRaises(InsufficientFunds, RunClient, host, ['burn', '--quantity', '100000'])
+		nextTX = 1
 
-		host._addUnspent(200000)
-		host._addUnspent(300000)
+		host._addUnspent(100000000)
+		nextTX += 1
+
 		RunClient(host, ['burn', '--quantity', '100000'])
+		firstBurnTarget = "0" + str(nextTX) + ":1"
+		nextTX += 1
 		info = GetStateInfo(host)
-		firstBurnTarget = "04:1"
 		self.assertEqual(info['balances'], {firstBurnTarget:100000})
 
-		self.assertRaises(InsufficientFunds, RunClient, host, ['burn', '--quantity', '600000'])
-
 		RunClient(host, ['burn', '--quantity', '150000'])
-
+		secondBurnTarget = "0" + str(nextTX) + ":1"
+		nextTX += 1
 		info = GetStateInfo(host)
-		secondBurnTarget = "05:1"
 		self.assertEqual(info['balances'], {firstBurnTarget:100000, secondBurnTarget:150000})
 
 		host._addUnspent(600000)
+		nextTX += 1
 
 		RunClient(host, ['burn', '--quantity', '160000'])
-
+		thirdBurnTarget = "0" + str(nextTX) + ":1"
+		nextTX += 1
 		info = GetStateInfo(host)
-		thirdBurnTarget = "07:1"
 		self.assertEqual(info['balances'], {firstBurnTarget:100000, secondBurnTarget:150000, thirdBurnTarget:160000})
 
 		host._setOwner('recipient')
 		payTargetAddress = host.formatAddressForEndUser(host.getNewSwapBillAddress())
 		host._setOwner('')
-		
-		RunClient(host, ['pay', '--quantity', '100', '--toAddress', payTargetAddress])
-		#print('unspent after pay:')
-		#print(host.getUnspent())
 
+		RunClient(host, ['pay', '--quantity', '100', '--toAddress', payTargetAddress])
+		payChange = "0" + str(nextTX) + ":1"
+		payTarget = "0" + str(nextTX) + ":2"
+		nextTX += 1
 		info = GetStateInfo(host)
-		payChange = "08:1"
-		#self.assertEqual(info['balances'], {firstBurnTarget:100000, secondBurnTarget:150000, 'pay_target':100, payChange:160000-100})
-		payTarget = "08:2"
 		self.assertEqual(info['balances'], {firstBurnTarget:100000, secondBurnTarget:150000, payTarget:100, payChange:160000-100})
 		host._setOwner('recipient')
 		self.assertEqual(host.formatAddressForEndUser(GetAddressForUnspent(host, payTarget)), payTargetAddress)
@@ -193,7 +255,7 @@ class Test(unittest.TestCase):
 		host._addUnspent(50200000)
 		RunClient(host, ['burn', '--quantity', '50000000'])
 		host._setOwner('dave')
-		host._addUnspent(60200000)
+		host._addUnspent(60300000) ## will have 100000 backing funds left over
 		RunClient(host, ['burn', '--quantity', '60000000'])
 		info = GetStateInfo(host)
 		#print('dave unspent:')
@@ -202,6 +264,8 @@ class Test(unittest.TestCase):
 		ownerBalances = GetOwnerBalances(host, ownerList, info['balances'])
 		#print(ownerBalances)
 		self.assertDictEqual(ownerBalances, {'bob': 20000000, 'clive': 50000000, 'alice': 30000000, 'dave': 60000000})
+		backingAmounts = GetOwnerBackingAmounts(host, ownerList, info['balances'])
+		self.assertDictEqual(backingAmounts, {'dave': 100000})
 
 		## alice and bob both want to buy LTC
 		## clive and dave both want to sell
@@ -209,6 +273,7 @@ class Test(unittest.TestCase):
 		## alice makes buy offer
 
 		host._setOwner('alice')
+		host._addUnspent(100000000)
 		RunClient(host, ['post_ltc_buy', '--quantity', '30000000', '--exchangeRate', '0.5'])
 		info = GetStateInfo(host)
 		self.assertEqual(info['numberOfLTCBuyOffers'], 1)
@@ -220,9 +285,11 @@ class Test(unittest.TestCase):
 		## bob makes better offer, but with smaller amount
 
 		host._setOwner('bob')
+		host._addUnspent(100000000)
 		RunClient(host, ['post_ltc_buy', '--quantity', '10000000', '--exchangeRate', '0.25'])
 		info = GetStateInfo(host)
-		self.assertEqual(info['balances'], {'bob_swapbill7':10000000, 'clive_swapbill3':50000000, 'dave_swapbill4':60000000})
+		ownerBalances = GetOwnerBalances(host, ownerList, info['balances'])
+		self.assertDictEqual(ownerBalances, {'bob': 10000000, 'clive': 50000000, 'dave': 60000000})
 		self.assertEqual(info['numberOfLTCBuyOffers'], 2)
 		self.assertEqual(info['numberOfLTCSellOffers'], 0)
 		self.assertEqual(info['numberOfPendingExchanges'], 0)
@@ -230,9 +297,12 @@ class Test(unittest.TestCase):
 		## clive makes a sell offer, matching bob's buy exactly
 
 		host._setOwner('clive')
+		host._addUnspent(100000000)
 		RunClient(host, ['post_ltc_sell', '--quantity', '10000000', '--exchangeRate', '0.25'])
+		cliveCompletionPaymentExpiry = host._nextBlock + 50 # note that RunClient posts the transaction, and then the transaction will go through in the next block
 		info = GetStateInfo(host)
-		self.assertEqual(info['balances'], {'bob_swapbill7':10000000, 'clive_swapbill9':49375000, 'dave_swapbill4':60000000})
+		ownerBalances = GetOwnerBalances(host, ownerList, info['balances'])
+		self.assertDictEqual(ownerBalances, {'bob': 10000000, 'clive': 49375000, 'dave': 60000000})
 		self.assertEqual(info['numberOfLTCBuyOffers'], 1)
 		self.assertEqual(info['numberOfLTCSellOffers'], 0)
 		self.assertEqual(info['numberOfPendingExchanges'], 1)
@@ -242,33 +312,42 @@ class Test(unittest.TestCase):
 		host._setOwner('bob')
 		RunClient(host, ['post_ltc_buy', '--quantity', '10000000', '--exchangeRate', '0.25'])
 		info = GetStateInfo(host)
-		self.assertEqual(info['balances'], {'clive_swapbill9':49375000, 'dave_swapbill4':60000000})
+		ownerBalances = GetOwnerBalances(host, ownerList, info['balances'])
+		self.assertDictEqual(ownerBalances, {'clive': 49375000, 'dave': 60000000})
 		self.assertEqual(info['numberOfLTCBuyOffers'], 2)
 		self.assertEqual(info['numberOfLTCSellOffers'], 0)
 		self.assertEqual(info['numberOfPendingExchanges'], 1)
 
 		host._setOwner('dave')
+		host._addUnspent(100000000)
 		RunClient(host, ['post_ltc_sell', '--quantity', '20000000', '--exchangeRate', '0.26953125'])
 		info = GetStateInfo(host)
-		self.assertEqual(info['balances'], {'clive_swapbill9':49375000, 'dave_swapbill13':58750000})
+		ownerBalances = GetOwnerBalances(host, ownerList, info['balances'])
+		self.assertDictEqual(ownerBalances, {'clive': 49375000, 'dave': 58750000})
 		self.assertEqual(info['numberOfLTCBuyOffers'], 1)
 		self.assertEqual(info['numberOfLTCSellOffers'], 1)
 		self.assertEqual(info['numberOfPendingExchanges'], 2)
 
-		host._advance(47)
+		assert cliveCompletionPaymentExpiry > host._nextBlock
+		host._advance(cliveCompletionPaymentExpiry - host._nextBlock)
+		# GetStateInfo will advance to the expiry block
+		# but the exchange doesn't expire until the end of that block
 		info = GetStateInfo(host)
-		self.assertEqual(info['balances'], {'clive_swapbill9':49375000, 'dave_swapbill13':58750000})
+		ownerBalances = GetOwnerBalances(host, ownerList, info['balances'])
+		self.assertDictEqual(ownerBalances, {'clive': 49375000, 'dave': 58750000})
 		self.assertEqual(info['numberOfLTCBuyOffers'], 1)
 		self.assertEqual(info['numberOfLTCSellOffers'], 1)
 		self.assertEqual(info['numberOfPendingExchanges'], 2)
-		#clive fails to make his payment within the required block clount!
 		host._advance(1)
+		#clive failed to make his payment within the required block clount!
+		#the pending exchange expires
 		info = GetStateInfo(host)
-		#bob is credited his offer amount (which was locked up for the exchange) + clive's deposit
-		self.assertEqual(info['balances'], {'bob_swapbill8':10625000, 'clive_swapbill9':49375000, 'dave_swapbill13':58750000})
 		self.assertEqual(info['numberOfLTCBuyOffers'], 1)
 		self.assertEqual(info['numberOfLTCSellOffers'], 1)
 		self.assertEqual(info['numberOfPendingExchanges'], 1)
+		#bob is credited his offer amount (which was locked up for the exchange) + clive's deposit
+		ownerBalances = GetOwnerBalances(host, ownerList, info['balances'])
+		self.assertDictEqual(ownerBalances, {'bob':10625000, 'clive': 49375000, 'dave': 58750000})
 
 		#dave is more on the ball, and makes his completion payment
 		host._setOwner('dave')
@@ -276,7 +355,8 @@ class Test(unittest.TestCase):
 
 		info = GetStateInfo(host)
 		#dave gets credited bob's exchange funds, and is also refunded his exchange deposit
-		self.assertEqual(info['balances'], {'bob_swapbill8':10625000, 'clive_swapbill9':49375000, 'dave_swapbill13':58750000, 'dave_swapbill14':10625000})
+		ownerBalances = GetOwnerBalances(host, ownerList, info['balances'])
+		self.assertDictEqual(ownerBalances, {'bob':10625000, 'clive': 49375000, 'dave': 58750000+10625000})
 		self.assertEqual(info['numberOfLTCBuyOffers'], 1)
 		self.assertEqual(info['numberOfLTCSellOffers'], 1)
 		self.assertEqual(info['numberOfPendingExchanges'], 0)

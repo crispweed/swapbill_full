@@ -114,12 +114,12 @@ class Test(unittest.TestCase):
 
 		# can't repeat the same transaction (output has been consumed)
 		reason = self.Apply_AssertFails(state, 'Pay', sourceAccount=('tx3',1), amount=20, maxBlock=200)
-		self.assertEqual(reason, 'insufficient balance in source account (transaction ignored)')
+		self.assertEqual(reason, 'source account does not exist')
 		self.assertEqual(state._balances, {('tx1',1):10, ('tx2',1):20, ('tx4',1):10, ('tx4',2):20})
 
 		# can't pay from a nonexistant account
 		reason = self.Apply_AssertFails(state, 'Pay', sourceAccount=('tx12',2), amount=20, maxBlock=200)
-		self.assertEqual(reason, 'insufficient balance in source account (transaction ignored)')
+		self.assertEqual(reason, 'source account does not exist')
 		self.assertEqual(state._balances, {('tx1',1):10, ('tx2',1):20, ('tx4',1):10, ('tx4',2):20})
 
 		# pay transaction fails and has no affect on state if there is not enough balance for payment
@@ -174,7 +174,7 @@ class Test(unittest.TestCase):
 		outputs = self.Apply_AssertSucceeds(state, 'LTCBuyOffer', sourceAccount=burnA, swapBillOffered=30000000, exchangeRate=0x80000000, maxBlockOffset=0, receivingAddress='a_receive', maxBlock=200)
 		changeA = outputs['change']
 		refundA = outputs['refund']
-		self.assertEqual(state._balances, {changeA:70000000, burnB:200000000, burnC:200000000})
+		self.assertEqual(state._balances, {changeA:70000000, burnB:200000000, burnC:200000000, refundA:0})
 		self.assertEqual(state._LTCBuys.size(), 1)
 
 		# B wants to sell
@@ -182,7 +182,7 @@ class Test(unittest.TestCase):
 		# try offering more than available
 		reason = self.Apply_AssertFails(state, 'LTCSellOffer', sourceAccount=burnB, swapBillDesired=40000000000, exchangeRate=0x80000000, maxBlockOffset=0, maxBlock=200)
 		self.assertEqual(reason, 'insufficient balance for deposit in source account (offer not posted)')
-		self.assertEqual(state._balances, {changeA:70000000, burnB:200000000, burnC:200000000})
+		self.assertEqual(state._balances, {changeA:70000000, burnB:200000000, burnC:200000000, refundA:0})
 		self.assertEqual(state._LTCBuys.size(), 1)
 		self.assertEqual(state._LTCSells.size(), 0)
 
@@ -190,7 +190,7 @@ class Test(unittest.TestCase):
 		outputs = self.Apply_AssertSucceeds(state, 'LTCSellOffer', sourceAccount=burnB, swapBillDesired=40000000, exchangeRate=0x80000000, maxBlockOffset=0, maxBlock=200)
 		changeB = outputs['change']
 		receivingB = outputs['receiving']
-		self.assertEqual(state._balances, {changeA:70000000, changeB:197500000, burnC:200000000})
+		self.assertEqual(state._balances, {changeA:70000000, changeB:197500000, burnC:200000000, refundA:0, receivingB:0})
 		self.assertEqual(state._LTCBuys.size(), 0)
 		self.assertEqual(state._LTCSells.size(), 1)
 		self.assertEqual(len(state._pendingExchanges), 1)
@@ -202,7 +202,7 @@ class Test(unittest.TestCase):
 		reason = self.Apply_AssertFails(state, 'LTCExchangeCompletion', pendingExchangeIndex=1, destinationAddress='a_receive', destinationAmount=20000000)
 		self.assertEqual(reason, 'no pending exchange with the specified index (transaction ignored)')
 		# no state change
-		self.assertEqual(state._balances, {changeA:70000000, changeB:197500000, burnC:200000000})
+		self.assertEqual(state._balances, {changeA:70000000, changeB:197500000, burnC:200000000, refundA:0, receivingB:0})
 		self.assertEqual(state._LTCBuys.size(), 0)
 		self.assertEqual(state._LTCSells.size(), 1)
 		self.assertEqual(len(state._pendingExchanges), 1)
@@ -212,7 +212,7 @@ class Test(unittest.TestCase):
 		reason = self.Apply_AssertFails(state, 'LTCExchangeCompletion', pendingExchangeIndex=0, destinationAddress='randomAddress', destinationAmount=20000000)
 		self.assertEqual(reason, 'destination account does not match destination for pending exchange with the specified index (transaction ignored)')
 		# no state change
-		self.assertEqual(state._balances, {changeA:70000000, changeB:197500000, burnC:200000000})
+		self.assertEqual(state._balances, {changeA:70000000, changeB:197500000, burnC:200000000, refundA:0, receivingB:0})
 		self.assertEqual(state._LTCBuys.size(), 0)
 		self.assertEqual(state._LTCSells.size(), 1)
 		self.assertEqual(len(state._pendingExchanges), 1)
@@ -222,7 +222,7 @@ class Test(unittest.TestCase):
 		reason = self.Apply_AssertFails(state, 'LTCExchangeCompletion', pendingExchangeIndex=0, destinationAddress='a_receive', destinationAmount=14999999)
 		self.assertEqual(reason, 'amount is less than required payment amount (transaction ignored)')
 		# no state change (b just loses these ltc)
-		self.assertEqual(state._balances, {changeA:70000000, changeB:197500000, burnC:200000000})
+		self.assertEqual(state._balances, {changeA:70000000, changeB:197500000, burnC:200000000, refundA:0, receivingB:0})
 		self.assertEqual(state._LTCBuys.size(), 0)
 		self.assertEqual(state._LTCSells.size(), 1)
 		self.assertEqual(len(state._pendingExchanges), 1)
@@ -242,7 +242,7 @@ class Test(unittest.TestCase):
 		# payment of the 30000000 offered by A
 		# plus fraction of deposit for the amount matched (=1875000)
 		# (the rest of the deposit is left with an outstanding remainder sell offer)
-		self.assertEqual(state._balances, {changeA:70000000, changeB:197500000, burnC:200000000, receivingB:31875000})
+		self.assertEqual(state._balances, {changeA:70000000, changeB:197500000, burnC:200000000, refundA:0, receivingB:31875000})
 		self.assertEqual(state._LTCBuys.size(), 0)
 		self.assertEqual(state._LTCSells.size(), 1)
 		self.assertEqual(len(state._pendingExchanges), 0)
@@ -268,11 +268,11 @@ class Test(unittest.TestCase):
 		burnB = self.Burn(10000000)
 		changeB, receiveB = self.SellOffer(state, burnB, swapBillDesired=10000000, exchangeRate=0x80000000)
 		# deposit is 10000000 // 16 = 625000
-		self.assertEqual(state._balances, {changeB:9375000})
+		self.assertEqual(state._balances, {changeB:9375000, receiveB:0})
 		burnA = self.Burn(9900000)
 		changeA, refundA = self.BuyOffer(state, burnA, 'receiveLTC', swapBillOffered=9900000, exchangeRate=0x80000000)
 		# b should be refunded 100000 // 10000000 of his depost = 6250
-		self.assertEqual(state._balances, {changeB:9375000, receiveB:6250})
+		self.assertEqual(state._balances, {changeB:9375000, receiveB:6250, refundA:0})
 		self.assertEqual(len(state._pendingExchanges), 1)
 		self.Completion(state, 0, 'receiveLTC', 9900000 // 2)
 		self.assertEqual(len(state._pendingExchanges), 0)
@@ -281,7 +281,7 @@ class Test(unittest.TestCase):
 		# *** and so, it is important that the refund above is not spent before all parts of the buy offer are completed, and all funds collected
 		# *** and state should not permit you to do this
 		# TODO implement and check prevention of this kind of early cash-out
-		self.assertEqual(state._balances, {changeB:9375000, receiveB:10525000})
+		self.assertEqual(state._balances, {changeB:9375000, receiveB:10525000, refundA:0}) ## TODO clean up the refund account
 
 	def test_small_buy_remainder_refunded(self):
 		state = State.State(100, 'starthash')
@@ -289,11 +289,11 @@ class Test(unittest.TestCase):
 		burnB = self.Burn(10000000)
 		changeB, receiveB = self.SellOffer(state, burnB, swapBillDesired=10000000, exchangeRate=0x80000000)
 		# deposit is 10000000 // 16 = 625000
-		self.assertEqual(state._balances, {changeB:9375000})
+		self.assertEqual(state._balances, {changeB:9375000, receiveB:0})
 		burnA = self.Burn(10100000)
 		changeA, refundA = self.BuyOffer(state, burnA, 'receiveLTC', swapBillOffered=10100000, exchangeRate=0x80000000)
 		# a should be refunded 100000 remainder from buy offer
-		self.assertEqual(state._balances, {changeB:9375000, refundA:100000})
+		self.assertEqual(state._balances, {changeB:9375000, receiveB:0, refundA:100000})
 		self.assertEqual(len(state._pendingExchanges), 1)
 		self.Completion(state, 0, 'receiveLTC', 10000000 // 2)
 		self.assertEqual(len(state._pendingExchanges), 0)
@@ -305,16 +305,16 @@ class Test(unittest.TestCase):
 		burnB = self.Burn(10000000)
 		changeB, receiveB = self.SellOffer(state, burnB, swapBillDesired=10000000, exchangeRate=0x80000000)
 		# deposit is 10000000 // 16 = 625000
-		self.assertEqual(state._balances, {changeB: 9375000})
+		self.assertEqual(state._balances, {changeB: 9375000, receiveB:0})
 		burnA = self.Burn(10000000)
 		changeA, refundA = self.BuyOffer(state, burnA, 'receiveLTC', swapBillOffered=10000000, exchangeRate=0x80000000)
 		# nothing refunded, no change to balances
-		self.assertEqual(state._balances, {changeB:9375000})
+		self.assertEqual(state._balances, {changeB:9375000, receiveB:0, refundA:0})
 		self.assertEqual(len(state._pendingExchanges), 1)
 		self.Completion(state, 0, 'receiveLTC', 10000000 // 2)
 		self.assertEqual(state.totalAccountedFor(), state._totalCreated)
 		self.assertEqual(len(state._pendingExchanges), 0)
-		self.assertEqual(state._balances, {changeB:9375000, receiveB:10625000})
+		self.assertEqual(state._balances, {changeB:9375000, receiveB:10625000, refundA:0}) ## TODO clean up refund account after offers expire!
 
 	def test_sell_remainder_outstanding(self):
 		state = State.State(100, 'starthash')
@@ -322,11 +322,11 @@ class Test(unittest.TestCase):
 		burnB = self.Burn(20000000)
 		changeB, receiveB = self.SellOffer(state, burnB, swapBillDesired=20000000, exchangeRate=0x80000000)
 		# deposit is 20000000 // 16 = 1250000
-		self.assertEqual(state._balances, {changeB:18750000})
+		self.assertEqual(state._balances, {changeB:18750000, receiveB:0})
 		burnA = self.Burn(10000000)
 		changeA, refundA = self.BuyOffer(state, burnA, 'receiveLTC', swapBillOffered=10000000, exchangeRate=0x80000000)
 		# nothing refunded, no change to balances
-		self.assertEqual(state._balances, {changeB:18750000})
+		self.assertEqual(state._balances, {changeB:18750000, receiveB:0, refundA:0})
 		self.assertEqual(len(state._pendingExchanges), 1)
 		self.assertEqual(state._LTCBuys.size(), 0)
 		self.assertEqual(state._LTCSells.size(), 1) ## half of sell offer is left outstanding
@@ -334,7 +334,7 @@ class Test(unittest.TestCase):
 		self.assertEqual(len(state._pendingExchanges), 0)
 		# b should be refunded half his deposit = 625000, plus payment of 10000000
 		# (and b now has all swapbill except deposit for outstanding sell offer = 625000)
-		self.assertEqual(state._balances, {changeB:18750000, receiveB:10625000})
+		self.assertEqual(state._balances, {changeB:18750000, receiveB:10625000, refundA:0})
 		# a goes on to buy the rest
 		burnA2 = self.Burn(10000000)
 		changeA2, refundA2 = self.BuyOffer(state, burnA2, 'receiveLTC2', swapBillOffered=10000000, exchangeRate=0x80000000)
@@ -342,7 +342,7 @@ class Test(unittest.TestCase):
 		# other second payment counterparty + second half of deposit are credited to b's receive account
 		# *** note that this is the same account as already credited above, and should not be redeemed early
 		# TODO add transaction checks to prevent early cash out, and check for this here
-		self.assertEqual(state._balances, {changeB:18750000, receiveB:21250000})
+		self.assertEqual(state._balances, {changeB:18750000, receiveB:21250000, refundA:0, refundA2:0})
 
 	def test_buy_remainder_outstanding(self):
 		state = State.State(100, 'starthash')
@@ -350,26 +350,26 @@ class Test(unittest.TestCase):
 		burnB = self.Burn(20000000)
 		changeB, receiveB = self.SellOffer(state, burnB, swapBillDesired=20000000, exchangeRate=0x80000000)
 		# deposit is 20000000 // 16 = 1250000
-		self.assertEqual(state._balances, {changeB:18750000})
+		self.assertEqual(state._balances, {changeB:18750000, receiveB:0})
 		burnA = self.Burn(30000000)
 		changeA, refundA = self.BuyOffer(state, burnA, 'receiveLTC', swapBillOffered=30000000, exchangeRate=0x80000000)
 		# nothing refunded, no change to balances
-		self.assertEqual(state._balances, {changeB:18750000})
+		self.assertEqual(state._balances, {changeB:18750000, receiveB:0, refundA:0})
 		self.assertEqual(len(state._pendingExchanges), 1)
 		self.assertEqual(state._LTCBuys.size(), 1) ## half of buy offer is left outstanding
 		self.assertEqual(state._LTCSells.size(), 0)
 		self.Completion(state, 0, 'receiveLTC', 20000000 // 2)
 		self.assertEqual(len(state._pendingExchanges), 0)
 		# b should be refunded all his deposit, and receives payment in swapbill
-		self.assertEqual(state._balances, {changeB:18750000, receiveB:21250000})
+		self.assertEqual(state._balances, {changeB:18750000, receiveB:21250000, refundA:0})
 		# b goes on to sell the rest
 		burnB2 = self.Burn(10000000)
 		changeB2, receiveB2 = self.SellOffer(state, burnB2, swapBillDesired=10000000, exchangeRate=0x80000000)
-		self.assertEqual(state._balances, {changeB:18750000, receiveB:21250000, changeB2:9375000})
+		self.assertEqual(state._balances, {changeB:18750000, receiveB:21250000, refundA:0, changeB2:9375000, receiveB2:0})
 		self.assertEqual(len(state._pendingExchanges), 1)
 		self.Completion(state, 1, 'receiveLTC', 10000000 // 2)
 		self.assertEqual(len(state._pendingExchanges), 0)
-		self.assertEqual(state._balances, {changeB:18750000, receiveB:21250000, changeB2:9375000, receiveB2:10625000})
+		self.assertEqual(state._balances, {changeB:18750000, receiveB:21250000, refundA:0, changeB2:9375000, receiveB2:10625000})
 
 ## TODO tests for offer matching multiple other offers
 ## TODO test for fail to complete due to expiry

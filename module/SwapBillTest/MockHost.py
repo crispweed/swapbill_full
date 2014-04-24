@@ -115,8 +115,9 @@ class MockHost(object):
 		assert found is not None
 		if not self.addressIsMine(found['address']):
 			raise Exception('At least one unspent output used in the transaction cannot be signed.', self.formatAddressForEndUser(found['address']))
-		#print('consuming unspent:')
-		#print(found)
+		if hasattr(self, '_logConsumeUnspent') and self._logConsumeUnspent:
+			print('consuming unspent:')
+			print(found)
 		self._unspent = unspentAfter
 		return found['amount']
 
@@ -169,4 +170,17 @@ class MockHost(object):
 
 	def formatAccountForEndUser(self, account):
 		txID, vOut = account
+		assert txID[:-2] == '00' * 31
 		return txID[-2:] + ':' + str(vOut)
+	def _accountFromEndUserFormat(self, formatted):
+		txID = '00' * 31 + formatted[:2]
+		assert formatted[2:3] == ':'
+		vOut = int(formatted[3:])
+		return txID, vOut
+
+	def _checkAccountHasUnspent(self, account):
+		txID, vOut = account
+		for entry in self._unspent:
+			if entry['txid'] == txID and entry['vout'] == vOut:
+				return
+		raise Exception('no unspent for:', account)

@@ -21,7 +21,7 @@ def AddPaymentFeesAndChange(baseTX, baseInputAmount, dustLimit, transactionFee, 
 		txID = baseTX.inputTXID(i)
 		vOut = baseTX.inputVOut(i)
 		filledOutTX.addInput(txID, vOut)
-		
+
 	totalRequired = filledOutTX.sumOfOutputs() + transactionFee
 	if baseInputAmount + sum(unspentAmounts) < totalRequired:
 		raise InsufficientFunds('Not enough funds available for the transaction, total required:', totalRequired, 'transaction fee:', transactionFee, 'sum of unspent:', sum(unspentAmounts))
@@ -35,6 +35,7 @@ def AddPaymentFeesAndChange(baseTX, baseInputAmount, dustLimit, transactionFee, 
 
 	if baseInputAmount + outputsTotal > totalRequired:
 		overSupply = baseInputAmount + outputsTotal - totalRequired
+		#print('overSupply:', overSupply)
 		if overSupply >= dustLimit:
 			filledOutTX.addOutput(changePubKeyHash, overSupply)
 

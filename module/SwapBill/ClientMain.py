@@ -105,7 +105,12 @@ def Main(startBlockIndex, startBlockHash, commandLineArgs=sys.argv[1:], host=Non
 		change = host.getNewNonSwapBillAddress()
 		print('attempting to send ' + FormatTransactionForUserDisplay.Format(host, transactionType, outputs, outputPubKeys, details), file=out)
 		backingUnspent, swapBillUnspent = GetUnspent.GetUnspent(transactionBuildLayer, state._balances)
-		baseTX = TransactionTypes.FromStateTransaction(transactionType, outputs, outputPubKeyHashes, details)
+		#if transactionType == 'LTCExchangeCompletion':
+			#print('balances:')
+			#print(state._balances)
+			#print('backingUnspent:')
+			#print(backingUnspent)
+		baseTX = TransactionTypes.FromStateTransaction(transactionType, outputs, outputPubKeys, details)
 		baseInputsAmount = 0
 		for i in range(baseTX.numberOfInputs()):
 			txID = baseTX.inputTXID(i)
@@ -129,7 +134,7 @@ def Main(startBlockIndex, startBlockHash, commandLineArgs=sys.argv[1:], host=Non
 			address, dustAmount = swapBillUnspent[key]
 			if not host.addressIsMine(address):
 				#print('not mine:', address)
-				continue			
+				continue
 			#print('mine:', address)
 			amount = state._balances[key]
 			if best is None or amount > bestAmount:
@@ -195,6 +200,8 @@ def Main(startBlockIndex, startBlockHash, commandLineArgs=sys.argv[1:], host=Non
 		    'destinationAddress':exchange.ltcReceiveAddress,
 		    'destinationAmount':exchange.ltc
 		}
+		#print('complete_ltc_sell details:')
+		#print(details)
 		CheckAndSend(transactionType, (), (), details)
 
 	elif args.action == 'show_balance':
