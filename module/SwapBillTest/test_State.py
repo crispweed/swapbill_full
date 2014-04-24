@@ -9,6 +9,14 @@ def Pack(**details):
 	return details
 
 class Test(unittest.TestCase):
+	outputsLookup = {
+	    'Burn':('destination',),
+	    'Pay':('change','destination'),
+	    'LTCBuyOffer':('change','refund'),
+	    'LTCSellOffer':('change','receiving'),
+	    'LTCExchangeCompletion':()
+	    }
+	
 	def __init__(self, *args, **kwargs):
 		super(Test, self).__init__(*args, **kwargs)
 		self._nextTX = 0
@@ -24,6 +32,10 @@ class Test(unittest.TestCase):
 		self.assertRaises(InvalidTransactionParameters, state.checkTransaction, 'Burn', ('destination',), {})
 		self.assertRaises(InvalidTransactionParameters, state.checkTransaction, 'Burn', ('destination',), {'amount':0, 'spuriousAdditionalDetail':0})
 
+	def TXID(self):
+		self._nextTX += 1
+		return 'tx' + str(self._nextTX)
+
 	def test_burn(self):
 		state = State.State(100, 'mockhash')
 		self.assertRaises(OutputsSpecDoesntMatch, state.checkTransaction, 'Burn', ('none',), {'amount':0})
@@ -34,33 +46,34 @@ class Test(unittest.TestCase):
 		succeeds, reason = state.checkTransaction('Burn', ('destination',), {'amount':1})
 		self.assertEqual(succeeds, True)
 		self.assertEqual(reason, '')
-		state.applyTransaction(transactionType='Burn', txID='tx0', outputs=('destination',), transactionDetails={'amount':1})
-		self.assertEqual(state._balances, {('tx0',1):1})
+		state.applyTransaction(transactionType='Burn', txID=self.TXID(), outputs=('destination',), transactionDetails={'amount':1})
+		self.assertEqual(state._balances, {('tx1',1):1})
 		# state should assert if you try to apply a bad transaction, and exit without any effect
-		self.assertRaises(AssertionError, state.applyTransaction, 'Burn', 'tx1', ('destination',), {'amount':0})
-		self.assertEqual(state._balances, {('tx0',1):1})
-		state.applyTransaction(transactionType='Burn', txID='tx1', outputs=('destination',), transactionDetails={'amount':2})
-		self.assertEqual(state._balances, {('tx0',1):1, ('tx1',1):2})
+		self.assertRaises(AssertionError, state.applyTransaction, 'Burn', 'badTX', ('destination',), {'amount':0})
+		self.assertEqual(state._balances, {('tx1',1):1})
+		state.applyTransaction(transactionType='Burn', txID=self.TXID(), outputs=('destination',), transactionDetails={'amount':2})
+		self.assertEqual(state._balances, {('tx1',1):1, ('tx2',1):2})
 
 	def Burn(self, amount):
-		self._nextTX += 1
-		txID = 'tx' + str(self._nextTX)
+		txID = self.TXID()
 		self.state.applyTransaction(transactionType='Burn', txID=txID, outputs=('destination',), transactionDetails={'amount':amount})
 		return (txID, 1)
 
-	#def Apply_AssertSucceeds(self, state, transactionType, txID, **details):
+	def Apply_AssertSucceeds(self, state, transactionType, **details):
+		outputs = self.outputsLookup[transactionType]
 		### note that applyTransaction now calls check and asserts success internally
 		### but this then also asserts that there is no warning
-		#succeeds, reason = state.checkTransaction(transactionType, details)
-		#self.assertEqual(succeeds, True)
-		#self.assertEqual(reason, '')
-		#state.applyTransaction(transactionType, txID, details)
+		canApply, reason = state.checkTransaction(transactionType, outputs, details)
+		self.assertEqual(canApply, True)
+		self.assertEqual(reason, '')
+		state.applyTransaction(transactionType, txID=self.TXID(), outputs=outputs, transactionDetails=details)
 
-	#def Apply_AssertFails(self, state, transactionType, **details):
-		#wouldApplySuccessfully, reason = state.checkTransaction(transactionType, details)
-		#self.assertEqual(wouldApplySuccessfully, False)
-		#self.assertRaises(AssertionError, state.applyTransaction, transactionType, 'AssertFails_TXID', details)
-		#return reason
+	def Apply_AssertFails(self, state, transactionType, **details):
+		outputs = self.outputsLookup[transactionType]
+		canApply, reason = state.checkTransaction(transactionType, outputs, details)
+		self.assertEqual(canApply, False)
+		self.assertRaises(AssertionError, state.applyTransaction, transactionType, txID='AssertFails_TXID', outputs=outputs, transactionDetails=details)
+		return reason
 
 	def test_burn_and_pay(self):
 		state = State.State(100, 'mockhash')
@@ -71,42 +84,56 @@ class Test(unittest.TestCase):
 		self.assertEqual(state._balances, {output1:10, output2:20})
 		output3 = self.Burn(30)
 		self.assertEqual(state._balances, {output1:10, output2:20, output3:30})
+		self.assertEqual(state._balances, {('tx1',1):10, ('tx2',1):20, ('tx3',1):30})
 
-		return
+		self.Apply_AssertSucceeds(state, 'Pay', sourceAccount=('tx3',1), amount=20, maxBlock=200)
+		self.assertEqual(state._balances, {('tx1',1):10, ('tx2',1):20, ('tx4',1):10, ('tx4',2):20})
 
-		self.Apply_AssertSucceeds(state, 'Pay', 'tx3', sourceAccount=('tx2',4), changeOutput=2, amount=20, destinationOutput=3, maxBlock=200)
-		self.assertEqual(state._balances, {('tx0',1):10, ('tx1',1):20, ('tx3',2):10, ('tx3',3):20})
-
-		# can't repeat the same transaction
-		reason = self.Apply_AssertFails(state, 'Pay', sourceAccount=('tx2',4), changeOutput=2, amount=15, destinationOutput=3, maxBlock=200)
+		# can't repeat the same transaction (output has been consumed)
+		reason = self.Apply_AssertFails(state, 'Pay', sourceAccount=('tx3',1), amount=20, maxBlock=200)
 		self.assertEqual(reason, 'insufficient balance in source account (transaction ignored)')
-		self.assertEqual(state._balances, {('tx0',1):10, ('tx1',1):20, ('tx3',2):10, ('tx3',3):20})
+		self.assertEqual(state._balances, {('tx1',1):10, ('tx2',1):20, ('tx4',1):10, ('tx4',2):20})
 
-		# can't pay from some random account
-		reason = self.Apply_AssertFails(state, 'Pay', sourceAccount=('madeUpTX',0), changeOutput=2, amount=15, destinationOutput=3, maxBlock=200)
+		# can't pay from a nonexistant account
+		reason = self.Apply_AssertFails(state, 'Pay', sourceAccount=('tx12',2), amount=20, maxBlock=200)
 		self.assertEqual(reason, 'insufficient balance in source account (transaction ignored)')
-		self.assertEqual(state._balances, {('tx0',1):10, ('tx1',1):20, ('tx3',2):10, ('tx3',3):20})
+		self.assertEqual(state._balances, {('tx1',1):10, ('tx2',1):20, ('tx4',1):10, ('tx4',2):20})
 
 		# pay transaction fails and has no affect on state if there is not enough balance for payment
-		reason = self.Apply_AssertFails(state, 'Pay', sourceAccount=('tx3',2), changeOutput=2, amount=11, destinationOutput=3, maxBlock=200)
+		reason = self.Apply_AssertFails(state, 'Pay', sourceAccount=('tx1',1), amount=11, maxBlock=200)
 		self.assertEqual(reason, 'insufficient balance in source account (transaction ignored)')
-		self.assertEqual(state._balances, {('tx0',1):10, ('tx1',1):20, ('tx3',2):10, ('tx3',3):20})
+		self.assertEqual(state._balances, {('tx1',1):10, ('tx2',1):20, ('tx4',1):10, ('tx4',2):20})
 
-	def not_test_minimum_exchange_amount(self):
+		# (but reduce by one and this should go through)
+		self.Apply_AssertSucceeds(state, 'Pay', sourceAccount=('tx1',1), amount=10, maxBlock=200)
+		self.assertEqual(state._balances, {('tx2',1):20, ('tx4',1):10, ('tx4',2):20, ('tx5',2):10})
+
+		# transaction with maxBlock before current block fails 
+		reason = self.Apply_AssertFails(state, 'Pay', sourceAccount=('tx2',1), amount=20, maxBlock=99)
+		self.assertEqual(reason, 'max block for transaction has been exceeded')
+		self.assertEqual(state._balances, {('tx2',1):20, ('tx4',1):10, ('tx4',2):20, ('tx5',2):10})
+
+		# but maxBlock exactly equal to current block is ok 
+		self.Apply_AssertSucceeds(state, 'Pay', sourceAccount=('tx2',1), amount=20, maxBlock=200)
+		self.assertEqual(state._balances, {('tx6',2):20, ('tx4',1):10, ('tx4',2):20, ('tx5',2):10})
+
+	def test_minimum_exchange_amount(self):
 		state = State.State(100, 'mockhash')
-		self.Apply_AssertSucceeds(state, 'Burn', 'tx0', amount=100, destinationOutput=1)
-		self.assertEqual(state._balances, {('tx0',1):100})
+		self.state = state
+		burnOutput = self.Burn(100)
+		self.assertEqual(state._balances, {burnOutput:100})		
 		# cannot post buy or sell offers, because of minimum exchange amount constraint
-		reason = self.Apply_AssertFails(state, 'LTCBuyOffer', sourceAccount=('tx0',1), changeOutput=0, refundOutput=1, swapBillOffered=100, exchangeRate=0x80000000, maxBlockOffset=0, receivingAddress='a_receive', maxBlock=200)
+		reason = self.Apply_AssertFails(state, 'LTCBuyOffer', sourceAccount=burnOutput, swapBillOffered=100, exchangeRate=0x80000000, maxBlockOffset=0, receivingAddress='a_receive', maxBlock=200)
 		self.assertEqual(reason, 'does not satisfy minimum exchange amount (offer not posted)')
-		self.assertEqual(state._balances, {('tx0',1):100})
-		reason = self.Apply_AssertFails(state, 'LTCSellOffer', sourceAccount=('tx0',1), changeOutput=0, receivingOutput=1, swapBillDesired=100, exchangeRate=0x80000000, maxBlockOffset=0, maxBlock=200)
+		self.assertEqual(state._balances, {burnOutput:100})
+		reason = self.Apply_AssertFails(state, 'LTCSellOffer', sourceAccount=burnOutput, swapBillDesired=100, exchangeRate=0x80000000, maxBlockOffset=0, maxBlock=200)
 		self.assertEqual(reason, 'does not satisfy minimum exchange amount (offer not posted)')
-		self.assertEqual(state._balances, {('tx0',1):100})
+		self.assertEqual(state._balances, {burnOutput:100})
 
 	def not_test_ltc_trading1(self):
 		# let's give out some real money, and then try again
 		state = State.State(100, 'mockhash')
+		self.state = state
 		self.Apply_AssertSucceeds(state, 'Burn', 'tx0', amount=100000000, destinationOutput=10)
 		self.Apply_AssertSucceeds(state, 'Burn', 'tx1', amount=200000000, destinationOutput=20)
 		self.Apply_AssertSucceeds(state, 'Burn', 'tx2', amount=200000000, destinationOutput=30)
@@ -203,6 +230,7 @@ class Test(unittest.TestCase):
 
 	def not_test_pay(self):
 		state = State.State(100, 'mockhash')
+		self.state = state
 		self.Apply_AssertSucceeds(state, 'Burn', amount=20, destinationOutput='b')
 		self.Apply_AssertSucceeds(state, 'Burn', amount=30, destinationOutput='c')
 		self.Apply_AssertSucceeds(state, 'Burn', amount=10, destinationOutput='a')
@@ -220,6 +248,7 @@ class Test(unittest.TestCase):
 
 	def not_test_ltc_trading2(self):
 		state = State.State(100, 'starthash')
+		self.state = state
 
 		state.applyTransaction('Burn', {'amount':10000 * milliCoin, 'destinationOutput':'a'})
 		state.applyTransaction('Burn', {'amount':10000 * milliCoin, 'destinationOutput':'b'})
@@ -306,6 +335,7 @@ class Test(unittest.TestCase):
 
 	def not_test_small_sell_remainder_refunded(self):
 		state = State.State(100, 'starthash')
+		self.state = state
 		state.applyTransaction('Burn', {'amount':10000000, 'destinationOutput':'b'})
 		self.SellOffer(state, 'b', swapBillDesired=10000000, exchangeRate=0x80000000)
 		self.assertEqual(state.totalAccountedFor(), state._totalCreated)
@@ -325,6 +355,7 @@ class Test(unittest.TestCase):
 
 	def not_test_small_buy_remainder_refunded(self):
 		state = State.State(100, 'starthash')
+		self.state = state
 		state.applyTransaction('Burn', {'amount':10000000, 'destinationOutput':'b'})
 		self.SellOffer(state, 'b', swapBillDesired=10000000, exchangeRate=0x80000000)
 		self.assertEqual(state.totalAccountedFor(), state._totalCreated)
@@ -343,6 +374,7 @@ class Test(unittest.TestCase):
 
 	def not_test_exact_match(self):
 		state = State.State(100, 'starthash')
+		self.state = state
 		state.applyTransaction('Burn', {'amount':10000000, 'destinationOutput':'b'})
 		self.SellOffer(state, 'b', swapBillDesired=10000000, exchangeRate=0x80000000)
 		self.assertEqual(state.totalAccountedFor(), state._totalCreated)
@@ -361,6 +393,7 @@ class Test(unittest.TestCase):
 
 	def not_test_sell_remainder_outstanding(self):
 		state = State.State(100, 'starthash')
+		self.state = state
 		state.applyTransaction('Burn', {'amount':20000000, 'destinationOutput':'b'})
 		self.SellOffer(state, 'b', swapBillDesired=20000000, exchangeRate=0x80000000)
 		self.assertEqual(state.totalAccountedFor(), state._totalCreated)
@@ -390,6 +423,7 @@ class Test(unittest.TestCase):
 
 	def not_test_buy_remainder_outstanding(self):
 		state = State.State(100, 'starthash')
+		self.state = state
 		state.applyTransaction('Burn', {'amount':20000000, 'destinationOutput':'b'})
 		self.SellOffer(state, 'b', swapBillDesired=20000000, exchangeRate=0x80000000)
 		self.assertEqual(state.totalAccountedFor(), state._totalCreated)
@@ -420,6 +454,7 @@ class Test(unittest.TestCase):
 
 	def not_test_state_transaction(self):
 		state = State.State(100, 'starthash')
+		self.state = state
 		transactionType = 'Burneeheeyooo'
 		transactionDetails = {'amount':1000, 'destinationOutput':'burnDestination'}
 		self.assertRaises(State.InvalidTransactionType, state.checkTransaction, transactionType, transactionDetails)

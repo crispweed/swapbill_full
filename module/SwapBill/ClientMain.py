@@ -68,6 +68,7 @@ def Main(startBlockIndex, startBlockHash, commandLineArgs=sys.argv[1:], host=Non
 			key = host.formatAccountForEndUser(account)
 			formattedBalances[key] = state._balances[account]
 		info = {
+		    'totalCreated':state._totalCreated,
 		    'atEndOfBlock':state._currentBlockIndex - 1, 'balances':formattedBalances, 'syncOutput':syncOut.getvalue(),
 		    'numberOfLTCBuyOffers':state._LTCBuys.size(),
 		    'numberOfLTCSellOffers':state._LTCSells.size(),

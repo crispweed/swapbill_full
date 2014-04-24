@@ -134,7 +134,7 @@ class State(object):
 		if available > amount:
 			self._addToBalance((txID, 1), available - amount)
 
-	def _check_LTCBuyOffer(self, sourceAccount, swapBillOffered, exchangeRate, maxBlockOffset, receivingAddress, maxBlock):
+	def _check_LTCBuyOffer(self, outputs, sourceAccount, swapBillOffered, exchangeRate, maxBlockOffset, receivingAddress, maxBlock):
 		if outputs != ('change', 'refund'):
 			raise OutputsSpecDoesntMatch()
 		assert type(swapBillOffered) is int

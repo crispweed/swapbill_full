@@ -29,15 +29,31 @@ def GetStateInfo(host):
 	return json.loads(output)
 
 def GetAddressForUnspent(host, formattedAccount):
-	print('trying to match', formattedAccount)
+	#print('trying to match', formattedAccount)
 	for entry in host.getUnspent():
 		txID = entry['txid']
 		vOut = entry['vout']
 		formattedAccountForEntry = host.formatAccountForEndUser((txID, vOut))
-		print(formattedAccountForEntry)
+		#print(formattedAccountForEntry)
 		if formattedAccountForEntry == formattedAccount:
 			return entry['address']
 	raise Exception('not found')
+
+def GetOwnerBalances(host, ownerList, balances):
+	result = {}
+	ownerAtStart = host._getOwner()
+	for owner in ownerList:
+		host._setOwner(owner)
+		unspent = host.getUnspent()
+		ownerBalance = 0
+		for entry in unspent:
+			account = (entry['txid'], entry['vout'])
+			key = host.formatAccountForEndUser(account)
+			ownerBalance += balances[key]
+		if ownerBalance > 0:
+			result[owner] = ownerBalance
+	host._setOwner(ownerAtStart)
+	return result
 
 class Test(unittest.TestCase):
 	def test(self):
@@ -180,7 +196,12 @@ class Test(unittest.TestCase):
 		host._addUnspent(60200000)
 		RunClient(host, ['burn', '--quantity', '60000000'])
 		info = GetStateInfo(host)
-		self.assertEqual(info['balances'], {'alice_swapbill1':30000000, 'bob_swapbill2':20000000, 'clive_swapbill3':50000000, 'dave_swapbill4':60000000})
+		#print('dave unspent:')
+		#print(host.getUnspent())
+		ownerList = ('alice', 'bob', 'clive', 'dave', 'bob')
+		ownerBalances = GetOwnerBalances(host, ownerList, info['balances'])
+		#print(ownerBalances)
+		self.assertDictEqual(ownerBalances, {'bob': 20000000, 'clive': 50000000, 'alice': 30000000, 'dave': 60000000})
 
 		## alice and bob both want to buy LTC
 		## clive and dave both want to sell
@@ -190,10 +211,11 @@ class Test(unittest.TestCase):
 		host._setOwner('alice')
 		RunClient(host, ['post_ltc_buy', '--quantity', '30000000', '--exchangeRate', '0.5'])
 		info = GetStateInfo(host)
-		self.assertEqual(info['balances'], {'bob_swapbill2':20000000, 'clive_swapbill3':50000000, 'dave_swapbill4':60000000})
 		self.assertEqual(info['numberOfLTCBuyOffers'], 1)
 		self.assertEqual(info['numberOfLTCSellOffers'], 0)
 		self.assertEqual(info['numberOfPendingExchanges'], 0)
+		ownerBalances = GetOwnerBalances(host, ownerList, info['balances'])
+		self.assertDictEqual(ownerBalances, {'bob': 20000000, 'clive': 50000000, 'dave': 60000000})
 
 		## bob makes better offer, but with smaller amount
 

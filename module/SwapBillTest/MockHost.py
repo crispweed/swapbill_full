@@ -38,6 +38,8 @@ class MockHost(object):
 	def _setOwner(self, id):
 		assert not '_' in id
 		self._id = id
+	def _getOwner(self):
+		return self._id
 
 	def _addUnspent(self, amount):
 		self._nextTXID += 1
@@ -113,7 +115,9 @@ class MockHost(object):
 		assert found is not None
 		if not self.addressIsMine(found['address']):
 			raise Exception('At least one unspent output used in the transaction cannot be signed.', self.formatAddressForEndUser(found['address']))
-		self.unspent = unspentAfter
+		#print('consuming unspent:')
+		#print(found)
+		self._unspent = unspentAfter
 		return found['amount']
 
 	def signAndSend(self, unsignedTransactionHex):
