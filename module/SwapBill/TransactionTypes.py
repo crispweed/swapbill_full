@@ -25,7 +25,7 @@ _mappingByTypeCode = (
     ('LTCExchangeCompletion', None, (('pendingExchangeIndex', 6, None, 10), None), (), (('destinationAddress', 'destinationAmount'),)),
 	)
 
-_forwardCompatibilityMapping = ('ForwardToFutureNetworkVersion', None, (('amount', 6, 'maxBlock', 4, None, 6), None), ('change',), ())
+_forwardCompatibilityMapping = ('ForwardToFutureNetworkVersion', 'sourceAccount', (('amount', 6, 'maxBlock', 4, None, 6), None), ('change',), ())
 
 def _mappingFromTypeString(transactionType):
 	for i in range(len(_mappingByTypeCode)):
