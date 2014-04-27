@@ -6,7 +6,7 @@ scriptPath = path.dirname(path.abspath(__file__))
 sys.path.append(path.join(scriptPath, 'module'))
 sys.dont_write_bytecode = True
 from SwapBill import RPC, Address, BlockChain
-from SwapBill.Amounts import ToSatoshis, FromSatoshis
+from SwapBill.Amounts import ToSatoshis
 import sys
 PY3 = sys.version_info.major > 2
 

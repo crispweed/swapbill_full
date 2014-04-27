@@ -9,7 +9,7 @@ from SwapBill import RawTransaction, Address, TransactionFee, GetUnspent
 from SwapBill import TransactionTypes, BuildHostedTransaction, Sync, Host, TransactionBuildLayer
 from SwapBill import FormatTransactionForUserDisplay
 from SwapBill.Sync import SyncAndReturnState
-from SwapBill.Amounts import ToSatoshis, FromSatoshis
+from SwapBill.Amounts import ToSatoshis
 from SwapBill.ExceptionReportedToUser import ExceptionReportedToUser
 
 class BadAddressArgument(ExceptionReportedToUser):

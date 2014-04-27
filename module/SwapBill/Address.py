@@ -14,7 +14,7 @@ def base58_check_encode(b, version):
 	address_hex = d + dhash(d)[:4]
 
 	# Convert big-endian bytes to integer
-	n = int('0x0' + binascii.hexlify(address_hex).decode('utf8'), 16)
+	n = int('0x0' + binascii.hexlify(address_hex).decode('ascii'), 16)
 
 	# Divide that integer into base58
 	res = []
@@ -45,7 +45,7 @@ def base58_decode (s, version):
 	h = '%x' % n
 	if len(h) % 2:
 		h = '0' + h
-	res = binascii.unhexlify(h.encode('utf8'))
+	res = binascii.unhexlify(h.encode('ascii'))
 
 	# Add padding back.
 	pad = 0

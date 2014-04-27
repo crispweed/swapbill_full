@@ -8,7 +8,7 @@ sys.dont_write_bytecode = True
 from SwapBill import RPC, RawTransaction, Address, TransactionFee, ScriptPubKeyLookup
 from SwapBill import TransactionTypes, BuildHostedTransaction, GetUnspent, Sync, ParseConfig
 from SwapBill.Sync import SyncAndReturnState
-from SwapBill.Amounts import ToSatoshis, FromSatoshis
+from SwapBill.Amounts import ToSatoshis
 PY3 = sys.version_info.major > 2
 
 config_file = path.join(path.expanduser("~"), '.litecoin', 'litecoin.conf')

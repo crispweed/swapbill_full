@@ -3,6 +3,12 @@ import unittest
 from SwapBill import Address
 
 class Test(unittest.TestCase):
+	def CheckRoundTrip(self, pubKeyHash, version=b'\x6f'):
+		version = b'\x6f'
+		address = Address.FromPubKeyHash(version, pubKeyHash)
+		pubKeyHash2 = Address.ToPubKeyHash(version, address)
+		self.assertEqual(pubKeyHash, pubKeyHash2)		
+		
 	def test(self):
 		version = b'\x6f'
 		# note old control address suffix here
@@ -23,3 +29,24 @@ class Test(unittest.TestCase):
 		self.assertEqual(address, 'mh5DS9xE4PBBhB5eHKRCNaEzekgspzxATY')
 		pubKeyHash2 = Address.ToPubKeyHash(version, address)
 		self.assertEqual(pubKeyHash, pubKeyHash2)
+
+	def test_bad_address(self):
+		version = b'\x6f'
+		self.assertRaisesRegexp(Address.BadAddress, 'Not a valid base58 character', Address.ToPubKeyHash, version, 'm$5DS9xE4PBBhB5eHKRCNaEzekgspzxATY')
+		self.assertRaisesRegexp(Address.BadAddress, 'incorrect version byte', Address.ToPubKeyHash, version, 'm')
+		self.assertRaisesRegexp(Address.BadAddress, 'checksum mismatch', Address.ToPubKeyHash, version, 'mh5DS9xE4PBBhB6eHKRCNaEzekgspzxATY')
+		self.assertRaisesRegexp(Address.BadAddress, 'incorrect version byte', Address.ToPubKeyHash, version, 'mh5DS9xE4PBBhB6eHKRCNaEzekgspzxAT')
+
+	def test_round_trips(self):
+		self.CheckRoundTrip(b'\x00' * 20)
+		self.CheckRoundTrip(b'\x01' * 20)
+		self.CheckRoundTrip(b'\x80' * 20)
+		self.CheckRoundTrip(b'\xff' * 20)
+		self.CheckRoundTrip(b'\x00' * 20, version=b'\x00')
+		self.CheckRoundTrip(b'\x01' * 20, version=b'\x00')
+		self.CheckRoundTrip(b'\x80' * 20, version=b'\x00')
+		self.CheckRoundTrip(b'\xff' * 20, version=b'\x00')
+		self.CheckRoundTrip(b'\x00' * 20, version=b'\xff')
+		self.CheckRoundTrip(b'\x01' * 20, version=b'\xff')
+		self.CheckRoundTrip(b'\x80' * 20, version=b'\xff')
+		self.CheckRoundTrip(b'\xff' * 20, version=b'\xff')
