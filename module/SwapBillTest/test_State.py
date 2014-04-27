@@ -66,7 +66,8 @@ class Test(unittest.TestCase):
 
 	def test_burn(self):
 		state = State.State(100, 'mockhash')
-		self.assertRaises(OutputsSpecDoesntMatch, state.checkTransaction, 'Burn', ('none',), {'amount':0})
+		self.assertRaises(OutputsSpecDoesntMatch, state.checkTransaction, 'Burn', (), {'amount':0})
+		self.assertRaises(OutputsSpecDoesntMatch, state.checkTransaction, 'Burn', ('madeUpOutput',), {'amount':0})
 		self.assertRaises(OutputsSpecDoesntMatch, state.checkTransaction, 'Burn', ('destination','destination'), {'amount':0})
 		succeeds, reason = state.checkTransaction('Burn', ('destination',), {'amount':0})
 		self.assertEqual(succeeds, False)
@@ -107,6 +108,15 @@ class Test(unittest.TestCase):
 		self.assertEqual(state._balances, {output1:10, output2:20})
 		output3 = self.Burn(30)
 		self.assertEqual(state._balances, {output1:10, output2:20, output3:30})
+		self.assertEqual(state._balances, {('tx1',1):10, ('tx2',1):20, ('tx3',1):30})
+
+		self.assertRaises(OutputsSpecDoesntMatch, state.checkTransaction, 'Pay', (), {'sourceAccount':('tx3',1), 'amount':0, 'maxBlock':200})
+		self.assertRaises(OutputsSpecDoesntMatch, state.checkTransaction, 'Pay', ('madeUpOutput',), {'sourceAccount':('tx3',1), 'amount':0, 'maxBlock':200})
+		self.assertRaises(OutputsSpecDoesntMatch, state.checkTransaction, 'Pay', ('destination','change'), {'sourceAccount':('tx3',1), 'amount':0, 'maxBlock':200})
+
+		# zero amount
+		reason = self.Apply_AssertFails(state, 'Pay', sourceAccount=('tx3',1), amount=0, maxBlock=200)
+		self.assertEqual(reason, 'zero amount not permitted')
 		self.assertEqual(state._balances, {('tx1',1):10, ('tx2',1):20, ('tx3',1):30})
 
 		self.Apply_AssertSucceeds(state, 'Pay', sourceAccount=('tx3',1), amount=20, maxBlock=200)
@@ -154,6 +164,7 @@ class Test(unittest.TestCase):
 		self.assertEqual(state._balances, {burnOutput:100})
 
 	def test_ltc_trading1(self):
+		# this test adds tests against the ltc transaction types, and also runs through a simple exchange scenario
 		# let's give out some real money, and then try again
 		state = State.State(100, 'mockhash')
 		self.state = state
@@ -164,14 +175,34 @@ class Test(unittest.TestCase):
 
 		# A wants to buy
 
+		details = {
+		    'sourceAccount':burnA,
+		    'swapBillOffered':3000000000, 'exchangeRate':0x80000000,
+		    'maxBlock':200, 'maxBlockOffset':0,
+		    'receivingAddress':'a_receive'
+		}
+
+		self.assertRaises(OutputsSpecDoesntMatch, state.checkTransaction, 'LTCBuyOffer', (), details)
+		self.assertRaises(OutputsSpecDoesntMatch, state.checkTransaction, 'LTCBuyOffer', ('madeUpOutput'), details)
+		self.assertRaises(OutputsSpecDoesntMatch, state.checkTransaction, 'LTCBuyOffer', ('refund', 'change'), details)
+		self.assertRaises(OutputsSpecDoesntMatch, state.checkTransaction, 'LTCBuyOffer', ('change', 'refund', 'extraOutput'), details)
+
 		# try offering more than available
-		reason = self.Apply_AssertFails(state, 'LTCBuyOffer', sourceAccount=burnA, swapBillOffered=3000000000, exchangeRate=0x80000000, maxBlockOffset=0, receivingAddress='a_receive', maxBlock=200)
+		reason = self.Apply_AssertFails(state, 'LTCBuyOffer', **details)
 		self.assertEqual(reason, 'insufficient balance in source account (offer not posted)')
 		self.assertEqual(state._balances, {burnA:100000000, burnB:200000000, burnC:200000000})
 		self.assertEqual(state._LTCBuys.size(), 0)
 
+		# zero amount not permitted
+		details['swapBillOffered'] = 0
+		reason = self.Apply_AssertFails(state, 'LTCBuyOffer', **details)
+		self.assertEqual(reason, 'zero amount not permitted')
+		self.assertEqual(state._balances, {burnA:100000000, burnB:200000000, burnC:200000000})
+		self.assertEqual(state._LTCBuys.size(), 0)
+
 		# reasonable buy offer that should go through
-		outputs = self.Apply_AssertSucceeds(state, 'LTCBuyOffer', sourceAccount=burnA, swapBillOffered=30000000, exchangeRate=0x80000000, maxBlockOffset=0, receivingAddress='a_receive', maxBlock=200)
+		details['swapBillOffered'] = 30000000
+		outputs = self.Apply_AssertSucceeds(state, 'LTCBuyOffer', **details)
 		changeA = outputs['change']
 		refundA = outputs['refund']
 		self.assertEqual(state._balances, {changeA:70000000, burnB:200000000, burnC:200000000, refundA:0})
@@ -179,15 +210,35 @@ class Test(unittest.TestCase):
 
 		# B wants to sell
 
+		details = {
+		    'sourceAccount':burnB,
+		    'swapBillDesired':40000000000, 'exchangeRate':0x80000000,
+		    'maxBlock':200, 'maxBlockOffset':0
+		}
+
+		self.assertRaises(OutputsSpecDoesntMatch, state.checkTransaction, 'LTCSellOffer', (), details)
+		self.assertRaises(OutputsSpecDoesntMatch, state.checkTransaction, 'LTCSellOffer', ('madeUpOutput'), details)
+		self.assertRaises(OutputsSpecDoesntMatch, state.checkTransaction, 'LTCSellOffer', ('receiving', 'change'), details)
+		self.assertRaises(OutputsSpecDoesntMatch, state.checkTransaction, 'LTCSellOffer', ('change', 'receiving', 'extraOutput'), details)
+
 		# try offering more than available
-		reason = self.Apply_AssertFails(state, 'LTCSellOffer', sourceAccount=burnB, swapBillDesired=40000000000, exchangeRate=0x80000000, maxBlockOffset=0, maxBlock=200)
+		reason = self.Apply_AssertFails(state, 'LTCSellOffer', **details)
 		self.assertEqual(reason, 'insufficient balance for deposit in source account (offer not posted)')
 		self.assertEqual(state._balances, {changeA:70000000, burnB:200000000, burnC:200000000, refundA:0})
 		self.assertEqual(state._LTCBuys.size(), 1)
 		self.assertEqual(state._LTCSells.size(), 0)
 
+		# zero amount
+		details['swapBillDesired'] = 0
+		reason = self.Apply_AssertFails(state, 'LTCSellOffer', **details)
+		self.assertEqual(reason, 'zero amount not permitted')
+		self.assertEqual(state._balances, {changeA:70000000, burnB:200000000, burnC:200000000, refundA:0})
+		self.assertEqual(state._LTCBuys.size(), 1)
+		self.assertEqual(state._LTCSells.size(), 0)
+
 		# reasonable sell offer that should go through (and match)
-		outputs = self.Apply_AssertSucceeds(state, 'LTCSellOffer', sourceAccount=burnB, swapBillDesired=40000000, exchangeRate=0x80000000, maxBlockOffset=0, maxBlock=200)
+		details['swapBillDesired'] = 40000000
+		outputs = self.Apply_AssertSucceeds(state, 'LTCSellOffer', **details)
 		changeB = outputs['change']
 		receivingB = outputs['receiving']
 		self.assertEqual(state._balances, {changeA:70000000, changeB:197500000, burnC:200000000, refundA:0, receivingB:0})
@@ -198,8 +249,12 @@ class Test(unittest.TestCase):
 
 		# B must now complete with appropriate ltc payment
 
+		details = {'pendingExchangeIndex':1, 'destinationAddress':'a_receive', 'destinationAmount':20000000}
+
+		self.assertRaises(OutputsSpecDoesntMatch, state.checkTransaction, 'LTCExchangeCompletion', ('madeUpOutput'), details)
+
 		# bad pending exchange index
-		reason = self.Apply_AssertFails(state, 'LTCExchangeCompletion', pendingExchangeIndex=1, destinationAddress='a_receive', destinationAmount=20000000)
+		reason = self.Apply_AssertFails(state, 'LTCExchangeCompletion', **details)
 		self.assertEqual(reason, 'no pending exchange with the specified index (transaction ignored)')
 		# no state change
 		self.assertEqual(state._balances, {changeA:70000000, changeB:197500000, burnC:200000000, refundA:0, receivingB:0})
