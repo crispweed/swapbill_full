@@ -1,6 +1,6 @@
 from __future__ import print_function
 from os import path
-from SwapBill import ParseConfig, RPC, RawTransaction, Address, TransactionFee, ScriptPubKeyLookup, Amounts
+from SwapBill import ParseConfig, RPC, RawTransaction, Address, TransactionFee, Amounts
 from SwapBill.ExceptionReportedToUser import ExceptionReportedToUser
 
 class SigningFailed(ExceptionReportedToUser):

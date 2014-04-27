@@ -1,3 +1,4 @@
+from __future__ import print_function
 from SwapBill import RPC ## for setup only
 
 class Host(object):
