@@ -54,4 +54,8 @@ class Test(unittest.TestCase):
 		assert inputs == [3,2,0]
 		inputs, spent = _callWithSanityChecks(3, [9,5,8,5], 30) ## fail to meet amount required, but return best
 		assert inputs == [3,2,0]
-
+		inputs, spent = _callWithSanityChecks(4, [9,5,8,5], 19)
+		self.assertListEqual(inputs, [1,3,2,0])
+		# max inputs greater than number of inputs
+		inputs, spent = _callWithSanityChecks(5, [9,5,8,5], 19)
+		self.assertListEqual(inputs, [1,3,2,0])
