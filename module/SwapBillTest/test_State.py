@@ -88,13 +88,31 @@ class Test(unittest.TestCase):
 		self.state = state
 		burn = self.Burn(100000000)
 		self.assertEqual(state._balances, {burn:100000000})
-		outputs = self.Apply_AssertSucceeds(state, 'ForwardToFutureNetworkVersion', sourceAccount=burn, amount=1, maxBlock=200)
+		details = {'sourceAccount':burn, 'amount':1, 'maxBlock':200}
+		self.assertRaises(OutputsSpecDoesntMatch, state.checkTransaction, 'ForwardToFutureNetworkVersion', (), details)
+		self.assertRaises(OutputsSpecDoesntMatch, state.checkTransaction, 'ForwardToFutureNetworkVersion', ('madeUpOutput'), details)
+		self.assertRaises(OutputsSpecDoesntMatch, state.checkTransaction, 'ForwardToFutureNetworkVersion', ('change', 'madeUpOutput'), details)
+		outputs = self.Apply_AssertSucceeds(state, 'ForwardToFutureNetworkVersion', **details)
 		change = outputs['change']
 		self.assertEqual(state._balances, {change:99999999})
 		self.assertEqual(state.totalAccountedFor(), state._totalCreated)
 		self.assertEqual(state._totalForwarded, 1)
-		reason = self.Apply_AssertFails(state, 'ForwardToFutureNetworkVersion', sourceAccount=change, amount=100000000, maxBlock=200)
+		details = {'sourceAccount':change, 'amount':1, 'maxBlock':200}
+		details['amount'] = 100000000
+		reason = self.Apply_AssertFails(state, 'ForwardToFutureNetworkVersion', **details)
 		self.assertEqual(reason, 'insufficient balance in source account (transaction ignored)')
+		details['amount'] = 0
+		reason = self.Apply_AssertFails(state, 'ForwardToFutureNetworkVersion', **details)
+		self.assertEqual(reason, 'zero amount not permitted')
+		details['amount'] = 1
+		details['maxBlock'] = 99
+		reason = self.Apply_AssertFails(state, 'ForwardToFutureNetworkVersion', **details)
+		self.assertEqual(reason, 'max block for transaction has been exceeded')
+		reason = self.Apply_AssertFails(state, 'ForwardToFutureNetworkVersion', **details)
+		details['maxBlock'] = 100
+		details['sourceAccount'] = 'madeUpSourceAccount'
+		reason = self.Apply_AssertFails(state, 'ForwardToFutureNetworkVersion', **details)
+		self.assertEqual(reason, 'source account does not exist' )
 		self.assertEqual(state._balances, {change:99999999})
 		self.assertEqual(state.totalAccountedFor(), state._totalCreated)
 		self.assertEqual(state._totalForwarded, 1)
@@ -177,8 +195,8 @@ class Test(unittest.TestCase):
 
 		details = {
 		    'sourceAccount':burnA,
-		    'swapBillOffered':3000000000, 'exchangeRate':0x80000000,
-		    'maxBlock':200, 'maxBlockOffset':0,
+		    'swapBillOffered':30000000, 'exchangeRate':0x80000000,
+		    'maxBlock':100, 'maxBlockOffset':0,
 		    'receivingAddress':'a_receive'
 		}
 
@@ -187,21 +205,35 @@ class Test(unittest.TestCase):
 		self.assertRaises(OutputsSpecDoesntMatch, state.checkTransaction, 'LTCBuyOffer', ('refund', 'change'), details)
 		self.assertRaises(OutputsSpecDoesntMatch, state.checkTransaction, 'LTCBuyOffer', ('change', 'refund', 'extraOutput'), details)
 
+		# nonexistant source account
+		details['sourceAccount'] = 'madeUpAccount'
+		reason = self.Apply_AssertFails(state, 'LTCBuyOffer', **details)
+		details['sourceAccount'] = burnA
+		self.assertEqual(reason, 'source account does not exist')
+
+		# bad max block
+		details['maxBlock'] = 99
+		reason = self.Apply_AssertFails(state, 'LTCBuyOffer', **details)
+		details['maxBlock'] = 100
+		self.assertEqual(reason, 'max block for transaction has been exceeded' )
+
 		# try offering more than available
+		details['swapBillOffered'] = 3000000000
 		reason = self.Apply_AssertFails(state, 'LTCBuyOffer', **details)
 		self.assertEqual(reason, 'insufficient balance in source account (offer not posted)')
-		self.assertEqual(state._balances, {burnA:100000000, burnB:200000000, burnC:200000000})
-		self.assertEqual(state._LTCBuys.size(), 0)
 
 		# zero amount not permitted
 		details['swapBillOffered'] = 0
 		reason = self.Apply_AssertFails(state, 'LTCBuyOffer', **details)
 		self.assertEqual(reason, 'zero amount not permitted')
+
 		self.assertEqual(state._balances, {burnA:100000000, burnB:200000000, burnC:200000000})
 		self.assertEqual(state._LTCBuys.size(), 0)
 
 		# reasonable buy offer that should go through
 		details['swapBillOffered'] = 30000000
+		details['maxBlock'] = 0xfffffff0 # these two details changed to add test coverage for expiry overflow
+		details['maxBlockOffset'] = 400
 		outputs = self.Apply_AssertSucceeds(state, 'LTCBuyOffer', **details)
 		changeA = outputs['change']
 		refundA = outputs['refund']
@@ -212,7 +244,7 @@ class Test(unittest.TestCase):
 
 		details = {
 		    'sourceAccount':burnB,
-		    'swapBillDesired':40000000000, 'exchangeRate':0x80000000,
+		    'swapBillDesired':40000000, 'exchangeRate':0x80000000,
 		    'maxBlock':200, 'maxBlockOffset':0
 		}
 
@@ -221,23 +253,37 @@ class Test(unittest.TestCase):
 		self.assertRaises(OutputsSpecDoesntMatch, state.checkTransaction, 'LTCSellOffer', ('receiving', 'change'), details)
 		self.assertRaises(OutputsSpecDoesntMatch, state.checkTransaction, 'LTCSellOffer', ('change', 'receiving', 'extraOutput'), details)
 
+		# nonexistant source account
+		details['sourceAccount'] = 'madeUpAccount'
+		reason = self.Apply_AssertFails(state, 'LTCSellOffer', **details)
+		details['sourceAccount'] = burnB
+		self.assertEqual(reason, 'source account does not exist')
+
+		# bad max block
+		details['maxBlock'] = 99
+		reason = self.Apply_AssertFails(state, 'LTCSellOffer', **details)
+		details['maxBlock'] = 100
+		self.assertEqual(reason, 'max block for transaction has been exceeded' )
+
 		# try offering more than available
+		details['swapBillDesired'] = 40000000000
 		reason = self.Apply_AssertFails(state, 'LTCSellOffer', **details)
 		self.assertEqual(reason, 'insufficient balance for deposit in source account (offer not posted)')
 		self.assertEqual(state._balances, {changeA:70000000, burnB:200000000, burnC:200000000, refundA:0})
-		self.assertEqual(state._LTCBuys.size(), 1)
-		self.assertEqual(state._LTCSells.size(), 0)
 
 		# zero amount
 		details['swapBillDesired'] = 0
 		reason = self.Apply_AssertFails(state, 'LTCSellOffer', **details)
 		self.assertEqual(reason, 'zero amount not permitted')
 		self.assertEqual(state._balances, {changeA:70000000, burnB:200000000, burnC:200000000, refundA:0})
+
 		self.assertEqual(state._LTCBuys.size(), 1)
 		self.assertEqual(state._LTCSells.size(), 0)
 
 		# reasonable sell offer that should go through (and match)
 		details['swapBillDesired'] = 40000000
+		details['maxBlock'] = 0xfffffff0 # these two details changed to add test coverage for expiry overflow
+		details['maxBlockOffset'] = 400
 		outputs = self.Apply_AssertSucceeds(state, 'LTCSellOffer', **details)
 		changeB = outputs['change']
 		receivingB = outputs['receiving']
