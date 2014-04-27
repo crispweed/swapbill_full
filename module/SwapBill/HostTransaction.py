@@ -9,10 +9,6 @@ class InMemoryTransaction(object):
 		assert type(amount) is int
 		assert amount >= 0
 		self._outputs.append((pubKeyHash, amount))
-	def addOutputsFromSeparateLists(self, pubKeyHashes, amounts):
-		assert len(pubKeyHashes) == len(amounts)
-		for i in range(len(pubKeyHashes)):
-			self.addOutput(pubKeyHashes[i], amounts[i])
 	# helper
 	def sumOfOutputs(self):
 		result = 0
