@@ -32,7 +32,6 @@ class MockHost(object):
 		self._transactionsByBlock = {0:[]}
 		self._nextTXID = 0
 		self._nextSuppliedOutput = 0
-		self._sourceLookup = {}
 		self._unspent = []
 
 	def _setOwner(self, id):
@@ -52,7 +51,6 @@ class MockHost(object):
 		toAdd['scriptPubKey'] = scriptPubKey
 		toAdd['address'] = pubKeyHash
 		toAdd['amount'] = amount
-		self._sourceLookup[(txid, vout)] = pubKeyHash
 		self._unspent.append(toAdd)
 
 	def addTransaction(self, txid, unsignedTransactionHex):
@@ -139,8 +137,6 @@ class MockHost(object):
 			toAdd['scriptPubKey'] = scriptPubKey
 			toAdd['address'] = pubKeyHash
 			toAdd['amount'] = entry['value']
-			self._sourceLookup[(txid, vout)] = pubKeyHash
-			#print(toAdd)
 			self._unspent.append(toAdd)
 			outputAmounts.append(entry['value'])
 		transactionFee = sumOfInputs - sum(outputAmounts)
@@ -159,9 +155,6 @@ class MockHost(object):
 			print('feeRequired:', feeRequired)
 		assert transactionFee < feeRequired + TransactionFee.dustLimit ## can potentially overspend, in theory, but will be nice to see the actual test case info that causes this
 		self.addTransaction(txid, unsignedTransactionHex)
-
-	def getSourceFor(self, txID, vOut):
-		return self._sourceLookup[(txID, vOut)]
 
 	def formatAddressForEndUser(self,  pubKeyHash):
 		return PubKeyHashAsText(pubKeyHash)

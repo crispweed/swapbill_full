@@ -3,40 +3,7 @@ import unittest, binascii
 from SwapBill import TransactionTypes
 from SwapBill.TransactionTypes import FromStateTransaction, ToStateTransaction
 
-class MockInputProvider(object):
-	def __init__(self):
-		self._count = 0
-	def getTXInputForAddress(self, sourceAccount):
-		sourceAccountAscii = binascii.hexlify(sourceAccount).decode('ascii')
-		self._count += 1
-		txID = 'txID_' + str(self._count) + '_' + sourceAccountAscii
-		vOut = self._count
-		return txID, vOut
-
-class MockSourceLookup(object):
-	def getSourceFor(self, txID, vOut):
-		prefix = 'txID_' + str(vOut) + '_'
-		assert txID.startswith(prefix)
-		sourceAccountAscii = txID[len(prefix):]
-		sourceAccount = binascii.unhexlify(sourceAccountAscii.encode('ascii'))
-		return sourceAccount
-
 class Test(unittest.TestCase):
-
-	def EncodeAndCheck(self, transactionType, details, ignoredBytesAtEnd=0):
-		#inputProvider = MockInputProvider()
-		#tx = TransactionTypes.FromStateTransaction(transactionType, details, inputProvider)
-		tx = TransactionTypes.FromStateTransaction(transactionType, details)
-		sourceLookup = MockSourceLookup()
-		decodedType, decodedDetails = TransactionTypes.ToStateTransaction(sourceLookup, tx)
-		self.assertEqual(transactionType, decodedType)
-		self.assertDictEqual(details, decodedDetails)
-		if ignoredBytesAtEnd > 0:
-			tx._outputs[0] = (tx._outputs[0][0][:-ignoredBytesAtEnd] + b'\xff' * ignoredBytesAtEnd, tx._outputs[0][1])
-			decodedType, decodedDetails = TransactionTypes.ToStateTransaction(sourceLookup, tx)
-			self.assertEqual(transactionType, decodedType)
-			self.assertDictEqual(details, decodedDetails)
-		return tx
 
 	def checkIgnoredBytes(self, tx, numberOfIgnoredBytes):
 		assert tx._outputs[0][0].startswith(b'SWP')

@@ -7,7 +7,7 @@ else:
 	import cPickle as pickle
 from os import path
 from collections import deque
-from SwapBill import State, DecodeTransaction, TransactionTypes, SourceLookup
+from SwapBill import State, DecodeTransaction, TransactionTypes
 from SwapBill import FormatTransactionForUserDisplay
 
 class ReindexingRequiredException(Exception):
