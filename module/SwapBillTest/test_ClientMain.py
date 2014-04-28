@@ -226,7 +226,7 @@ class Test(unittest.TestCase):
 		payTargetAddress = host.formatAddressForEndUser(host.getNewSwapBillAddress())
 		host._setOwner('')
 
-		self.assertRaises(ClientMain.BadAddressArgument, RunClient, host, ['pay', '--quantity', '100', '--toAddress', 'madeUpAddress'])
+		self.assertRaisesRegexp(ClientMain.BadAddressArgument, 'An address argument is not valid', RunClient, host, ['pay', '--quantity', '100', '--toAddress', 'madeUpAddress'])
 		RunClient(host, ['pay', '--quantity', '100', '--toAddress', payTargetAddress])
 		payChange = "0" + str(nextTX) + ":1"
 		payTarget = "0" + str(nextTX) + ":2"
