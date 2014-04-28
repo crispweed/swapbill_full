@@ -1,5 +1,5 @@
 from __future__ import print_function
-import sys, argparse, binascii, traceback, struct, json
+import sys, argparse, binascii, traceback, struct
 PY3 = sys.version_info.major > 2
 if PY3:
 	import io
@@ -48,10 +48,10 @@ sp.add_argument('--exchangeRate', required=True, help='the exchange rate SWP/LTC
 sp = subparsers.add_parser('complete_ltc_sell', help='complete an ltc exchange by fulfilling a pending exchange payment')
 sp.add_argument('--pending_exchange_id', required=True, help='the id of the pending exchange payment to fulfill')
 
-subparsers.add_parser('show_balance', help='show current SwapBill balance')
-subparsers.add_parser('show_offers', help='show current SwapBill exchange offers')
-subparsers.add_parser('show_pending_exchanges', help='show current SwapBill pending exchange payments')
-subparsers.add_parser('print_state_info_json', help='outpt some state information in JSON format')
+subparsers.add_parser('get_balance', help='get current SwapBill balance')
+subparsers.add_parser('get_offers', help='get current SwapBill exchange offers')
+subparsers.add_parser('get_pending_exchanges', help='get current SwapBill pending exchange payments')
+subparsers.add_parser('get_state_info', help='get some general state information')
 
 def Main(startBlockIndex, startBlockHash, commandLineArgs=sys.argv[1:], host=None, out=sys.stdout):
 	args = parser.parse_args(commandLineArgs)
@@ -60,7 +60,7 @@ def Main(startBlockIndex, startBlockHash, commandLineArgs=sys.argv[1:], host=Non
 		host = Host.Host(useTestNet=True, configFile=args.config_file)
 		print("current litecoind block count = {}".format(host._rpcHost.call('getblockcount')), file=out)
 
-	if args.action == 'print_state_info_json':
+	if args.action == 'get_state_info':
 		syncOut = io.StringIO()
 		state = SyncAndReturnState(args.cache_file, startBlockIndex, startBlockHash, host, out=syncOut)
 		formattedBalances = {}
@@ -74,8 +74,7 @@ def Main(startBlockIndex, startBlockHash, commandLineArgs=sys.argv[1:], host=Non
 		    'numberOfLTCSellOffers':state._LTCSells.size(),
 		    'numberOfPendingExchanges':len(state._pendingExchanges)
 		}
-		print(json.dumps(info), file=out)
-		return
+		return info
 
 	state = SyncAndReturnState(args.cache_file, startBlockIndex, startBlockHash, host, out=out)
 	print("state updated to end of block {}".format(state._currentBlockIndex - 1), file=out)
@@ -117,8 +116,7 @@ def Main(startBlockIndex, startBlockHash, commandLineArgs=sys.argv[1:], host=Non
 			vOut = baseTX.inputVOut(i)
 			baseInputsAmount += swapBillUnspent[(txID, vOut)][1]
 		txID = SetFeeAndSend(baseTX, baseInputsAmount, backingUnspent)
-		print('Transaction sent with transactionID:', file=out)
-		print(txID, file=out)
+		return {'transaction id':txID}
 
 	def CheckAndReturnPubKeyHash(address):
 		try:
@@ -149,7 +147,7 @@ def Main(startBlockIndex, startBlockHash, commandLineArgs=sys.argv[1:], host=Non
 		outputs = ('destination',)
 		outputPubKeyHashes = (host.getNewSwapBillAddress(),)
 		details = {'amount':int(args.quantity)}
-		CheckAndSend(transactionType, outputs, outputPubKeyHashes, details)
+		return CheckAndSend(transactionType, outputs, outputPubKeyHashes, details)
 
 	elif args.action == 'pay':
 		transactionType = 'Pay'
@@ -160,7 +158,7 @@ def Main(startBlockIndex, startBlockHash, commandLineArgs=sys.argv[1:], host=Non
 		    'amount':int(args.quantity),
 		    'maxBlock':0xffffffff
 		}
-		CheckAndSend(transactionType, outputs, outputPubKeyHashes, details)
+		return CheckAndSend(transactionType, outputs, outputPubKeyHashes, details)
 
 	elif args.action == 'post_ltc_buy':
 		transactionType = 'LTCBuyOffer'
@@ -174,7 +172,7 @@ def Main(startBlockIndex, startBlockHash, commandLineArgs=sys.argv[1:], host=Non
 		    'maxBlock':0xffffffff,
 		    'maxBlockOffset':0
 		}
-		CheckAndSend(transactionType, outputs, outputPubKeyHashes, details)
+		return CheckAndSend(transactionType, outputs, outputPubKeyHashes, details)
 
 	elif args.action == 'post_ltc_sell':
 		transactionType = 'LTCSellOffer'
@@ -187,7 +185,7 @@ def Main(startBlockIndex, startBlockHash, commandLineArgs=sys.argv[1:], host=Non
 		    'maxBlock':0xffffffff,
 		    'maxBlockOffset':0
 		}
-		CheckAndSend(transactionType, outputs, outputPubKeyHashes, details)
+		return CheckAndSend(transactionType, outputs, outputPubKeyHashes, details)
 
 	elif args.action == 'complete_ltc_sell':
 		transactionType = 'LTCExchangeCompletion'
@@ -202,29 +200,20 @@ def Main(startBlockIndex, startBlockHash, commandLineArgs=sys.argv[1:], host=Non
 		}
 		#print('complete_ltc_sell details:')
 		#print(details)
-		CheckAndSend(transactionType, (), (), details)
+		return CheckAndSend(transactionType, (), (), details)
 
-	elif args.action == 'show_balance':
-		unspent, sourceLookup = GetUnspent.GetUnspent(transactionBuildLayer, state._balances)
-		totalOwned = 0
-		totalSpendable = 0
-		largestSpendable = 0
-		for pubKeyHash in state._balances:
-			if not host.addressIsMine(pubKeyHash):
-				continue
-			balance = state._balances[pubKeyHash]
-			totalOwned += balance
-			if not sourceLookup.addressIsSeeded(pubKeyHash):
-				continue
-			totalSpendable += balance
-			if balance > largestSpendable:
-				largestSpendable = balance
-		print('(in swap bill satoshis): ', file=out)
-		print('total owned =', totalOwned, file=out)
-		print('total spendable =', totalSpendable, file=out)
-		print('current active balance =', totalSpendable, file=out)
+	elif args.action == 'get_balance':
+		unspent, swapBillUnspent = GetUnspent.GetUnspent(transactionBuildLayer, state._balances)
+		total = 0
+		activeAccountAmount = 0
+		for key in swapBillUnspent:
+			amount = state._balances[key]
+			total += amount
+			if amount > activeAccountAmount:
+				activeAccountAmount = amount
+		return {'total':total, 'in active account':activeAccountAmount}
 
-	elif args.action == 'show_offers':
+	elif args.action == 'get_offers':
 		print('Buy offers:')
 		offers = state._LTCBuys.getSortedExchangeRateAndDetails()
 		if len(offers) == 0:
@@ -257,7 +246,7 @@ def Main(startBlockIndex, startBlockHash, commandLineArgs=sys.argv[1:], host=Non
 				line += ' (mine)'
 			print(line)
 
-	elif args.action == 'show_pending_exchanges':
+	elif args.action == 'get_pending_exchanges':
 		print('Pending exchange completion payments:')
 		if len(state._pendingExchanges) == 0:
 			print('  (no pending completion payments)')

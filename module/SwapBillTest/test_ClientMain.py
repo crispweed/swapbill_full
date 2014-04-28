@@ -1,5 +1,5 @@
 from __future__ import print_function
-import unittest, sys, os, json
+import unittest, sys, os
 PY3 = sys.version_info.major > 2
 if PY3:
 	import io
@@ -71,12 +71,11 @@ def InitHost():
 def RunClient(host, args):
 	fullArgs = ['--cache-file', cacheFile] + args
 	out = io.StringIO()
-	ClientMain.Main(startBlockIndex=0, startBlockHash=host.getBlockHash(0), commandLineArgs=fullArgs, host=host, out=out)
-	return out.getvalue()
+	result = ClientMain.Main(startBlockIndex=0, startBlockHash=host.getBlockHash(0), commandLineArgs=fullArgs, host=host, out=out)
+	return out.getvalue(), result
 
 def GetStateInfo(host):
-	output = RunClient(host, ['print_state_info_json'])
-	info = json.loads(output)
+	output, info = RunClient(host, ['get_state_info'])
 	CheckEachBalanceHasUnspent(host, info['balances'])
 	return info
 
@@ -240,6 +239,11 @@ class Test(unittest.TestCase):
 		RunClient(host, ['burn', '--quantity', '2000000'])
 		info = GetStateInfo(host)
 		self.assertEqual(info['balances'], {'02:1':1000000, '04:1':2000000})
+		output, info = RunClient(host, ['get_balance'])
+		self.assertDictEqual(info, {'in active account': 2000000, 'total': 2000000})
+		host._setOwner('1')
+		output, info = RunClient(host, ['get_balance'])
+		self.assertDictEqual(info, {'in active account': 1000000, 'total': 1000000})
 
 	def test_ltc_trading(self):
 		host = InitHost()
@@ -360,3 +364,16 @@ class Test(unittest.TestCase):
 		self.assertEqual(info['numberOfLTCBuyOffers'], 1)
 		self.assertEqual(info['numberOfLTCSellOffers'], 1)
 		self.assertEqual(info['numberOfPendingExchanges'], 0)
+
+		host._setOwner('alice')
+		output, info = RunClient(host, ['get_balance'])
+		self.assertDictEqual(info, {'in active account': 0, 'total': 0})
+		host._setOwner('bob')
+		output, info = RunClient(host, ['get_balance'])
+		self.assertDictEqual(info, {'in active account': 10625000, 'total': 10625000})
+		host._setOwner('clive')
+		output, info = RunClient(host, ['get_balance'])
+		self.assertDictEqual(info, {'in active account': 49375000, 'total': 49375000})
+		host._setOwner('dave')
+		output, info = RunClient(host, ['get_balance'])
+		self.assertDictEqual(info, {'in active account': 58750000, 'total': 58750000+10625000})
