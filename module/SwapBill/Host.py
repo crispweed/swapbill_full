@@ -65,8 +65,8 @@ class Host(object):
 		return Address.ToPubKeyHash(self._addressVersion, self._rpcHost.call('getnewaddress', 'SwapBill'))
 
 	def addressIsMine(self, pubKeyHash):
-		address = Address.FromPubKeyHash(_addressVersion, pubKeyHash)
-		validateResults = _rpcHost.call('validateaddress', address)
+		address = Address.FromPubKeyHash(self._addressVersion, pubKeyHash)
+		validateResults = self._rpcHost.call('validateaddress', address)
 		result = validateResults['ismine']
 		assert result in (True, False)
 		return result
@@ -105,7 +105,7 @@ class Host(object):
 		result = []
 		for txHash in transactions[1:]:
 			txHex = self._rpcHost.call('getrawtransaction', txHash)
-			result.append(txHash, txHex)
+			result.append((txHash, txHex))
 		return result
 
 	def getSourceFor(self, txID, vOut):
