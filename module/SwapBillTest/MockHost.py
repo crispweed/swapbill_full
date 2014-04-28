@@ -1,8 +1,14 @@
 import binascii
 from SwapBill import RawTransaction, TransactionFee
 from SwapBill import Host ## just for insufficient fee exception
+from SwapBill import Address ## just for bad address exception
+
+addressPrefix = 'adr_'
 
 def TextAsPubKeyHash(s):
+	if not s.startswith(addressPrefix):
+		raise Address.BadAddress()
+	s = s[len(addressPrefix):]
 	assert len(s) <= 20
 	assert not '-' in s
 	padded = s + '-' * (20 - len(s))
@@ -13,7 +19,7 @@ def PubKeyHashAsText(data):
 	assert type(data) is type(b'')
 	assert len(data) == 20
 	padded = data.decode('ascii')
-	return padded.strip('-')
+	return addressPrefix + padded.strip('-')
 def MakeTXID(i):
 	txid = '00' * 31 + '{:02X}'.format(i)
 	# make case consistent with hexlify!
@@ -46,7 +52,7 @@ class MockHost(object):
 		vout = 7
 		toAdd = {'txid':txid, 'vout':vout}
 		self._nextSuppliedOutput += 1
-		pubKeyHash = TextAsPubKeyHash(self._id + '_supplied' + str(self._nextSuppliedOutput))
+		pubKeyHash = TextAsPubKeyHash(addressPrefix + self._id + '_supplied' + str(self._nextSuppliedOutput))
 		scriptPubKey = RawTransaction.ScriptPubKeyForPubKeyHash(pubKeyHash)
 		toAdd['scriptPubKey'] = scriptPubKey
 		toAdd['address'] = pubKeyHash
@@ -88,17 +94,17 @@ class MockHost(object):
 
 	def getNewNonSwapBillAddress(self):
 		self._nextChange += 1
-		return TextAsPubKeyHash(self._id + '_nonsb' + str(self._nextChange))
+		return TextAsPubKeyHash(addressPrefix + self._id + '_nonsb' + str(self._nextChange))
 	def getNewSwapBillAddress(self):
 		self._nextSwapBill += 1
-		return TextAsPubKeyHash(self._id + '_swapbill' + str(self._nextSwapBill))
+		return TextAsPubKeyHash(addressPrefix + self._id + '_swapbill' + str(self._nextSwapBill))
 	def addressIsMine(self, pubKeyHash):
 		try:
 			asText = PubKeyHashAsText(pubKeyHash)
 		except UnicodeDecodeError:
 			# control address
 			return False
-		return asText.startswith(self._id + '_')
+		return asText.startswith(addressPrefix + self._id + '_')
 
 	def _consumeUnspent(self, txID, vOut, scriptPubKey):
 		unspentAfter = []

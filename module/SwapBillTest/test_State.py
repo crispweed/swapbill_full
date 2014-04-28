@@ -5,9 +5,6 @@ from SwapBill.State import OutputsSpecDoesntMatch, InvalidTransactionType, Inval
 
 milliCoin = 100000
 
-def Pack(**details):
-	return details
-
 class Test(unittest.TestCase):
 	outputsLookup = {
 	    'Burn':('destination',),

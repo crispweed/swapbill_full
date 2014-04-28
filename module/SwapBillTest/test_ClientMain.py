@@ -9,6 +9,7 @@ from SwapBillTest.MockHost import MockHost
 from SwapBill import ClientMain
 from SwapBill.BuildHostedTransaction import InsufficientFunds
 from SwapBill.ClientMain import TransactionNotSuccessfulAgainstCurrentState
+from SwapBill.ExceptionReportedToUser import ExceptionReportedToUser
 
 cacheFile = 'test.cache'
 
@@ -104,7 +105,11 @@ class Test(unittest.TestCase):
 		info = GetStateInfo(host)
 		self.assertEqual(info['balances'], {"02:1": 1000000, "03:1": 2000000})
 
-		output = RunClient(host, ['pay', '--quantity', '1', '--toAddress', "_swapbill2"])
+		host._setOwner('recipient')
+		payTargetAddress = host.formatAddressForEndUser(host.getNewSwapBillAddress())
+		host._setOwner('')
+
+		output = RunClient(host, ['pay', '--quantity', '1', '--toAddress', payTargetAddress])
 
 		info = GetStateInfo(host)
 		self.assertEqual(info['balances'], {'02:1': 1000000, '04:2': 1, '04:1': 1999999})
@@ -180,6 +185,12 @@ class Test(unittest.TestCase):
 		info = GetStateInfo(host)
 		self.assertEqual(info['balances'], {burnTarget:100000})
 
+	def test_bad_invocations(self):
+		host = MockHost()
+		if os.path.exists(cacheFile):
+			os.remove(cacheFile)
+		self.assertRaisesRegexp(ExceptionReportedToUser, 'No pending exchange with the specified ID', RunClient, host, ['complete_ltc_sell', '--pending_exchange_id', '123'])
+
 	def test_burn_and_pay(self):
 		host = MockHost()
 		if os.path.exists(cacheFile):
@@ -215,6 +226,7 @@ class Test(unittest.TestCase):
 		payTargetAddress = host.formatAddressForEndUser(host.getNewSwapBillAddress())
 		host._setOwner('')
 
+		self.assertRaises(ClientMain.BadAddressArgument, RunClient, host, ['pay', '--quantity', '100', '--toAddress', 'madeUpAddress'])
 		RunClient(host, ['pay', '--quantity', '100', '--toAddress', payTargetAddress])
 		payChange = "0" + str(nextTX) + ":1"
 		payTarget = "0" + str(nextTX) + ":2"
@@ -226,7 +238,7 @@ class Test(unittest.TestCase):
 		host._setOwner('')
 
 		# and this should not submit because there are not enough funds for the payment
-		self.assertRaises(TransactionNotSuccessfulAgainstCurrentState, RunClient, host, ['pay', '--quantity', '160000', '--toAddress', 'pay_target'])
+		self.assertRaises(TransactionNotSuccessfulAgainstCurrentState, RunClient, host, ['pay', '--quantity', '160000', '--toAddress', payTargetAddress])
 
 	def test_two_owners(self):
 		host = InitHost()
