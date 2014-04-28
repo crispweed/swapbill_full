@@ -329,7 +329,7 @@ class Test(unittest.TestCase):
 
 		output, result = RunClient(host, ['get_pending_exchanges'])
 		expectedResult = [
-		    ('key', 0, {
+		    ('pending exchange index', 0, {
 		        'I am seller (and need to complete)': True,
 		        'outstanding ltc payment amount': 2500000,
 		        'swap bill paid by buyer': 10000000,
@@ -346,7 +346,7 @@ class Test(unittest.TestCase):
 		output, result = RunClient(host, ['get_pending_exchanges'])
 		# (as above, but identifies bob as buyer instead of seller)
 		expectedResult = [
-		    ('key', 0, {
+		    ('pending exchange index', 0, {
 		        'I am seller (and need to complete)': False,
 		        'outstanding ltc payment amount': 2500000,
 		        'swap bill paid by buyer': 10000000,

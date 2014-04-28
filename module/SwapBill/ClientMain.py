@@ -252,7 +252,7 @@ def Main(startBlockIndex, startBlockHash, commandLineArgs=sys.argv[1:], host=Non
 			d['swap bill paid by buyer'] = exchange.swapBillAmount
 			d['outstanding ltc payment amount'] = exchange.ltc
 			d['expires on block'] = exchange.expiry
-			result.append(('key', key, d))
+			result.append(('pending exchange index', key, d))
 		return result
 
 	else:
