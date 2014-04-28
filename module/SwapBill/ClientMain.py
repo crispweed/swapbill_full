@@ -49,7 +49,8 @@ sp = subparsers.add_parser('complete_ltc_sell', help='complete an ltc exchange b
 sp.add_argument('--pending_exchange_id', required=True, help='the id of the pending exchange payment to fulfill')
 
 subparsers.add_parser('get_balance', help='get current SwapBill balance')
-subparsers.add_parser('get_offers', help='get current SwapBill exchange offers')
+subparsers.add_parser('get_buy_offers', help='get list of currently active litecoin buy offers')
+subparsers.add_parser('get_sell_offers', help='get list of currently active litecoin sell offers')
 subparsers.add_parser('get_pending_exchanges', help='get current SwapBill pending exchange payments')
 subparsers.add_parser('get_state_info', help='get some general state information')
 
@@ -213,68 +214,46 @@ def Main(startBlockIndex, startBlockHash, commandLineArgs=sys.argv[1:], host=Non
 				activeAccountAmount = amount
 		return {'total':total, 'in active account':activeAccountAmount}
 
-	elif args.action == 'get_offers':
-		print('Buy offers:')
+	elif args.action == 'get_buy_offers':
+		unspent, swapBillUnspent = GetUnspent.GetUnspent(transactionBuildLayer, state._balances)
+		result = []
 		offers = state._LTCBuys.getSortedExchangeRateAndDetails()
-		if len(offers) == 0:
-			print('  (no buy offers)')
 		for exchangeRate, buyDetails in offers:
-			pubKeyHash = buyDetails.refundAccount
+			mine = buyDetails.refundAccount in swapBillUnspent
 			exchangeAmount = buyDetails.swapBillAmount
 			rate_Double = float(exchangeRate) / 0x100000000
 			ltc = int(exchangeAmount * rate_Double)
-			line = '  rate:{:.7f}, swapbill offered:{}, ltc equivalent:{}'.format(rate_Double, exchangeAmount, ltc)
-			address = host.formatAddressForEndUser(pubKeyHash)
-			validateResults = host._rpcHost.call('validateaddress', address)
-			if validateResults['ismine'] == True:
-				line += ' (mine)'
-			print(line)
-		print('Sell offers:')
+			result.append(('exchange rate', rate_Double, {'swapbill offered':exchangeAmount, 'ltc equivalent':ltc, 'mine':mine}))
+		return result
+
+	elif args.action == 'get_sell_offers':
+		unspent, swapBillUnspent = GetUnspent.GetUnspent(transactionBuildLayer, state._balances)
+		result = []
 		offers = state._LTCSells.getSortedExchangeRateAndDetails()
-		if len(offers) == 0:
-			print('  (no sell offers)')
 		for exchangeRate, sellDetails in offers:
-			pubKeyHash = sellDetails.receivingAccount
+			mine = sellDetails.receivingAccount in swapBillUnspent
 			exchangeAmount = sellDetails.swapBillAmount
 			depositAmount = sellDetails.swapBillDeposit
 			rate_Double = float(exchangeRate) / 0x100000000
 			ltc = int(exchangeAmount * rate_Double)
-			line = '  rate:{:.7f}, swapbill desired:{}, ltc equivalent:{}'.format(rate_Double, exchangeAmount, ltc)
-			address = host.formatAddressForEndUser(pubKeyHash)
-			validateResults = host._rpcHost.call('validateaddress', address)
-			if validateResults['ismine'] == True:
-				line += ' (mine)'
-			print(line)
+			result.append(('exchange rate', rate_Double, {'swapbill desired':exchangeAmount, 'deposit paid':depositAmount, 'ltc equivalent':ltc, 'mine':mine}))
+		return result
 
 	elif args.action == 'get_pending_exchanges':
-		print('Pending exchange completion payments:')
-		if len(state._pendingExchanges) == 0:
-			print('  (no pending completion payments)')
+		unspent, swapBillUnspent = GetUnspent.GetUnspent(transactionBuildLayer, state._balances)
+		result = []
 		for key in state._pendingExchanges:
+			d = {}
 			exchange = state._pendingExchanges[key]
-			print(' key =', key, ':')
-			address = host.formatAddressForEndUser(exchange.buyerAddress)
-			line = '  buyer = ' + address
-			validateResults = host._rpcHost.call('validateaddress', address)
-			if validateResults['ismine'] == True:
-				line += ' (me)'
-			print(line)
-			address = host.formatAddressForEndUser(exchange.sellerAddress)
-			line = '  seller = ' + address
-			validateResults = host._rpcHost.call('validateaddress', address)
-			if validateResults['ismine'] == True:
-				line += ' (me)'
-			print(line)
-			print('  swapBillAmount =', exchange.swapBillAmount)
-			print('  swapBillDeposit =', exchange.swapBillDeposit)
-			print('  ltc amount to pay =', exchange.ltc)
-			address = Address.FromPubKeyHash(host._addressVersion, exchange.ltcReceiveAddress)
-			line = '  pay ltc to = ' + address
-			validateResults = host._rpcHost.call('validateaddress', address)
-			if validateResults['ismine'] == True:
-				line += ' (me)'
-			print(line)
-			print('  expires on block =', exchange.expiry)
+			#d['ltc receive address'] = host.formatAddressForEndUser(exchange.ltcReceiveAddress)
+			d['I am seller (and need to complete)'] = exchange.sellerReceivingAccount in swapBillUnspent
+			d['I am buyer (and waiting for payment)'] = exchange.buyerAddress in swapBillUnspent
+			d['deposit paid by seller'] = exchange.swapBillDeposit
+			d['swap bill paid by buyer'] = exchange.swapBillAmount
+			d['outstanding ltc payment amount'] = exchange.ltc
+			d['expires on block'] = exchange.expiry
+			result.append(('key', key, d))
+		return result
 
 	else:
 		parser.print_help()

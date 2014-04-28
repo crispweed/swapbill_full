@@ -286,9 +286,15 @@ class Test(unittest.TestCase):
 		ownerBalances = GetOwnerBalances(host, ownerList, info['balances'])
 		self.assertDictEqual(ownerBalances, {'bob': 20000000, 'clive': 50000000, 'dave': 60000000})
 
+		output, result = RunClient(host, ['get_buy_offers'])
+		self.assertEqual(result, [('exchange rate', 0.5, {'ltc equivalent': 15000000, 'mine': True, 'swapbill offered': 30000000})])
+
 		## bob makes better offer, but with smaller amount
 
 		host._setOwner('bob')
+		output, result = RunClient(host, ['get_buy_offers'])
+		self.assertEqual(result, [('exchange rate', 0.5, {'ltc equivalent': 15000000, 'mine': False, 'swapbill offered': 30000000})])
+
 		host._addUnspent(100000000)
 		RunClient(host, ['post_ltc_buy', '--quantity', '10000000', '--exchangeRate', '0.25'])
 		info = GetStateInfo(host)
@@ -297,6 +303,13 @@ class Test(unittest.TestCase):
 		self.assertEqual(info['numberOfLTCBuyOffers'], 2)
 		self.assertEqual(info['numberOfLTCSellOffers'], 0)
 		self.assertEqual(info['numberOfPendingExchanges'], 0)
+
+		output, result = RunClient(host, ['get_buy_offers'])
+		expectedResult = [
+		    ('exchange rate', 0.25, {'ltc equivalent': 2500000, 'mine': True, 'swapbill offered': 10000000}),
+			('exchange rate', 0.5, {'ltc equivalent': 15000000, 'mine': False, 'swapbill offered': 30000000})
+		]
+		self.assertEqual(result, expectedResult)
 
 		## clive makes a sell offer, matching bob's buy exactly
 
@@ -311,9 +324,38 @@ class Test(unittest.TestCase):
 		self.assertEqual(info['numberOfLTCSellOffers'], 0)
 		self.assertEqual(info['numberOfPendingExchanges'], 1)
 
+		output, result = RunClient(host, ['get_sell_offers'])
+		self.assertEqual(result, []) # (got matched immediately)
+
+		output, result = RunClient(host, ['get_pending_exchanges'])
+		expectedResult = [
+		    ('key', 0, {
+		        'I am seller (and need to complete)': True,
+		        'outstanding ltc payment amount': 2500000,
+		        'swap bill paid by buyer': 10000000,
+		        'expires on block': 57,
+		        'I am buyer (and waiting for payment)': False,
+		        'deposit paid by seller': 625000
+		    })]
+		self.assertEqual(result, expectedResult)
+
 		## dave and bob make overlapping offers that 'cross over'
 
 		host._setOwner('bob')
+
+		output, result = RunClient(host, ['get_pending_exchanges'])
+		# (as above, but identifies bob as buyer instead of seller)
+		expectedResult = [
+		    ('key', 0, {
+		        'I am seller (and need to complete)': False,
+		        'outstanding ltc payment amount': 2500000,
+		        'swap bill paid by buyer': 10000000,
+		        'expires on block': 57,
+		        'I am buyer (and waiting for payment)': True,
+		        'deposit paid by seller': 625000
+		    })]
+		self.assertEqual(result, expectedResult)
+		
 		RunClient(host, ['post_ltc_buy', '--quantity', '10000000', '--exchangeRate', '0.25'])
 		info = GetStateInfo(host)
 		ownerBalances = GetOwnerBalances(host, ownerList, info['balances'])
@@ -331,6 +373,14 @@ class Test(unittest.TestCase):
 		self.assertEqual(info['numberOfLTCBuyOffers'], 1)
 		self.assertEqual(info['numberOfLTCSellOffers'], 1)
 		self.assertEqual(info['numberOfPendingExchanges'], 2)
+
+		output, result = RunClient(host, ['get_buy_offers'])
+		expectedResult = [('exchange rate', 0.5, {'ltc equivalent': 15000000, 'mine': False, 'swapbill offered': 30000000})]
+		self.assertEqual(result, expectedResult)
+
+		output, result = RunClient(host, ['get_sell_offers'])
+		expectedResult = [('exchange rate', 0.26953125, {'deposit paid': 625000, 'ltc equivalent': 2695312, 'mine': True, 'swapbill desired': 10000000})]
+		self.assertEqual(result, expectedResult)
 
 		assert cliveCompletionPaymentExpiry > host._nextBlock
 		host._advance(cliveCompletionPaymentExpiry - host._nextBlock)
