@@ -8,24 +8,25 @@ class NotValidSwapBillTransaction(Exception):
 	pass
 
 _mappingByTypeCode = (
-    ('Burn', None, ((0, 16), 'amount'), ('destination',), ()),
-    ('Pay', 'sourceAccount', (('amount', 6, 'maxBlock', 4, None, 6), None), ('change','destination'), ()),
+    ('Burn', 0, ((0, 16), 'amount'), ('destination',), ()),
+    ('Pay', 1, (('amount', 6, 'maxBlock', 4, None, 6), None), ('change','destination'), ()),
     ('LTCBuyOffer',
-     'sourceAccount',
+     1,
      (('swapBillOffered', 6, 'maxBlock', 4, 'exchangeRate', 4, 'maxBlockOffset', 2), None),
      ('change', 'refund'),
      (('receivingAddress', None),)
 	),
     ('LTCSellOffer',
-     'sourceAccount',
+     1,
      (('swapBillDesired', 6, 'maxBlock', 4, 'exchangeRate', 4, 'maxBlockOffset', 2), None),
      ('change', 'receiving'),
      ()
 	),
-    ('LTCExchangeCompletion', None, (('pendingExchangeIndex', 6, None, 10), None), (), (('destinationAddress', 'destinationAmount'),)),
+    ('LTCExchangeCompletion', 0, (('pendingExchangeIndex', 6, None, 10), None), (), (('destinationAddress', 'destinationAmount'),)),
+    ('Collect', None, (('_numberOfSources', 2, 'maxBlock', 4, None, 10), None), ('destination',), ()),
 	)
 
-_forwardCompatibilityMapping = ('ForwardToFutureNetworkVersion', 'sourceAccount', (('amount', 6, 'maxBlock', 4, None, 6), None), ('change',), ())
+_forwardCompatibilityMapping = ('ForwardToFutureNetworkVersion', 1, (('amount', 6, 'maxBlock', 4, None, 6), None), ('change',), ())
 
 def _mappingFromTypeString(transactionType):
 	for i in range(len(_mappingByTypeCode)):
@@ -65,8 +66,11 @@ def ToStateTransaction(tx):
 	mapping = _mappingFromTypeCode(typeCode)
 	transactionType = mapping[0]
 	details = {}
-	if mapping[1] is not None:
-		details[mapping[1]] = (tx.inputTXID(0), tx.inputVOut(0))
+	numberOfSources = mapping[1]
+	if numberOfSources == 1:
+		details['sourceAccount'] = (tx.inputTXID(0), tx.inputVOut(0))
+	else:
+		assert numberOfSources == 0
 	controlAddressMapping, amountMapping = mapping[2]
 	pos = 4
 	for i in range(len(controlAddressMapping) // 2):
@@ -101,9 +105,12 @@ def FromStateTransaction(transactionType, outputs, outputPubKeyHashes, details):
 	assert len(outputs) == len(outputPubKeyHashes)
 	typeCode, mapping = _mappingFromTypeString(transactionType)
 	tx = HostTransaction.InMemoryTransaction()
-	if mapping[1] is not None:
-		txID, vout = details[mapping[1]]
+	numberOfSources = mapping[1]
+	if numberOfSources == 1:
+		txID, vout = details['sourceAccount']
 		tx.addInput(txID, vout)
+	else:
+		assert numberOfSources == 0
 	controlAddressMapping, amountMapping = mapping[2]
 	controlAddressData = ControlAddressPrefix.prefix + _encodeInt(typeCode, 1)
 	for i in range(len(controlAddressMapping) // 2):
