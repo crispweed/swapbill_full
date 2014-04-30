@@ -7,7 +7,7 @@ else:
 	import cPickle as pickle
 from os import path
 from collections import deque
-from SwapBill import State, DecodeTransaction, TransactionTypes
+from SwapBill import State, DecodeTransaction, TransactionEncoding
 from SwapBill import FormatTransactionForUserDisplay
 
 class ReindexingRequiredException(Exception):
@@ -54,10 +54,10 @@ def _processBlock(host, state, blockHash, out):
 		if hostTX == None:
 			continue
 		try:
-			transactionType, outputs, outputPubKeyHashes, transactionDetails = TransactionTypes.ToStateTransaction(hostTX)
-		except TransactionTypes.NotValidSwapBillTransaction:
+			transactionType, outputs, outputPubKeyHashes, transactionDetails = TransactionEncoding.ToStateTransaction(hostTX)
+		except TransactionEncoding.NotValidSwapBillTransaction:
 			continue
-		except TransactionTypes.UnsupportedTransaction:
+		except TransactionEncoding.UnsupportedTransaction:
 			continue
 		state.applyTransaction(transactionType, txID, outputs, transactionDetails)
 		print('applied ' + FormatTransactionForUserDisplay.Format(host, transactionType, outputs, outputPubKeyHashes, transactionDetails), file=out)

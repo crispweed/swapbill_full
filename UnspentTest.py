@@ -4,7 +4,7 @@ from os import path
 scriptPath = path.dirname(path.abspath(__file__))
 sys.path.append(path.join(scriptPath, 'module'))
 sys.dont_write_bytecode = True
-from SwapBill import Host, TransactionTypes, TransactionFee, BuildHostedTransaction, ScriptPubKeyLookup, Address
+from SwapBill import Host, TransactionEncoding, TransactionFee, BuildHostedTransaction, ScriptPubKeyLookup, Address
 from SwapBill.Sync import SyncAndReturnState
 
 class Config(object):
@@ -71,7 +71,7 @@ fromAddress = 'mpE1iVsytmgaKqcjW3LasEps47MdJJrDb9'
 
 source = CheckAndReturnPubKeyHash(fromAddress)
 exchangeRate = int(0.3 * 0x100000000)
-tx = TransactionTypes.LTCSellOffer()
+tx = TransactionEncoding.LTCSellOffer()
 swapBillToBuy = 1000000
 tx.init_FromUserRequirements(source=source, swapBillDesired=swapBillToBuy, exchangeRate=exchangeRate)
 CheckAndSend_FromAddress(tx)
@@ -80,7 +80,7 @@ CheckAndSend_FromAddress(tx)
 
 #scriptPubKeyLookup = ScriptPubKeyLookup.Lookup(unspent[1])
 #target = host.getNewSwapBillAddress()
-#burnTX = TransactionTypes.Burn()
+#burnTX = TransactionEncoding.Burn()
 #burnTX.init_FromUserRequirements(burnAmount=100000, target=target)
 #change = host.getNewNonSwapBillAddress()
 #print('attempting to send swap bill transaction:', burnTX)

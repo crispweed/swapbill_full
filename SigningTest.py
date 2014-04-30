@@ -6,7 +6,7 @@ scriptPath = path.dirname(path.abspath(__file__))
 sys.path.append(path.join(scriptPath, 'module'))
 sys.dont_write_bytecode = True
 from SwapBill import RPC, RawTransaction, Address, TransactionFee, ScriptPubKeyLookup
-from SwapBill import TransactionTypes, BuildHostedTransaction, GetUnspent, Sync, ParseConfig
+from SwapBill import TransactionEncoding, BuildHostedTransaction, GetUnspent, Sync, ParseConfig
 from SwapBill.Sync import SyncAndReturnState
 from SwapBill.Amounts import ToSatoshis
 PY3 = sys.version_info.major > 2
@@ -41,7 +41,7 @@ rpcHost = RPC.Host('http://' + litecoinConfig['rpcuser'] + ':' + litecoinConfig[
 unspent = GetUnspent.AllNonSwapBill(config.addressVersion, rpcHost, {})
 scriptPubKeyLookup = ScriptPubKeyLookup.Lookup(unspent[1])
 destination = Address.ToPubKeyHash(config.addressVersion, 'mnwNZCyvCKkEycX86UmugTfM2V7pRzxGWu')
-burnTX = TransactionTypes.Burn()
+burnTX = TransactionEncoding.Burn()
 burnTX.init_FromUserRequirements(burnAmount=100000, target=destination)
 change = destination
 transactionFee = TransactionFee.baseFee

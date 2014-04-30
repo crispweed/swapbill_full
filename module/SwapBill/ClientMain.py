@@ -6,7 +6,7 @@ if PY3:
 else:
 	import StringIO as io
 from SwapBill import RawTransaction, Address, TransactionFee, GetUnspent
-from SwapBill import TransactionTypes, BuildHostedTransaction, Sync, Host, TransactionBuildLayer
+from SwapBill import TransactionEncoding, BuildHostedTransaction, Sync, Host, TransactionBuildLayer
 from SwapBill import FormatTransactionForUserDisplay
 from SwapBill.Sync import SyncAndReturnState
 from SwapBill.Amounts import ToSatoshis
@@ -110,7 +110,7 @@ def Main(startBlockIndex, startBlockHash, commandLineArgs=sys.argv[1:], host=Non
 			#print(state._balances)
 			#print('backingUnspent:')
 			#print(backingUnspent)
-		baseTX = TransactionTypes.FromStateTransaction(transactionType, outputs, outputPubKeys, details)
+		baseTX = TransactionEncoding.FromStateTransaction(transactionType, outputs, outputPubKeys, details)
 		baseInputsAmount = 0
 		for i in range(baseTX.numberOfInputs()):
 			txID = baseTX.inputTXID(i)
