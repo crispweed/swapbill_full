@@ -88,8 +88,10 @@ def ToStateTransaction(tx):
 		details[amountMapping] = tx.outputAmount(0)
 	if meta['_numberOfSources'] == 1:
 		details['sourceAccount'] = (tx.inputTXID(0), tx.inputVOut(0))
-	else:
-		assert meta['_numberOfSources'] == 0
+	elif meta['_numberOfSources'] != 0:
+		details['sourceAccounts'] = []
+		for i in range(meta['_numberOfSources']):
+			details['sourceAccounts'].append((tx.inputTXID(i), tx.inputVOut(i)))
 	outputs = mapping[3]
 	outputPubKeyHashes = []
 	for i in range(len(outputs)):
@@ -115,7 +117,6 @@ def FromStateTransaction(transactionType, outputs, outputPubKeyHashes, originalD
 		tx.addInput(txID, vout)
 	elif 'sourceAccounts' in details:
 		for txID, vout in details['sourceAccounts']:
-			txID, vout = details['sourceAccount']
 			tx.addInput(txID, vout)
 	details['_numberOfSources'] = tx.numberOfInputs()
 	if mapping[1] is not None:
@@ -152,5 +153,8 @@ def FromStateTransaction(transactionType, outputs, outputPubKeyHashes, originalD
 		#print('outputPubKeyHashes:', outputPubKeyHashes)
 		#print('outputPubKeyHashes_Check:', outputPubKeyHashes_Check)
 	assert outputPubKeyHashes_Check == outputPubKeyHashes
+	#if details_Check != originalDetails:
+		#print('originalDetails:', originalDetails)
+		#print('details_Check:', details_Check)
 	assert details_Check == originalDetails
 	return tx

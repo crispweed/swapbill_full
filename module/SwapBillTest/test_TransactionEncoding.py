@@ -81,6 +81,13 @@ class Test(unittest.TestCase):
 		self.assertDictEqual(tx.__dict__, {'_inputs': [], '_outputs': [(b'SWP\x04 \x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00', 0), ('destinationPKH', 999)]} )
 		self.checkIgnoredBytes(tx, 10)
 		self.assertRaises(AssertionError, self.checkIgnoredBytes, tx, 11)
+		tx = FromStateTransaction(
+		    'Collect', ('destination',), ('destinationPKH',),
+		    {'sourceAccounts':[('sourceTXID1',5), ('sourceTXID2',6), ('sourceTXID3',7)], 'maxBlock':345}
+		)
+		self.assertDictEqual(tx.__dict__, {'_inputs': [('sourceTXID1', 5), ('sourceTXID2', 6), ('sourceTXID3', 7)], '_outputs': [(b'SWP\x05\x03\x00Y\x01\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00', 0), ('destinationPKH', 0)]} )
+		self.checkIgnoredBytes(tx, 10)
+		self.assertRaises(AssertionError, self.checkIgnoredBytes, tx, 11)
 
 	def test_forwarding(self):
 		# cannot encode forward to future network version transactions explicitly from state transactions
