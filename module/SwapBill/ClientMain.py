@@ -48,6 +48,8 @@ sp.add_argument('--exchangeRate', required=True, help='the exchange rate SWP/LTC
 sp = subparsers.add_parser('complete_ltc_sell', help='complete an ltc exchange by fulfilling a pending exchange payment')
 sp.add_argument('--pending_exchange_id', required=True, help='the id of the pending exchange payment to fulfill')
 
+subparsers.add_parser('collect', help='combine all current owned swapbill outputs into active account')
+
 subparsers.add_parser('get_balance', help='get current SwapBill balance')
 subparsers.add_parser('get_buy_offers', help='get list of currently active litecoin buy offers')
 subparsers.add_parser('get_sell_offers', help='get list of currently active litecoin sell offers')
@@ -202,6 +204,22 @@ def Main(startBlockIndex, startBlockHash, commandLineArgs=sys.argv[1:], host=Non
 		#print('complete_ltc_sell details:')
 		#print(details)
 		return CheckAndSend(transactionType, (), (), details)
+
+	elif args.action == 'collect':
+		transactionType = 'Collect'
+		unspent, swapBillUnspent = GetUnspent.GetUnspent(transactionBuildLayer, state._balances)
+		sourceAccounts = []
+		for key in swapBillUnspent:
+			sourceAccounts.append(key)
+		if len(sourceAccounts) < 2:
+			raise ExceptionReportedToUser('There are currently less than two owned swapbill outputs.')
+		outputs = ('destination',)
+		outputPubKeyHashes = (host.getNewSwapBillAddress(),)
+		details = {
+		    'sourceAccounts':sourceAccounts,
+		    'maxBlock':0xffffffff
+		}
+		return CheckAndSend(transactionType, outputs, outputPubKeyHashes, details)
 
 	elif args.action == 'get_balance':
 		unspent, swapBillUnspent = GetUnspent.GetUnspent(transactionBuildLayer, state._balances)

@@ -240,6 +240,39 @@ class Test(unittest.TestCase):
 		# and this should not submit because there are not enough funds for the payment
 		self.assertRaises(TransactionNotSuccessfulAgainstCurrentState, RunClient, host, ['pay', '--quantity', '160000', '--toAddress', payTargetAddress])
 
+
+	def test_burn_and_collect(self):
+		host = MockHost()
+		if os.path.exists(cacheFile):
+			os.remove(cacheFile)
+		nextTX = 1
+		host._addUnspent(100000000)
+		nextTX += 1
+		RunClient(host, ['burn', '--quantity', '100000'])
+		firstBurnTarget = "0" + str(nextTX) + ":1"
+		nextTX += 1
+		info = GetStateInfo(host)
+		self.assertEqual(info['balances'], {firstBurnTarget:100000})
+		RunClient(host, ['burn', '--quantity', '150000'])
+		secondBurnTarget = "0" + str(nextTX) + ":1"
+		nextTX += 1
+		info = GetStateInfo(host)
+		self.assertEqual(info['balances'], {firstBurnTarget:100000, secondBurnTarget:150000})
+		host._addUnspent(600000)
+		nextTX += 1
+		RunClient(host, ['burn', '--quantity', '160000'])
+		thirdBurnTarget = "0" + str(nextTX) + ":1"
+		nextTX += 1
+		info = GetStateInfo(host)
+		self.assertEqual(info['balances'], {firstBurnTarget:100000, secondBurnTarget:150000, thirdBurnTarget:160000})
+		RunClient(host, ['collect'])
+		collectOutput = "0" + str(nextTX) + ":1"
+		nextTX += 1
+		info = GetStateInfo(host)
+		self.assertEqual(info['balances'], {collectOutput:410000})
+		# and should not submit again because there is now only one owned output
+		self.assertRaisesRegexp(ExceptionReportedToUser, 'There are currently less than two owned swapbill outputs.', RunClient, host, ['collect'])
+
 	def test_two_owners(self):
 		host = InitHost()
 
