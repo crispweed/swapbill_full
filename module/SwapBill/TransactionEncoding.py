@@ -66,11 +66,7 @@ def ToStateTransaction(tx):
 	mapping = _mappingFromTypeCode(typeCode)
 	transactionType = mapping[0]
 	details = {}
-	numberOfSources = mapping[1]
-	if numberOfSources == 1:
-		details['sourceAccount'] = (tx.inputTXID(0), tx.inputVOut(0))
-	else:
-		assert numberOfSources == 0
+	meta = {'_numberOfSources':mapping[1]}
 	controlAddressMapping, amountMapping = mapping[2]
 	pos = 4
 	for i in range(len(controlAddressMapping) // 2):
@@ -81,11 +77,19 @@ def ToStateTransaction(tx):
 			if data != struct.pack('<B', 0) * numberOfBytes:
 				raise NotValidSwapBillTransaction
 		elif valueMapping is not None:
-			details[valueMapping] = _decodeInt(data)
+			value = _decodeInt(data)
+			if valueMapping.startswith('_'):
+				meta[valueMapping] = value
+			else:
+				details[valueMapping] = value
 		pos += numberOfBytes
 	assert pos == 20
 	if amountMapping is not None:
 		details[amountMapping] = tx.outputAmount(0)
+	if meta['_numberOfSources'] == 1:
+		details['sourceAccount'] = (tx.inputTXID(0), tx.inputVOut(0))
+	else:
+		assert meta['_numberOfSources'] == 0
 	outputs = mapping[3]
 	outputPubKeyHashes = []
 	for i in range(len(outputs)):
@@ -101,16 +105,21 @@ def ToStateTransaction(tx):
 			details[amountMapping] = tx.outputAmount(1 + len(outputs) + i)
 	return transactionType, outputs, outputPubKeyHashes, details
 
-def FromStateTransaction(transactionType, outputs, outputPubKeyHashes, details):
+def FromStateTransaction(transactionType, outputs, outputPubKeyHashes, originalDetails):
 	assert len(outputs) == len(outputPubKeyHashes)
 	typeCode, mapping = _mappingFromTypeString(transactionType)
 	tx = HostTransaction.InMemoryTransaction()
-	numberOfSources = mapping[1]
-	if numberOfSources == 1:
+	details = originalDetails.copy()
+	if 'sourceAccount' in details:
 		txID, vout = details['sourceAccount']
 		tx.addInput(txID, vout)
-	else:
-		assert numberOfSources == 0
+	elif 'sourceAccounts' in details:
+		for txID, vout in details['sourceAccounts']:
+			txID, vout = details['sourceAccount']
+			tx.addInput(txID, vout)
+	details['_numberOfSources'] = tx.numberOfInputs()
+	if mapping[1] is not None:
+		assert mapping[1] == details['_numberOfSources']
 	controlAddressMapping, amountMapping = mapping[2]
 	controlAddressData = ControlAddressPrefix.prefix + _encodeInt(typeCode, 1)
 	for i in range(len(controlAddressMapping) // 2):
@@ -143,5 +152,5 @@ def FromStateTransaction(transactionType, outputs, outputPubKeyHashes, details):
 		#print('outputPubKeyHashes:', outputPubKeyHashes)
 		#print('outputPubKeyHashes_Check:', outputPubKeyHashes_Check)
 	assert outputPubKeyHashes_Check == outputPubKeyHashes
-	assert details_Check == details
+	assert details_Check == originalDetails
 	return tx
