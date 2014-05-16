@@ -7,8 +7,8 @@ class Test(unittest.TestCase):
 		version = b'\x6f'
 		address = Address.FromPubKeyHash(version, pubKeyHash)
 		pubKeyHash2 = Address.ToPubKeyHash(version, address)
-		self.assertEqual(pubKeyHash, pubKeyHash2)		
-		
+		self.assertEqual(pubKeyHash, pubKeyHash2)
+
 	def test(self):
 		version = b'\x6f'
 		# note old control address suffix here
@@ -32,10 +32,12 @@ class Test(unittest.TestCase):
 
 	def test_bad_address(self):
 		version = b'\x6f'
-		self.assertRaisesRegexp(Address.BadAddress, 'Not a valid base58 character', Address.ToPubKeyHash, version, 'm$5DS9xE4PBBhB5eHKRCNaEzekgspzxATY')
-		self.assertRaisesRegexp(Address.BadAddress, 'incorrect version byte', Address.ToPubKeyHash, version, 'm')
+		self.assertRaisesRegexp(Address.BadAddress, 'invalid base58 character encountered', Address.ToPubKeyHash, version, 'm$5DS9xE4PBBhB5eHKRCNaEzekgspzxATY')
+		self.assertRaisesRegexp(Address.BadAddress, 'checksum mismatch', Address.ToPubKeyHash, version, 'm')
 		self.assertRaisesRegexp(Address.BadAddress, 'checksum mismatch', Address.ToPubKeyHash, version, 'mh5DS9xE4PBBhB6eHKRCNaEzekgspzxATY')
-		self.assertRaisesRegexp(Address.BadAddress, 'incorrect version byte', Address.ToPubKeyHash, version, 'mh5DS9xE4PBBhB6eHKRCNaEzekgspzxAT')
+		pubKeyHash = b'\x11\x12\x13\x14\x15\x16\x17\x18\x19\x1a\x1babcdefghi'
+		address = Address.FromPubKeyHash(b'\x01', pubKeyHash)
+		self.assertRaisesRegexp(Address.BadAddress, 'incorrect version byte', Address.ToPubKeyHash, b'\x02', address)
 
 	def test_round_trips(self):
 		self.CheckRoundTrip(b'\x00' * 20)
