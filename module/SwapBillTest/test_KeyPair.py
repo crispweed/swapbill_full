@@ -12,4 +12,4 @@ class Test(unittest.TestCase):
 		pubKeyHash = KeyPair.publicKeyToPubKeyHash(publicKey)
 		self.assertEqual(pubKeyHash, b'\x12m\xab\xa48\xea\x84\xe7\xc4</V\xa3 \x0e\xd6^7\x1b;')
 		print(Address.FromPubKeyHash(b'\x6f', pubKeyHash))
-		# sent to this address with txID = 6af9e8e3f4702e70666bd26d93d28e3722b5aa4ef2a8626b51289f707a78959a
+		# sent to this address with txID = 6af9e8e3f4702e70666bd26d93d28e3722b5aa4ef2a8626b51289f707a78959a, vout = 0
