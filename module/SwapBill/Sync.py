@@ -75,7 +75,7 @@ def SyncAndReturnState(cacheFile, startBlockIndex, startBlockHash, host, out):
 		print('The block corresponding with cached state has been orphaned, full index generation required.', file=out)
 		loaded = False
 	if loaded and not state.startBlockMatches(startBlockHash):
-		print('Start config does not match config from loaded state, , full index generation required.', file=out)
+		print('Start config does not match config from loaded state, full index generation required.', file=out)
 		loaded = False
 	if loaded:
 		print('Loaded cached state data successfully', file=out)
