@@ -1,5 +1,5 @@
 from __future__ import print_function
-import ecdsa
+import ecdsa, hashlib
 from SwapBill import Base58Check
 
 class BadVersionNumber(Exception):
@@ -21,3 +21,7 @@ def privateKeyToPublicKey(privateKey):
 	vk = sk.verifying_key
 	return sk.verifying_key.to_string()
 
+def publicKeyToPubKeyHash(publicKey):
+	ripemd160 = hashlib.new('ripemd160')
+	ripemd160.update(hashlib.sha256(publicKey).digest())
+	return ripemd160.digest()
