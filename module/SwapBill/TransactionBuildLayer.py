@@ -28,12 +28,3 @@ class TransactionBuildLayer(object):
 		unsignedData = RawTransaction.Create(tx, self._scriptPubKeyLookup)
 		unsignedHex = RawTransaction.ToHex(unsignedData)
 		return self._host.signAndSend(unsignedHex)
-
-	#def getNonSwapBillUnspent(self, swapBillBalances):
-		#return GetUnspent.AllNonSwapBill(self._addressVersion, self._rpcHost, swapBillBalances)
-	#def getSingleUnspentForAddress(self, pubKeyHash):
-		#return GetUnspent.SingleForAddress(self._addressVersion, self._rpcHost, pubKeyHash)
-
-	#def getAddressesWithUnspent(self, swapBillBalances):
-		#return GetUnspent.AddressesWithUnspent(self._addressVersion, self._rpcHost, swapBillBalances)
-
