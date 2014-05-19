@@ -1,6 +1,7 @@
 from __future__ import print_function
 import unittest, os
-from SwapBill import Wallet, Address
+from SwapBill import Wallet
+#from SwapBill import Address
 
 walletFile = 'testWallet.txt'
 
@@ -9,15 +10,19 @@ class Test(unittest.TestCase):
 		if os.path.exists(walletFile):
 			os.remove(walletFile)
 		wallet = Wallet.Wallet(walletFile)
-		Address.FromPubKeyHash(b'\x6f', wallet.addKeyPairAndReturnPubKeyHash())
-		Address.FromPubKeyHash(b'\x6f', wallet.addKeyPairAndReturnPubKeyHash())
 		#print(Address.FromPubKeyHash(b'\x6f', wallet.addKeyPairAndReturnPubKeyHash()))
-		#print(wallet.getAllPrivateKeys())
+		addresses = []
+		addresses.append(wallet.addKeyPairAndReturnPubKeyHash())
+		addresses.append(wallet.addKeyPairAndReturnPubKeyHash())
+		for address in addresses:
+			self.assertTrue(wallet.hasKeyPairForPubKeyHash(address))
 		privateKeys1 = wallet.getAllPrivateKeys()
 		self.assertEqual(len(privateKeys1), 2)
 		wallet = Wallet.Wallet(walletFile)
-		Address.FromPubKeyHash(b'\x6f', wallet.addKeyPairAndReturnPubKeyHash())
-		#print(wallet.getAllPrivateKeys())
+		addresses.append(wallet.addKeyPairAndReturnPubKeyHash())
+		for address in addresses:
+			self.assertTrue(wallet.hasKeyPairForPubKeyHash(address))
 		privateKeys2 = wallet.getAllPrivateKeys()
 		self.assertEqual(len(privateKeys2), 3)
 		self.assertEqual(privateKeys2[:2], privateKeys1)
+		self.assertFalse(wallet.hasKeyPairForPubKeyHash(b'fakePubKeyHash'))
