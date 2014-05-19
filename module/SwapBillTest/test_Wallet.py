@@ -26,3 +26,4 @@ class Test(unittest.TestCase):
 		self.assertEqual(len(privateKeys2), 3)
 		self.assertEqual(privateKeys2[:2], privateKeys1)
 		self.assertFalse(wallet.hasKeyPairForPubKeyHash(b'fakePubKeyHash'))
+		os.remove(walletFile)
