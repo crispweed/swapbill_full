@@ -1,6 +1,6 @@
 from __future__ import print_function
 from os import path
-from SwapBill import ParseConfig, RPC, RawTransaction, Address, TransactionFee, Amounts
+from SwapBill import ParseConfig, RPC, RawTransaction, Address, TransactionFee, Amounts, Wallet
 from SwapBill.ExceptionReportedToUser import ExceptionReportedToUser
 
 class SigningFailed(ExceptionReportedToUser):
@@ -41,6 +41,7 @@ class Host(object):
 
 		self._rpcHost = RPC.Host('http://' + RPC_USER + ':' + RPC_PASSWORD + '@' + RPC_HOST + ':' + str(RPC_PORT))
 		self._cachedBlockHash = None
+		self._wallet = Wallet.Wallet('wallet.txt')
 
 # unspents, addresses, transaction encode and send
 
@@ -62,18 +63,24 @@ class Host(object):
 	def getNewNonSwapBillAddress(self):
 		return Address.ToPubKeyHash(self._addressVersion, self._rpcHost.call('getnewaddress'))
 	def getNewSwapBillAddress(self):
-		return Address.ToPubKeyHash(self._addressVersion, self._rpcHost.call('getnewaddress', 'SwapBill'))
+		#return Address.ToPubKeyHash(self._addressVersion, self._rpcHost.call('getnewaddress', 'SwapBill'))
+		return self._wallet.addKeyPairAndReturnPubKeyHash()
 
 	def addressIsMine(self, pubKeyHash):
+		if self._wallet.hasKeyPairForPubKeyHash(pubKeyHash):
+			return True
 		address = Address.FromPubKeyHash(self._addressVersion, pubKeyHash)
 		validateResults = self._rpcHost.call('validateaddress', address)
 		result = validateResults['ismine']
 		assert result in (True, False)
 		return result
+	#def swapBillOutputIsMine(self, txID, vOut):
 
 	def signAndSend(self, unsignedTransactionHex):
 		## lowest level transaction send interface
 		signingResult = self._rpcHost.call('signrawtransaction', unsignedTransactionHex)
+		if signingResult['complete'] != True:
+			signingResult = self._rpcHost.call('signrawtransaction', signingResult['hex'], None, self._wallet.getAllPrivateKeys())
 		if signingResult['complete'] != True:
 			raise SigningFailed("RPC call to signrawtransaction did not set 'complete' to True")
 		signedHex = signingResult['hex']

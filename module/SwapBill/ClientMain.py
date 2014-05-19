@@ -130,6 +130,8 @@ def Main(startBlockIndex, startBlockHash, commandLineArgs=sys.argv[1:], host=Non
 
 	def GetActiveAccount():
 		best = None
+		#for key in state._balances:
+			#txID, vOut = key
 		backingUnspent, swapBillUnspent = GetUnspent.GetUnspent(transactionBuildLayer, state._balances)
 		for key in swapBillUnspent:
 			address, dustAmount = swapBillUnspent[key]
