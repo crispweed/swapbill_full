@@ -19,11 +19,6 @@ def privateKeyToWIF(data, addressVersion):
 	assert len(data) == 32
 	return Base58Check.Encode(addressVersion + data)
 
-	data = Base58Check.Decode(wif)
-	if data[:1] != addressVersion:
-		raise BadVersionNumber()
-	return data[1:]
-
 def privateKeyToPublicKey(privateKey):
 	sk = ecdsa.SigningKey.from_string(privateKey, curve=ecdsa.SECP256k1)
 	vk = sk.verifying_key
