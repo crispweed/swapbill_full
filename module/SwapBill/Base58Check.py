@@ -1,3 +1,4 @@
+from __future__ import print_function
 import binascii
 import hashlib
 
@@ -22,13 +23,11 @@ def Encode(data):
 	res = ''.join(res[::-1])
 	# Encode leading zeros as base58 zeros
 	pad = 0
-	for c in data:
-		if c == b'\x00': pad += 1
-		else: break
+	while data[pad:pad + 1] == b'\x00':
+		pad += 1
 	return b58_digits[0] * pad + res
 
 def Decode(string):
-	assert type(string) is type('')
 	# Convert the string to an integer
 	n = 0
 	for c in string:
