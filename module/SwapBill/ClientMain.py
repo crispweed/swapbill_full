@@ -132,6 +132,8 @@ def Main(startBlockIndex, startBlockHash, commandLineArgs=sys.argv[1:], host=Non
 		best = None
 		#for key in state._balances:
 			#txID, vOut = key
+			#if not host.outputIsToOneOfMySwapBillAddresses(txID, vOut):
+				#continue
 		backingUnspent, swapBillUnspent = GetUnspent.GetUnspent(transactionBuildLayer, state._balances)
 		for key in swapBillUnspent:
 			address, dustAmount = swapBillUnspent[key]
