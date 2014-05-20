@@ -172,10 +172,9 @@ class MockHost(object):
 		self._nextTXID += 1
 		txid = MakeTXID(self._nextTXID)
 		outputAmounts = []
-		for swapBillVOut in range(len(decoded['vout'])):
-			litecoinVOut = len(decoded['vout']) - swapBillVOut # reversed!
-			entry = decoded['vout'][swapBillVOut]
-			toAdd = {'txid':txid, 'vout':litecoinVOut}
+		for vout in range(len(decoded['vout'])):
+			entry = decoded['vout'][vout]
+			toAdd = {'txid':txid, 'vout':vout}
 			scriptPubKey = entry['scriptPubKey']
 			pubKeyHash = binascii.unhexlify(entry['pubKeyHash'].encode('ascii'))
 			assert pubKeyHash == RawTransaction.PubKeyHashForScriptPubKey(scriptPubKey)

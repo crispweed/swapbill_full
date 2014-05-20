@@ -108,8 +108,8 @@ def Create(tx, scriptPubKeyLookup):
 	data += _encodeVarInt(tx.numberOfOutputs())
 
 	for i in range(tx.numberOfOutputs()):
-		pubKeyHash = tx.outputPubKeyHash(tx.numberOfOutputs() - 1 - i)
-		value = tx.outputAmount(tx.numberOfOutputs() - 1 - i)
+		pubKeyHash = tx.outputPubKeyHash(i)
+		value = tx.outputAmount(i)
 		assert len(pubKeyHash) == 20
 		data += struct.pack("<Q", value)
 		script = OP_DUP
@@ -148,7 +148,7 @@ def UnexpectedFormat_Fast(txBytes, controlAddressPrefix):
 		for i in range(numberOfOutputs):
 			pos += 8
 			pos, scriptLen = _decodeVarInt(txBytes, pos)
-			if i == numberOfOutputs - 1:
+			if i == 0:
 				script = txBytes[pos:pos + scriptLen]
 				expectedScriptStart = OP_DUP
 				expectedScriptStart += OP_HASH160
@@ -256,7 +256,6 @@ def Decode(txBytes):
 		#thisOutput['pubKeyHash'] = pubKeyHash
 		thisOutput['pubKeyHash'] = binascii.hexlify(pubKeyHash).decode('ascii')
 		outputs.append(thisOutput)
-	outputs.reverse()
 	result['vout'] = outputs
 
 	return result

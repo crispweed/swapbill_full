@@ -12,7 +12,7 @@ class Test(unittest.TestCase):
 
 	def test(self):
 		inputs = [("b46c0b9cab086fd3ffbe69796e0c0416c14e4b5f416fe7ec349848b08ded7986", 0)]
-		outputs = [(b'Ke\x12\xd1(\t\x12\x8de2\x92%\xb60\xb7\xf5\x08\xd2\xc5\x8b', 100000000), (b'8#\xd6}\xb1\xca g\xd1A\xae/\xfc\xe6\xcb\xa8\x8e(o"', 200000000)]
+		outputs = [(b'8#\xd6}\xb1\xca g\xd1A\xae/\xfc\xe6\xcb\xa8\x8e(o"', 200000000), (b'Ke\x12\xd1(\t\x12\x8de2\x92%\xb60\xb7\xf5\x08\xd2\xc5\x8b', 100000000)]
 		tx = HostTransaction.FromData((inputs, outputs))
 
 		lookup = {}
@@ -35,7 +35,7 @@ class Test(unittest.TestCase):
 
 		decoded = RawTransaction.Decode(rawTX)
 		self.assertListEqual(decoded['vin'], [{'vout': 0, 'txid': 'b46c0b9cab086fd3ffbe69796e0c0416c14e4b5f416fe7ec349848b08ded7986', 'scriptPubKey': '2102066feb3b543146fec6afcb89a2e92e18e3fbbee43ff5c1175cb01897594ab8acac'}])
-		self.assertListEqual(decoded['vout'], [{'pubKeyHash': '4b6512d12809128d65329225b630b7f508d2c58b', 'value': 100000000, 'scriptPubKey': '76a9144b6512d12809128d65329225b630b7f508d2c58b88ac'}, {'pubKeyHash': '3823d67db1ca2067d141ae2ffce6cba88e286f22', 'value': 200000000, 'scriptPubKey': '76a9143823d67db1ca2067d141ae2ffce6cba88e286f2288ac'}])
+		self.assertListEqual(decoded['vout'], [{'pubKeyHash': '3823d67db1ca2067d141ae2ffce6cba88e286f22', 'value': 200000000, 'scriptPubKey': '76a9143823d67db1ca2067d141ae2ffce6cba88e286f2288ac'}, {'pubKeyHash': '4b6512d12809128d65329225b630b7f508d2c58b', 'value': 100000000, 'scriptPubKey': '76a9144b6512d12809128d65329225b630b7f508d2c58b88ac'}])
 		self.assertEqual(len(decoded), 2)
 
 	def test_bad_transaction_detection(self):
@@ -70,10 +70,10 @@ class Test(unittest.TestCase):
 		self.assertEqual(pubKey, b'SWB\x03\x88\x13\x00\x00\x00\x00\xff\xff\xff\xff\x99\x99\x99Y\x00\x00')
 
 	def test_decode(self):
-		txHex = '01000000010100000000000000000000000000000000000000000000000000000000000000070000001976a914737570706c696564312d2d2d2d2d2d2d2d2d2d2d88acffffffff038091e305000000001976a9146368616e6765342d2d2d2d2d2d2d2d2d2d2d2d2d88aca0860100000000001976a9147377617062696c6c332d2d2d2d2d2d2d2d2d2d2d88ac40420f00000000001976a914535750000000000000000000000000000000000088ac00000000'
+		txHex = '0100000003f4dcbefc65134eedd0e4c51972d0153559373ca792d418224be7c28ba63ede20010000006b48304502206e0271aeb1b91673f9e0de8f0131d0c8d673ea738b94a0937a65e3cc1bd431460221008c00646703d19b6ce348e689df81b2429ffa8b57674cd26c7d3ac1003167f02401210210f8d9c2aa007e2024b85e419406a07e278febfc5828df523c45697129c81aaffffffffff4dcbefc65134eedd0e4c51972d0153559373ca792d418224be7c28ba63ede20030000006b483045022100faf3bc5cec4c3be0e8595c922617c20f05b9628a32c1a75548d305e25a6b2e18022035975ce25e2e987739d91feeccc9f0fd4e9a40fff24b1f92b730fd249009da71012103eb1932850c6ffdfbe806f534ead01a0b618a357782d8de6e947993c7a1334553ffffffff8c270b204ef48ee923b5ab0e2f3269447b1777af31d2bc84ef5a04e690970520010000006b48304502210087c1ee75391d2da87493ce0444c34a237d3418990e7ba45878e263148480e6d402203d89e68755925de0c852c03956fe540af9a3232b45a853796c08f3938c0d812b01210222bd9a33a910e7d7e08071424fa06c462605069de8ea99826eed02675e02f9d7ffffffff03a0860100000000001976a91453574203881300000000ffffffff99999959000088aca0860100000000001976a9147e877cb57a375c4525229942326f5e51fb6ad16288ac91790529000000001976a91431b05dabe3fc38cdb5a2de8e07123fd0b945047888ac00000000'
 		txBytes = RawTransaction.FromHex(txHex)
-		self.assertFalse(RawTransaction.UnexpectedFormat_Fast(txBytes, b'SWP'))
-		
+		self.assertFalse(RawTransaction.UnexpectedFormat_Fast(txBytes, b'SWB'))
+		self.assertTrue(RawTransaction.UnexpectedFormat_Fast(txBytes, b'SWP'))
+
 		#decoded = RawTransaction.Decode(txBytes)
 		#self.assertDictEqual(decoded, {})
-		
