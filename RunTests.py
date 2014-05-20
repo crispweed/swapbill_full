@@ -13,6 +13,8 @@ class RaisingOutputStream(object):
 basePath = path.join(scriptPath, 'module', 'SwapBillTest')
 
 if len(sys.argv) > 1:
+	if len(sys.argv) > 2:
+		unittest.defaultTestLoader.testMethodPrefix = sys.argv[2]
 	suite = unittest.defaultTestLoader.discover(basePath, pattern=sys.argv[1])
 else:
 	suite = unittest.defaultTestLoader.discover(basePath)
