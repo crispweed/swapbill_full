@@ -253,7 +253,6 @@ class Test(unittest.TestCase):
 		# and this should not submit because there are not enough funds for the payment
 		self.assertRaises(TransactionNotSuccessfulAgainstCurrentState, RunClient, host, ['pay', '--quantity', '160000', '--toAddress', payTargetAddress])
 
-
 	def test_burn_and_collect(self):
 		host = InitHost()
 		nextTX = 1
@@ -283,6 +282,16 @@ class Test(unittest.TestCase):
 		self.assertEqual(info['balances'], {collectOutput:410000})
 		# and should not submit again because there is now only one owned output
 		self.assertRaisesRegexp(ExceptionReportedToUser, 'There are currently less than two owned swapbill outputs.', RunClient, host, ['collect'])
+
+	def test_non_swapbill_transactions(self):
+		host = InitHost()
+		host._addUnspent(100000000)
+		RunClient(host, ['burn', '--quantity', '1000000'])
+		# just some randon transaction taken off the litecoin testnet
+		# so, inputs will not be valid for our fake blockchain, but we depend on that not being checked for the purpose of this test
+		host.addTransaction("6bc0c859176a50540778c03b6c8f28268823a68cd1cd75d4afe2edbcf50ea8d1", "0100000001566b10778dc28b7cc82e43794bfb26c47ab54a85e1f8e9c8dc04f261024b108c000000006b483045022100aaf6244b7df18296917f430dbb9fa42e159eb79eb3bad8e15a0dfbe84830e08c02206ff81a4cf2cdcd7910c67c13a0694064aec91ae6897d7382dc1e9400b2193bb5012103475fb57d448091d9ca790af2d6d9aca798393199aa70471f38dc359f9f30b50cffffffff0264000000000000001976a914e512a5846125405e009b6f22ac274289f69e185588acb83e5c02000000001976a9147cc3f7daeffe2cfb39630310fad6d0a9fbb4b6aa88ac00000000")
+		info = GetStateInfo(host)
+		self.assertEqual(info['balances'], {'02:1':1000000})
 
 	def test_two_owners(self):
 		host = InitHost()
@@ -484,3 +493,4 @@ class Test(unittest.TestCase):
 		host._setOwner('dave')
 		output, info = RunClient_Rescan(host, ['get_balance'])
 		self.assertDictEqual(info, {'in active account': 58750000, 'total': 58750000+10625000})
+

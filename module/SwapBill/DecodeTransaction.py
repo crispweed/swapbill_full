@@ -42,7 +42,7 @@ from SwapBill import RawTransaction, HostTransaction, ControlAddressPrefix
 def Decode(txHex):
 	txBytes = RawTransaction.FromHex(txHex)
 	if RawTransaction.UnexpectedFormat_Fast(txBytes, ControlAddressPrefix.prefix):
-		return None
+		return None, None
 	decoded = RawTransaction.Decode(txBytes)
 	result = HostTransaction.InMemoryTransaction()
 	for i in decoded['vin']:
