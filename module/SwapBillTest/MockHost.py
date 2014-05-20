@@ -52,6 +52,7 @@ class MockHost(object):
 		self._nextTXID = 0
 		self._nextSuppliedOutput = 0
 		self._unspent = []
+		self.holdNewTransactions = False
 
 	def _setOwner(self, id):
 		assert not '_' in id
@@ -85,6 +86,8 @@ class MockHost(object):
 		if nextBlock < self._nextBlock:
 			return str(nextBlock)
 		assert nextBlock == self._nextBlock
+		if self.holdNewTransactions:
+			return None
 		pendingTransactions = self._transactionsByBlock.get(self._nextBlock, [])
 		if len(pendingTransactions) == 0:
 			return None

@@ -50,11 +50,11 @@ def GetOwnerBalances(host, ownerList, balances):
 	host._setOwner(ownerAtStart)
 	return result
 
-def CheckEachBalanceHasUnspent(host, balances):
-	for formattedAccount in balances:
-		account = host._accountFromEndUserFormat(formattedAccount)
-		#print(account)
-		host._checkAccountHasUnspent(account)
+#def CheckEachBalanceHasUnspent(host, balances):
+	#for formattedAccount in balances:
+		#account = host._accountFromEndUserFormat(formattedAccount)
+		##print(account)
+		#host._checkAccountHasUnspent(account)
 
 def GetOwnerBackingAmounts(host, ownerList, balances):
 	result = {}
@@ -97,7 +97,7 @@ def RunClient_Rescan(host, args):
 
 def GetStateInfo(host):
 	output, info = RunClient(host, ['get_state_info'])
-	CheckEachBalanceHasUnspent(host, info['balances'])
+	#CheckEachBalanceHasUnspent(host, info['balances'])
 	return info
 
 class Test(unittest.TestCase):
@@ -293,6 +293,28 @@ class Test(unittest.TestCase):
 		host.addTransaction("6bc0c859176a50540778c03b6c8f28268823a68cd1cd75d4afe2edbcf50ea8d1", "0100000001566b10778dc28b7cc82e43794bfb26c47ab54a85e1f8e9c8dc04f261024b108c000000006b483045022100aaf6244b7df18296917f430dbb9fa42e159eb79eb3bad8e15a0dfbe84830e08c02206ff81a4cf2cdcd7910c67c13a0694064aec91ae6897d7382dc1e9400b2193bb5012103475fb57d448091d9ca790af2d6d9aca798393199aa70471f38dc359f9f30b50cffffffff0264000000000000001976a914e512a5846125405e009b6f22ac274289f69e185588acb83e5c02000000001976a9147cc3f7daeffe2cfb39630310fad6d0a9fbb4b6aa88ac00000000")
 		info = GetStateInfo(host)
 		self.assertEqual(info['balances'], {'02:1':1000000})
+
+	def test_double_spend(self):
+		host = InitHost()
+		host._addUnspent(100000000)
+		RunClient(host, ['burn', '--quantity', '1000000'])
+		host.holdNewTransactions = True
+		info = GetStateInfo(host)
+		self.assertEqual(info['balances'], {})
+		host.holdNewTransactions = False
+		info = GetStateInfo(host)
+		self.assertEqual(info['balances'], {'02:1': 1000000})
+		host._setOwner('recipient')
+		payTargetAddress = host.formatAddressForEndUser(host.getNewSwapBillAddress())
+		host._setOwner('')
+		RunClient(host, ['pay', '--quantity', '100', '--toAddress', payTargetAddress])
+		host.holdNewTransactions = True
+		info = GetStateInfo(host)
+		self.assertEqual(info['balances'], {'02:1': 1000000})
+		# *** TODO - uncomment this line, and finish off this test
+		# this should fail, with error to user about not having any spendable balance
+		#RunClient(host, ['pay', '--quantity', '100', '--toAddress', payTargetAddress])
+
 
 	def test_two_owners(self):
 		host = InitHost()

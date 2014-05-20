@@ -12,7 +12,7 @@ class Test(unittest.TestCase):
 		self.assertEqual(Base58Check.Decode(s), data)
 		s = b'13DV5niCGP'.decode('ascii')
 		self.assertEqual(Base58Check.Decode(s), data)
-		for i in range(256):
+		for i in (0,1,20,128,255):
 			for j in (0,20,128,255):
 				for k in (0,20,128,255):
 					data = bytes([i, j, k])
