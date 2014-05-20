@@ -1,17 +1,16 @@
 from __future__ import print_function
-import unittest, sys, os
+import unittest, sys, shutil, os
 PY3 = sys.version_info.major > 2
 if PY3:
 	import io
 else:
 	import StringIO as io
+from os import path
 from SwapBillTest.MockHost import MockHost
 from SwapBill import ClientMain
 from SwapBill.BuildHostedTransaction import InsufficientFunds
 from SwapBill.ClientMain import TransactionNotSuccessfulAgainstCurrentState
 from SwapBill.ExceptionReportedToUser import ExceptionReportedToUser
-
-cacheFile = 'test.cache'
 
 def GetAddressForUnspent(host, formattedAccount):
 	#print('trying to match', formattedAccount)
@@ -63,14 +62,17 @@ def GetOwnerBackingAmounts(host, ownerList, balances):
 	host._setOwner(ownerAtStart)
 	return result
 
+dataDirectory = 'dataDirectoryForTests'
+
 def InitHost():
-	host = MockHost()
-	if os.path.exists(cacheFile):
-		os.remove(cacheFile)
-	return host
+	if path.exists(dataDirectory):
+		assert path.isdir(dataDirectory)
+		shutil.rmtree(dataDirectory)
+	os.mkdir(dataDirectory)
+	return MockHost()
 
 def RunClient(host, args):
-	fullArgs = ['--cache-file', cacheFile] + args
+	fullArgs = ['--data-directory', dataDirectory] + args
 	out = io.StringIO()
 	result = ClientMain.Main(startBlockIndex=0, startBlockHash=host.getBlockHash(0), commandLineArgs=fullArgs, host=host, out=out)
 	return out.getvalue(), result
@@ -82,12 +84,9 @@ def GetStateInfo(host):
 
 class Test(unittest.TestCase):
 	def test(self):
-		host = MockHost()
+		host = InitHost()
 
-		if os.path.exists(cacheFile):
-			os.remove(cacheFile)
 		self.assertRaises(InsufficientFunds, RunClient, host, ['burn', '--quantity', '1000000'])
-		self.assertTrue(os.path.exists(cacheFile))
 
 		host._addUnspent(100000000)
 
@@ -98,6 +97,7 @@ class Test(unittest.TestCase):
 
 		info = GetStateInfo(host)
 		self.assertEqual(info['balances'], {"02:1": 1000000})
+		self.assertTrue(info['syncOutput'].startswith('Loaded cached state data successfully\nStarting from block 0\n'))
 
 		output = RunClient(host, ['burn', '--quantity', '2000000'])
 		#print(output)
@@ -110,6 +110,7 @@ class Test(unittest.TestCase):
 		host._setOwner('')
 
 		output = RunClient(host, ['pay', '--quantity', '1', '--toAddress', payTargetAddress])
+		self.assertTrue(info['syncOutput'].startswith('Loaded cached state data successfully\nStarting from block 0\n'))
 
 		info = GetStateInfo(host)
 		self.assertEqual(info['balances'], {'02:1': 1000000, '04:2': 1, '04:1': 1999999})
@@ -143,9 +144,7 @@ class Test(unittest.TestCase):
 		self.assertEqual(info['balances'], {'02:1': 1000000, '04:2': 1, '04:1': 1999999, '09:1': 87500000, '08:2': 0, '09:2': 212500000})
 
 	def test_ltc_sell_missing_unspent_regression(self):
-		host = MockHost()
-		if os.path.exists(cacheFile):
-			os.remove(cacheFile)
+		host = InitHost()
 		host._addUnspent(500000000)
 		RunClient(host, ['burn', '--quantity', '100000000'])
 		burnTarget = "02:1"
@@ -161,9 +160,7 @@ class Test(unittest.TestCase):
 		#print(host._unspent)
 
 	def test_burn_funding(self):
-		host = MockHost()
-		if os.path.exists(cacheFile):
-			os.remove(cacheFile)
+		host = InitHost()
 		dustLimit = 100000
 		transactionFee = 100000
 		# burn requires burnAmount for control + 1 dust for dest + transactionFee
@@ -186,15 +183,11 @@ class Test(unittest.TestCase):
 		self.assertEqual(info['balances'], {burnTarget:100000})
 
 	def test_bad_invocations(self):
-		host = MockHost()
-		if os.path.exists(cacheFile):
-			os.remove(cacheFile)
+		host = InitHost()
 		self.assertRaisesRegexp(ExceptionReportedToUser, 'No pending exchange with the specified ID', RunClient, host, ['complete_ltc_sell', '--pending_exchange_id', '123'])
 
 	def test_burn_and_pay(self):
-		host = MockHost()
-		if os.path.exists(cacheFile):
-			os.remove(cacheFile)
+		host = InitHost()
 
 		nextTX = 1
 
@@ -242,9 +235,7 @@ class Test(unittest.TestCase):
 
 
 	def test_burn_and_collect(self):
-		host = MockHost()
-		if os.path.exists(cacheFile):
-			os.remove(cacheFile)
+		host = InitHost()
 		nextTX = 1
 		host._addUnspent(100000000)
 		nextTX += 1
@@ -400,7 +391,7 @@ class Test(unittest.TestCase):
 		        'deposit paid by seller': 625000
 		    })]
 		self.assertEqual(result, expectedResult)
-		
+
 		RunClient(host, ['post_ltc_buy', '--quantity', '10000000', '--exchangeRate', '0.25'])
 		info = GetStateInfo(host)
 		ownerBalances = GetOwnerBalances(host, ownerList, info['balances'])

@@ -1,4 +1,4 @@
-/*.cache
+dataDirectoryForTests/
 __pycache__
 htmlcov
 .coverage

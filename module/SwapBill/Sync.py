@@ -1,51 +1,12 @@
 from __future__ import print_function
 import sys
-PY3 = sys.version_info.major > 2
-if PY3:
-	import pickle
-else:
-	import cPickle as pickle
 from os import path
 from collections import deque
-from SwapBill import State, DecodeTransaction, TransactionEncoding
+from SwapBill import State, DecodeTransaction, TransactionEncoding, PickledCache
 from SwapBill import FormatTransactionForUserDisplay
 
-class ReindexingRequiredException(Exception):
-	pass
-
-if sys.version_info > (3, 0):
-	defaultCacheFile = 'SwapBill.py3.cache'
-else:
-	defaultCacheFile = 'SwapBill.cache'
-cacheVersion = 0.6
-
-def _load(cacheFile):
-	if cacheFile is None:
-		cacheFile = defaultCacheFile
-	if not path.exists(cacheFile):
-		raise ReindexingRequiredException('no cache file found')
-	f = open(cacheFile, 'rb')
-	savedCacheVersion = pickle.load(f)
-	if savedCacheVersion != cacheVersion:
-		raise ReindexingRequiredException('cached data is from old version')
-	blockIndex = pickle.load(f)
-	blockHash = pickle.load(f)
-	state = pickle.load(f)
-	f.close()
-	return blockIndex, blockHash, state
-
-def _save(blockIndex, blockHash, state, cacheFile):
-	if cacheFile is None:
-		cacheFile = defaultCacheFile
-	try:
-		f = open(cacheFile, 'wb')
-		pickle.dump(cacheVersion, f, 2)
-		pickle.dump(blockIndex, f, 2)
-		pickle.dump(blockHash, f, 2)
-		pickle.dump(state, f, 2)
-		f.close()
-	except:
-		print("Error, failed to write cache:", sys.exc_info()[0])
+stateVersion = 0.7
+#ownedOutputsVersion = 0.1
 
 def _processBlock(host, state, blockHash, out):
 	transactions = host.getBlockTransactions(blockHash)
@@ -63,10 +24,10 @@ def _processBlock(host, state, blockHash, out):
 		print('applied ' + FormatTransactionForUserDisplay.Format(host, transactionType, outputs, outputPubKeyHashes, transactionDetails), file=out)
 	state.advanceToNextBlock()
 
-def SyncAndReturnState(cacheFile, startBlockIndex, startBlockHash, host, out):
+def SyncAndReturnState(cacheDirectory, startBlockIndex, startBlockHash, host, out):
 	try:
-		blockIndex, blockHash, state = _load(cacheFile)
-	except ReindexingRequiredException as e:
+		(blockIndex, blockHash, state) = PickledCache.Load(cacheDirectory, 'State', stateVersion)
+	except PickledCache.LoadFailedException as e:
 		print('Failed to load from cache, full index generation required (' + str(e) + ')', file=out)
 		loaded = False
 	else:
@@ -103,7 +64,7 @@ def SyncAndReturnState(cacheFile, startBlockIndex, startBlockHash, host, out):
 		mostRecentHash = nextBlockHash
 		toProcess.append(mostRecentHash)
 
-	_save(blockIndex, blockHash, state, cacheFile)
+	PickledCache.Save((blockIndex, blockHash, state), stateVersion, cacheDirectory, 'State')
 
 	while len(toProcess) > 0:
 		## advance in memory state
