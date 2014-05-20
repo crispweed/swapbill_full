@@ -50,6 +50,8 @@ sp.add_argument('--pending_exchange_id', required=True, help='the id of the pend
 
 subparsers.add_parser('collect', help='combine all current owned swapbill outputs into active account')
 
+subparsers.add_parser('get_receive_address', help='generate a new key pair for the swapbill wallet and display the corresponding public payment address')
+
 subparsers.add_parser('get_balance', help='get current SwapBill balance')
 subparsers.add_parser('get_buy_offers', help='get list of currently active litecoin buy offers')
 subparsers.add_parser('get_sell_offers', help='get list of currently active litecoin sell offers')
@@ -207,6 +209,10 @@ def Main(startBlockIndex, startBlockHash, commandLineArgs=sys.argv[1:], host=Non
 		    'maxBlock':0xffffffff
 		}
 		return CheckAndSend(transactionType, outputs, outputPubKeyHashes, details)
+
+	elif args.action == 'get_receive_address':
+		pubKeyHash = host.getNewSwapBillAddress()
+		return {'receive_address': host.formatAddressForEndUser(pubKeyHash)}
 
 	elif args.action == 'get_balance':
 		total = 0
