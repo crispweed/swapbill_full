@@ -78,11 +78,11 @@ class Host(object):
 	def privateKeyForPubKeyHash(self, pubKeyHash):
 		return self._wallet.privateKeyForPubKeyHash(pubKeyHash)
 
-	def signAndSend(self, unsignedTransactionHex):
+	def signAndSend(self, unsignedTransactionHex, privateKeys):
 		## lowest level transaction send interface
 		signingResult = self._rpcHost.call('signrawtransaction', unsignedTransactionHex)
 		if signingResult['complete'] != True:
-			signingResult = self._rpcHost.call('signrawtransaction', signingResult['hex'], None, self._wallet.getAllPrivateKeys())
+			signingResult = self._rpcHost.call('signrawtransaction', signingResult['hex'], None, privateKeys)
 		if signingResult['complete'] != True:
 			raise SigningFailed("RPC call to signrawtransaction did not set 'complete' to True")
 		signedHex = signingResult['hex']
