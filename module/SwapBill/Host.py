@@ -90,7 +90,10 @@ class Host(object):
 		# (or repeat in higher level code?)
 		if not TransactionFee.TransactionFeeIsSufficient(self._rpcHost, signedHex):
 			raise InsufficientTransactionFees()
-		txID = self._rpcHost.call('sendrawtransaction', signedHex)
+		try:
+			txID = self._rpcHost.call('sendrawtransaction', signedHex)
+		except RPC.RPCFailureException as e:
+			raise ExceptionReportedToUser('RPC error sending signed transaction: ' + str(e))
 		return txID
 
 # block chain tracking, transaction stream and decoding
