@@ -51,4 +51,7 @@ def Decode(txHex):
 		pubKeyHashHex = o['pubKeyHash']
 		pubKeyHash = binascii.unhexlify(pubKeyHashHex.encode('ascii'))
 		result.addOutput(pubKeyHash, o['value'])
-	return result
+	scriptPubKeys = []
+	for o in decoded['vout']:
+		scriptPubKeys.append(o['scriptPubKey'])
+	return result, scriptPubKeys

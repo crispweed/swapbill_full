@@ -1,7 +1,6 @@
 from __future__ import print_function
 from os import path
 from SwapBill import ParseConfig, RPC, RawTransaction, Address, TransactionFee, Amounts, Wallet
-from SwapBill import DecodeTransaction
 from SwapBill.ExceptionReportedToUser import ExceptionReportedToUser
 
 class SigningFailed(ExceptionReportedToUser):
@@ -75,11 +74,9 @@ class Host(object):
 		result = validateResults['ismine']
 		assert result in (True, False)
 		return result
-	def outputIsToOneOfMySwapBillAddresses(self, txID, vOut):
-		txHex = self._rpcHost.call('getrawtransaction', txID)
-		decoded = DecodeTransaction.Decode(txHex)
-		pubKeyHash = decoded['vout'][vOut]['pubKeyHash']
-		return self._wallet.hasKeyPairForPubKeyHash(pubKeyHash)
+
+	def privateKeyForPubKeyHash(self, pubKeyHash):
+		return self._wallet.privateKeyForPubKeyHash(pubKeyHash)
 
 	def signAndSend(self, unsignedTransactionHex):
 		## lowest level transaction send interface

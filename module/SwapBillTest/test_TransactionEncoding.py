@@ -7,14 +7,13 @@ class Test(unittest.TestCase):
 
 	def checkIgnoredBytes(self, tx, numberOfIgnoredBytes):
 		assert tx._outputs[0][0].startswith(b'SWP')
-		transactionType, outputs, outputPubKeyHashes, details = TransactionEncoding.ToStateTransaction(tx)
+		transactionType, outputs, details = TransactionEncoding.ToStateTransaction(tx)
 		for fillByte in (b'\xff', b'\x00', b'\x80'):
 			tx._outputs[0] = (tx._outputs[0][0][:-numberOfIgnoredBytes] + fillByte * numberOfIgnoredBytes, tx._outputs[0][1])
-			transactionType_Check, outputs_Check, outputPubKeyHashes_Check, details_Check = TransactionEncoding.ToStateTransaction(tx)
+			transactionType_Check, outputs_Check, details_Check = TransactionEncoding.ToStateTransaction(tx)
 			self.assertEqual(transactionType, transactionType_Check)
 			self.assertEqual(outputs, outputs_Check)
-			self.assertEqual(outputPubKeyHashes, outputPubKeyHashes_Check)
-			self.assertDictEqual(details, details_Check)			
+			self.assertDictEqual(details, details_Check)
 
 	def EncodeInt_CheckDecode(self, value, numberOfBytes):
 		result = TransactionEncoding._encodeInt(value, numberOfBytes)
@@ -96,17 +95,15 @@ class Test(unittest.TestCase):
 		# so hack the type code for a pay transaction to test this
 		tx = FromStateTransaction('Pay', ('change','destination'), ('changePKH','destinationPKH'), {'sourceAccount':('sourceTXID',4), 'amount':20, 'maxBlock':100})
 		tx._outputs[0] = (b'SWP\x0f\x14\x00\x00\x00\x00\x00d\x00\x00\x00\x00\x00\x00\x00\x00\x00', 0)
-		transactionType, outputs, outputPubKeyHashes, details = TransactionEncoding.ToStateTransaction(tx)
+		transactionType, outputs, details = TransactionEncoding.ToStateTransaction(tx)
 		self.assertEqual(transactionType, 'ForwardToFutureNetworkVersion')
 		self.assertEqual(outputs, ('change',))
-		self.assertEqual(outputPubKeyHashes, ('changePKH',))
 		self.assertDictEqual(details, {'sourceAccount':('sourceTXID',4), 'amount':20, 'maxBlock':100})
 		# same as above, but with max typecode interpreted in this way
-		tx._outputs[0] = (b'SWP\x7f\x14\x00\x00\x00\x00\x00d\x00\x00\x00\x00\x00\x00\x00\x00\x00', 0)
-		transactionType, outputs, outputPubKeyHashes, details = TransactionEncoding.ToStateTransaction(tx)
+		tx._outputs[0] = (b'SWP\x7f\x14\x00\x00\x00\x00\x00d\x00\x00\x00\x00\x00\x00\x00\x00\x00', 1)
+		transactionType, outputs, details = TransactionEncoding.ToStateTransaction(tx)
 		self.assertEqual(transactionType, 'ForwardToFutureNetworkVersion')
 		self.assertEqual(outputs, ('change',))
-		self.assertEqual(outputPubKeyHashes, ('changePKH',))
 		self.assertDictEqual(details, {'sourceAccount':('sourceTXID',4), 'amount':20, 'maxBlock':100})
 		# next typecode after that is not supported
 		tx._outputs[0] = (b'SWP\x80\x14\x00\x00\x00\x00\x00d\x00\x00\x00\x00\x00\x00\x00\x00\x00', 0)

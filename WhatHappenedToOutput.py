@@ -6,7 +6,7 @@ scriptPath = path.dirname(path.abspath(__file__))
 sys.path.append(path.join(scriptPath, 'module'))
 sys.dont_write_bytecode = True
 from SwapBill import RPC, RawTransaction, Address, TransactionFee, ScriptPubKeyLookup
-from SwapBill import TransactionEncoding, BuildHostedTransaction, GetUnspent, Sync, ParseConfig
+from SwapBill import TransactionEncoding, BuildHostedTransaction, Sync, ParseConfig
 from SwapBill.Sync import SyncAndReturnState
 from SwapBill.Amounts import ToSatoshis
 PY3 = sys.version_info.major > 2

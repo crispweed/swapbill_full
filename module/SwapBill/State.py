@@ -26,11 +26,6 @@ class State(object):
 		self._LTCSells = TradeOfferHeap.Heap(startBlockIndex, True) # higher exchange rate is better offer
 		self._nextExchangeIndex = 0
 		self._pendingExchanges = {}
-		self._accountWatcher = None
-
-	def setAccountWatcher(self, accountWatcher):
-		assert self._accountWatcher is None
-		self._accountWatcher = accountWatcher
 
 	def startBlockMatches(self, startBlockHash):
 		return self._startBlockHash == startBlockHash
@@ -59,8 +54,6 @@ class State(object):
 		assert amount >= 0
 		assert not account in self._balances
 		self._balances[account] = amount
-		if self._accountWatcher is not None:
-			self._accountWatcher.accountAdded(account)
 	def _addToAccount(self, account, amount):
 		assert type(amount) is int
 		assert amount >= 0
@@ -68,8 +61,6 @@ class State(object):
 	def _consumeAccount(self, account):
 		amount = self._balances[account]
 		self._balances.pop(account)
-		if self._accountWatcher is not None:
-			self._accountWatcher.accountRemoved(account)
 		return amount
 
 	def _matchLTC(self):

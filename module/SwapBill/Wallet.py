@@ -34,8 +34,8 @@ class Wallet(object):
 		return pubKeyHash in self._pubKeyHashes
 	def getAllPrivateKeys(self):
 		return self._privateKeys
-	def getAllPubKeyHashes(self):
-		return self._pubKeyHashes
+	#def getAllPubKeyHashes(self):
+		#return self._pubKeyHashes
 	def privateKeyForPubKeyHash(self, pubKeyHash):
 		for i in range(len(self._privateKeys)):
 			if self._pubKeyHashes[i] == pubKeyHash:

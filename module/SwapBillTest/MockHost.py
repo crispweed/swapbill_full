@@ -4,22 +4,35 @@ from SwapBill import Host ## just for insufficient fee exception
 from SwapBill import Address ## just for bad address exception
 
 addressPrefix = 'adr_'
+privateKeyPrefix = 'privateKey_'
+
+def TextAsPaddedData(s, size):
+	assert len(s) <= size
+	assert not '-' in s
+	padded = s + '-' * (size - len(s))
+	result = padded.encode('ascii')
+	assert len(result) == size
+	return result
+def PaddedDataAsText(data, size):
+	assert type(data) is type(b'')
+	assert len(data) == size
+	padded = data.decode('ascii')
+	return padded.strip('-')
 
 def TextAsPubKeyHash(s):
 	if not s.startswith(addressPrefix):
 		raise Address.BadAddress()
-	s = s[len(addressPrefix):]
-	assert len(s) <= 20
-	assert not '-' in s
-	padded = s + '-' * (20 - len(s))
-	result = padded.encode('ascii')
-	assert len(result) == 20
-	return result
+	return TextAsPaddedData(s[len(addressPrefix):], 20)
 def PubKeyHashAsText(data):
-	assert type(data) is type(b'')
-	assert len(data) == 20
-	padded = data.decode('ascii')
-	return addressPrefix + padded.strip('-')
+	return addressPrefix + PaddedDataAsText(data, 20)
+
+def TextAsPrivateKey(s):
+	if not s.startswith(privateKeyPrefix):
+		raise Exception('bad private key')
+	return TextAsPaddedData(s[len(privateKeyPrefix):], 32)
+def PrivateKeyAsText(data):
+	return privateKeyPrefix + PaddedDataAsText(data, 32)
+
 def MakeTXID(i):
 	txid = '00' * 31 + '{:02X}'.format(i)
 	# make case consistent with hexlify!
@@ -52,7 +65,7 @@ class MockHost(object):
 		vout = 7
 		toAdd = {'txid':txid, 'vout':vout}
 		self._nextSuppliedOutput += 1
-		pubKeyHash = TextAsPubKeyHash(addressPrefix + self._id + '_supplied' + str(self._nextSuppliedOutput))
+		pubKeyHash = TextAsPubKeyHash(addressPrefix + self._id + '_host_supplied' + str(self._nextSuppliedOutput))
 		scriptPubKey = RawTransaction.ScriptPubKeyForPubKeyHash(pubKeyHash)
 		toAdd['scriptPubKey'] = scriptPubKey
 		toAdd['address'] = pubKeyHash
@@ -94,9 +107,11 @@ class MockHost(object):
 
 	def getNewNonSwapBillAddress(self):
 		self._nextChange += 1
-		return TextAsPubKeyHash(addressPrefix + self._id + '_nonsb' + str(self._nextChange))
+		#print('new non swap bill address', self._id, self._nextSwapBill)
+		return TextAsPubKeyHash(addressPrefix + self._id + '_host_getnew' + str(self._nextChange))
 	def getNewSwapBillAddress(self):
 		self._nextSwapBill += 1
+		#print('new swap bill address', self._id, self._nextSwapBill)
 		return TextAsPubKeyHash(addressPrefix + self._id + '_swapbill' + str(self._nextSwapBill))
 	def addressIsMine(self, pubKeyHash):
 		try:
@@ -104,7 +119,8 @@ class MockHost(object):
 		except UnicodeDecodeError:
 			# control address
 			return False
-		return asText.startswith(addressPrefix + self._id + '_')
+		#return asText.startswith(addressPrefix + self._id + '_')
+		return asText.startswith(addressPrefix + self._id + '_host_')
 
 	def _consumeUnspent(self, txID, vOut, scriptPubKey):
 		unspentAfter = []
@@ -117,20 +133,39 @@ class MockHost(object):
 			else:
 				unspentAfter.append(entry)
 		assert found is not None
-		if not self.addressIsMine(found['address']):
-			raise Exception('At least one unspent output used in the transaction cannot be signed.', self.formatAddressForEndUser(found['address']))
+		pubKeyHash = found['address']
+		if self.addressIsMine(pubKeyHash):
+			requiredPrivateKey = None
+		else:
+			requiredPrivateKey = self.privateKeyForPubKeyHash(pubKeyHash)
+			assert requiredPrivateKey is not None
 		if hasattr(self, '_logConsumeUnspent') and self._logConsumeUnspent:
 			print('consuming unspent:')
 			print(found)
 		self._unspent = unspentAfter
-		return found['amount']
+		return found['amount'], requiredPrivateKey
 
-	def signAndSend(self, unsignedTransactionHex):
+	def privateKeyForPubKeyHash(self, pubKeyHash):
+		#print('self._id in privateKeyForPubKeyHash is:', self._id)
+		asText = PubKeyHashAsText(pubKeyHash)
+		beforeCount = addressPrefix + self._id + '_swapbill'
+		if asText.startswith(beforeCount):
+			count = str(asText[len(beforeCount):])
+			return TextAsPrivateKey(privateKeyPrefix + self._id + '_' + count)
+		return None
+
+	def signAndSend(self, unsignedTransactionHex, privateKeys=[]):
 		unsignedTransactionBytes = RawTransaction.FromHex(unsignedTransactionHex)
 		decoded = RawTransaction.Decode(unsignedTransactionBytes)
 		sumOfInputs = 0
+		requiredPrivateKeys = []
 		for entry in decoded['vin']:
-			sumOfInputs += self._consumeUnspent(entry['txid'], entry['vout'], entry['scriptPubKey'])
+			amount, privateKeyRequired = self._consumeUnspent(entry['txid'], entry['vout'], entry['scriptPubKey'])
+			sumOfInputs += amount
+			if privateKeyRequired is not None:
+				requiredPrivateKeys.append(privateKeyRequired)
+		if sorted(privateKeys) != sorted(requiredPrivateKeys):
+			raise Exception('supplied private keys do not match required private keys')
 		self._nextTXID += 1
 		txid = MakeTXID(self._nextTXID)
 		outputAmounts = []

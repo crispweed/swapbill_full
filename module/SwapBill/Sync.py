@@ -6,27 +6,43 @@ from SwapBill import State, DecodeTransaction, TransactionEncoding, PickledCache
 from SwapBill import FormatTransactionForUserDisplay
 
 stateVersion = 0.7
-#ownedOutputsVersion = 0.1
+ownedAccountsVersion = 0.1
 
-def _processBlock(host, state, blockHash, out):
+def _processBlock(host, state, ownedAccounts, blockHash, out):
 	transactions = host.getBlockTransactions(blockHash)
 	for txID, litecoinTXHex in transactions:
-		hostTX = DecodeTransaction.Decode(litecoinTXHex)
+		hostTX, scriptPubKeys = DecodeTransaction.Decode(litecoinTXHex)
 		if hostTX == None:
 			continue
 		try:
-			transactionType, outputs, outputPubKeyHashes, transactionDetails = TransactionEncoding.ToStateTransaction(hostTX)
+			transactionType, outputs, transactionDetails = TransactionEncoding.ToStateTransaction(hostTX)
 		except TransactionEncoding.NotValidSwapBillTransaction:
 			continue
 		except TransactionEncoding.UnsupportedTransaction:
 			continue
+		outputPubKeyHashes = []
+		for i in range(len(outputs)):
+			outputPubKeyHashes.append(hostTX.outputPubKeyHash(i + 1))
 		state.applyTransaction(transactionType, txID, outputs, transactionDetails)
 		print('applied ' + FormatTransactionForUserDisplay.Format(host, transactionType, outputs, outputPubKeyHashes, transactionDetails), file=out)
+		for i in range(hostTX.numberOfInputs()):
+			spentAccount = (hostTX.inputTXID(i), hostTX.inputVOut(i))
+			if spentAccount in ownedAccounts:
+				ownedAccounts.pop(spentAccount)
+		for i in range(len(outputs)):
+			newOwnedAccount = (txID, i + 1)
+			if newOwnedAccount in state._balances:
+				privateKey = host.privateKeyForPubKeyHash(outputPubKeyHashes[i])
+				if privateKey is not None:
+					#print("added owned account for:", transactionType, outputs[i], txID[-3:], i + 1)
+					assert not newOwnedAccount in ownedAccounts
+					ownedAccounts[newOwnedAccount] = (hostTX.outputAmount(i + 1), privateKey, scriptPubKeys[i + 1])
 	state.advanceToNextBlock()
 
-def SyncAndReturnState(cacheDirectory, startBlockIndex, startBlockHash, host, out):
+def SyncAndReturnStateAndOwnedAccounts(cacheDirectory, startBlockIndex, startBlockHash, host, out):
 	try:
 		(blockIndex, blockHash, state) = PickledCache.Load(cacheDirectory, 'State', stateVersion)
+		ownedAccounts = PickledCache.Load(cacheDirectory, 'OwnedAccounts', ownedAccountsVersion)
 	except PickledCache.LoadFailedException as e:
 		print('Failed to load from cache, full index generation required (' + str(e) + ')', file=out)
 		loaded = False
@@ -45,6 +61,7 @@ def SyncAndReturnState(cacheDirectory, startBlockIndex, startBlockHash, host, ou
 		blockHash = startBlockHash
 		assert host.getBlockHash(blockIndex) == blockHash
 		state = State.State(blockIndex, blockHash)
+		ownedAccounts = {}
 
 	print('Starting from block', blockIndex, file=out)
 
@@ -57,7 +74,7 @@ def SyncAndReturnState(cacheDirectory, startBlockIndex, startBlockHash, host, ou
 		## hard coded value used here for number of blocks to lag behind with persistent state
 		if len(toProcess) == 20:
 			## advance cached state
-			_processBlock(host, state, blockHash, out=out)
+			_processBlock(host, state, ownedAccounts, blockHash, out=out)
 			popped = toProcess.popleft()
 			blockIndex += 1
 			blockHash = popped
@@ -65,17 +82,18 @@ def SyncAndReturnState(cacheDirectory, startBlockIndex, startBlockHash, host, ou
 		toProcess.append(mostRecentHash)
 
 	PickledCache.Save((blockIndex, blockHash, state), stateVersion, cacheDirectory, 'State')
+	PickledCache.Save(ownedAccounts, ownedAccountsVersion, cacheDirectory, 'OwnedAccounts')
 
 	while len(toProcess) > 0:
 		## advance in memory state
-		_processBlock(host, state, blockHash, out=out)
+		_processBlock(host, state, ownedAccounts, blockHash, out=out)
 		popped = toProcess.popleft()
 		blockIndex += 1
 		blockHash = popped
 
-	_processBlock(host, state, blockHash, out=out)
+	_processBlock(host, state, ownedAccounts, blockHash, out=out)
 
-	return state
+	return state, ownedAccounts
 
 #def LoadAndReturnStateWithoutUpdate(config):
 	#try:
