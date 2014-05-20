@@ -311,10 +311,14 @@ class Test(unittest.TestCase):
 		host.holdNewTransactions = True
 		info = GetStateInfo(host)
 		self.assertEqual(info['balances'], {'02:1': 1000000})
-		# *** TODO - uncomment this line, and finish off this test
-		# this should fail, with error to user about not having any spendable balance
-		#RunClient(host, ['pay', '--quantity', '100', '--toAddress', payTargetAddress])
-
+		self.assertRaisesRegexp(ExceptionReportedToUser, 'no active swapbill balance currently available', RunClient, host, ['pay', '--quantity', '100', '--toAddress', payTargetAddress])
+		host.holdNewTransactions = False
+		info = GetStateInfo(host)
+		self.assertEqual(info['balances'], {'03:1': 999900, '03:2':100})
+		# once the first pay transaction goes through, we can make another one
+		RunClient(host, ['pay', '--quantity', '100', '--toAddress', payTargetAddress])
+		info = GetStateInfo(host)
+		self.assertEqual(info['balances'], {'04:1': 999800, '04:2':100, '03:2':100})
 
 	def test_two_owners(self):
 		host = InitHost()

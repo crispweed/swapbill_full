@@ -10,8 +10,8 @@ ownedAccountsVersion = 0.1
 
 def _processBlock(host, state, ownedAccounts, blockHash, out):
 	transactions = host.getBlockTransactions(blockHash)
-	for txID, litecoinTXHex in transactions:
-		hostTX, scriptPubKeys = DecodeTransaction.Decode(litecoinTXHex)
+	for txID, hostTXHex in transactions:
+		hostTX, scriptPubKeys = DecodeTransaction.Decode(hostTXHex)
 		if hostTX == None:
 			continue
 		try:
@@ -92,6 +92,28 @@ def SyncAndReturnStateAndOwnedAccounts(cacheDirectory, startBlockIndex, startBlo
 		blockHash = popped
 
 	_processBlock(host, state, ownedAccounts, blockHash, out=out)
+
+	# TODO - the best block chain may have changed during the above
+	# and so the following set of memory pool transactions may not correspond to our block chain endpoint
+	# and this may then result in us trying to make double spends in certain situations
+	# (which the host should then refuse)
+	# we can be more careful about this by checking best block chain after getting memory pool transactions
+	# and restarting the block chain traversal if this does not match up
+	memPoolTransactions = host.getMemPoolTransactions()
+	for txID, hostTXHex in memPoolTransactions:
+		hostTX, scriptPubKeys = DecodeTransaction.Decode(hostTXHex)
+		if hostTX == None:
+			continue
+		try:
+			transactionType, outputs, transactionDetails = TransactionEncoding.ToStateTransaction(hostTX)
+		except TransactionEncoding.NotValidSwapBillTransaction:
+			continue
+		except TransactionEncoding.UnsupportedTransaction:
+			continue
+		for i in range(hostTX.numberOfInputs()):
+			spentAccount = (hostTX.inputTXID(i), hostTX.inputVOut(i))
+			if spentAccount in ownedAccounts:
+				ownedAccounts.pop(spentAccount)
 
 	return state, ownedAccounts
 

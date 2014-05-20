@@ -120,6 +120,14 @@ class Host(object):
 			result.append((txHash, txHex))
 		return result
 
+	def getMemPoolTransactions(self):
+		mempool = self._rpcHost.call('getrawmempool')
+		result = []
+		for txHash in mempool:
+			txHex = self._rpcHost.call('getrawtransaction', txHash)
+			result.append((txHash, txHex))
+		return result
+
 # convenience
 
 	def formatAddressForEndUser(self,  pubKeyHash):

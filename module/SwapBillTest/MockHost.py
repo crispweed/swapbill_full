@@ -98,6 +98,9 @@ class MockHost(object):
 		i = int(blockHash)
 		return self._transactionsByBlock.get(i, [])
 
+	def getMemPoolTransactions(self):
+		return self._transactionsByBlock.get(self._nextBlock, [])
+
 	def _advance(self, numberOfBlocks):
 		self._nextBlock += numberOfBlocks
 
