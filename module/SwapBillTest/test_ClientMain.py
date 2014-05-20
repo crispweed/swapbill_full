@@ -203,6 +203,7 @@ class Test(unittest.TestCase):
 	def test_bad_invocations(self):
 		host = InitHost()
 		self.assertRaisesRegexp(ExceptionReportedToUser, 'No pending exchange with the specified ID', RunClient, host, ['complete_ltc_sell', '--pending_exchange_id', '123'])
+		self.assertRaisesRegexp(ExceptionReportedToUser, 'not a directory', RunClient, host, ['--data-directory=dontMakeADirectoryCalledThis', 'get_balance'])
 
 	def test_burn_and_pay(self):
 		host = InitHost()

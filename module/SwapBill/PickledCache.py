@@ -18,7 +18,7 @@ else:
 
 def Load(cacheDirectory, cacheName, desiredVersion):
 	if not path.isdir(cacheDirectory):
-		raise ExceptionReportedToUser("cacheDirectory is not a directory")
+		raise ExceptionReportedToUser("not a directory", cacheDirectory)
 	cacheFile = path.join(cacheDirectory, cacheName + cacheSuffix)
 	if not path.exists(cacheFile):
 		raise LoadFailedException('no cache file found')
@@ -30,7 +30,7 @@ def Load(cacheDirectory, cacheName, desiredVersion):
 
 def Save(data, dataVersion, cacheDirectory, cacheName):
 	if not path.isdir(cacheDirectory):
-		raise ExceptionReportedToUser("cacheDirectory is not a directory")
+		raise ExceptionReportedToUser("not a directory", cacheDirectory)
 	cacheFile = path.join(cacheDirectory, cacheName + cacheSuffix)
 	try:
 		with open(cacheFile, mode='wb') as f:
