@@ -29,6 +29,7 @@ parser = argparse.ArgumentParser(prog='SwapBillClient', description='the referen
 #parser.add_argument('-V', '--version', action='version', version="SwapBillClient version %s" % config.clientVersion)
 parser.add_argument('--config-file', help='the location of the configuration file')
 parser.add_argument('--data-directory', help='the location of the data directory', default='.')
+parser.add_argument('--include_pending', help='include transactions that have been submitted but not yet confirmed (based on host memory pool)', action='store_true')
 subparsers = parser.add_subparsers(dest='action', help='the action to be taken')
 
 sp = subparsers.add_parser('burn', help='destroy litecoin to create swapbill')
@@ -71,7 +72,7 @@ def Main(startBlockIndex, startBlockHash, commandLineArgs=sys.argv[1:], host=Non
 
 	if args.action == 'get_state_info':
 		syncOut = io.StringIO()
-		state, ownedAccounts = SyncAndReturnStateAndOwnedAccounts(args.data_directory, startBlockIndex, startBlockHash, host, out=syncOut)
+		state, ownedAccounts = SyncAndReturnStateAndOwnedAccounts(args.data_directory, startBlockIndex, startBlockHash, host, includePending=args.include_pending, out=syncOut)
 		formattedBalances = {}
 		for account in state._balances:
 			key = host.formatAccountForEndUser(account)
@@ -86,7 +87,7 @@ def Main(startBlockIndex, startBlockHash, commandLineArgs=sys.argv[1:], host=Non
 		}
 		return info
 
-	state, ownedAccounts = SyncAndReturnStateAndOwnedAccounts(args.data_directory, startBlockIndex, startBlockHash, host, out=out)
+	state, ownedAccounts = SyncAndReturnStateAndOwnedAccounts(args.data_directory, startBlockIndex, startBlockHash, host, includePending=args.include_pending, out=out)
 	print("state updated to end of block {}".format(state._currentBlockIndex - 1), file=out)
 
 	transactionBuildLayer = TransactionBuildLayer.TransactionBuildLayer(host, ownedAccounts)

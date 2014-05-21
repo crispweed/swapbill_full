@@ -293,6 +293,17 @@ class Test(unittest.TestCase):
 		info = GetStateInfo(host)
 		self.assertEqual(info['balances'], {'04:1': 999800, '04:2':100, '03:2':100})
 
+	def test_include_pending(self):
+		host = InitHost()
+		host._addUnspent(100000000)
+		host.holdNewTransactions = True
+		RunClient(host, ['burn', '--quantity', '1000000'])
+		RunClient(host, ['burn', '--quantity', '2000000'])
+		info = GetStateInfo(host)
+		self.assertEqual(info['balances'], {})
+		output, info = RunClient(host, ['--include_pending', 'get_state_info'])
+		self.assertEqual(info['balances'], {'02:1': 1000000, '03:1': 2000000})
+
 	def test_two_owners(self):
 		host = InitHost()
 		host._setOwner('1')

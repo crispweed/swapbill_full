@@ -8,8 +8,7 @@ from SwapBill import FormatTransactionForUserDisplay
 stateVersion = 0.7
 ownedAccountsVersion = 0.1
 
-def _processBlock(host, state, ownedAccounts, blockHash, out):
-	transactions = host.getBlockTransactions(blockHash)
+def _processTransactions(host, state, ownedAccounts, transactions, applyToState, out):
 	for txID, hostTXHex in transactions:
 		hostTX, scriptPubKeys = DecodeTransaction.Decode(hostTXHex)
 		if hostTX == None:
@@ -20,26 +19,33 @@ def _processBlock(host, state, ownedAccounts, blockHash, out):
 			continue
 		except TransactionEncoding.UnsupportedTransaction:
 			continue
-		outputPubKeyHashes = []
-		for i in range(len(outputs)):
-			outputPubKeyHashes.append(hostTX.outputPubKeyHash(i + 1))
-		state.applyTransaction(transactionType, txID, outputs, transactionDetails)
-		print('applied ' + FormatTransactionForUserDisplay.Format(host, transactionType, outputs, outputPubKeyHashes, transactionDetails), file=out)
+		if applyToState:
+			outputPubKeyHashes = []
+			for i in range(len(outputs)):
+				outputPubKeyHashes.append(hostTX.outputPubKeyHash(i + 1))
+			state.applyTransaction(transactionType, txID, outputs, transactionDetails)
+			print('applied ' + FormatTransactionForUserDisplay.Format(host, transactionType, outputs, outputPubKeyHashes, transactionDetails), file=out)
 		for i in range(hostTX.numberOfInputs()):
 			spentAccount = (hostTX.inputTXID(i), hostTX.inputVOut(i))
 			if spentAccount in ownedAccounts:
 				ownedAccounts.pop(spentAccount)
-		for i in range(len(outputs)):
-			newOwnedAccount = (txID, i + 1)
-			if newOwnedAccount in state._balances:
-				privateKey = host.privateKeyForPubKeyHash(outputPubKeyHashes[i])
-				if privateKey is not None:
-					#print("added owned account for:", transactionType, outputs[i], txID[-3:], i + 1)
-					assert not newOwnedAccount in ownedAccounts
-					ownedAccounts[newOwnedAccount] = (hostTX.outputAmount(i + 1), privateKey, scriptPubKeys[i + 1])
+		if applyToState:
+			for i in range(len(outputs)):
+				newOwnedAccount = (txID, i + 1)
+				if newOwnedAccount in state._balances:
+					privateKey = host.privateKeyForPubKeyHash(outputPubKeyHashes[i])
+					if privateKey is not None:
+						#print("added owned account for:", transactionType, outputs[i], txID[-3:], i + 1)
+						assert not newOwnedAccount in ownedAccounts
+						ownedAccounts[newOwnedAccount] = (hostTX.outputAmount(i + 1), privateKey, scriptPubKeys[i + 1])
+
+
+def _processBlock(host, state, ownedAccounts, blockHash, out):
+	transactions = host.getBlockTransactions(blockHash)
+	_processTransactions(host, state, ownedAccounts, transactions, True, out)
 	state.advanceToNextBlock()
 
-def SyncAndReturnStateAndOwnedAccounts(cacheDirectory, startBlockIndex, startBlockHash, host, out):
+def SyncAndReturnStateAndOwnedAccounts(cacheDirectory, startBlockIndex, startBlockHash, host, includePending, out):
 	try:
 		(blockIndex, blockHash, state) = PickledCache.Load(cacheDirectory, 'State', stateVersion)
 		ownedAccounts = PickledCache.Load(cacheDirectory, 'OwnedAccounts', ownedAccountsVersion)
@@ -93,27 +99,15 @@ def SyncAndReturnStateAndOwnedAccounts(cacheDirectory, startBlockIndex, startBlo
 
 	_processBlock(host, state, ownedAccounts, blockHash, out=out)
 
-	# TODO - the best block chain may have changed during the above
-	# and so the following set of memory pool transactions may not correspond to our block chain endpoint
-	# and this may then result in us trying to make double spends in certain situations
-	# (which the host should then refuse)
-	# we can be more careful about this by checking best block chain after getting memory pool transactions
+	# note that the best block chain may have changed during the above
+	# and so the following set of memory pool transactions may not correspond to the actual block chain endpoint we synchronised to
+	# and this may then result in us trying to make double spends, in certain situations
+	# the host should then refuse these transactions, and so this is not a disaster
+	# (and double spend situations can probably also arise more generally in the case of block chain forks, with it not possible for us to always prevent this)
+	# but we can potentially be more careful about this by checking best block chain after getting memory pool transactions
 	# and restarting the block chain traversal if this does not match up
 	memPoolTransactions = host.getMemPoolTransactions()
-	for txID, hostTXHex in memPoolTransactions:
-		hostTX, scriptPubKeys = DecodeTransaction.Decode(hostTXHex)
-		if hostTX == None:
-			continue
-		try:
-			transactionType, outputs, transactionDetails = TransactionEncoding.ToStateTransaction(hostTX)
-		except TransactionEncoding.NotValidSwapBillTransaction:
-			continue
-		except TransactionEncoding.UnsupportedTransaction:
-			continue
-		for i in range(hostTX.numberOfInputs()):
-			spentAccount = (hostTX.inputTXID(i), hostTX.inputVOut(i))
-			if spentAccount in ownedAccounts:
-				ownedAccounts.pop(spentAccount)
+	_processTransactions(host, state, ownedAccounts, memPoolTransactions, includePending, out)
 
 	return state, ownedAccounts
 
