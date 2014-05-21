@@ -9,7 +9,7 @@ class InsufficientTransactionFees(Exception):
 	pass
 
 class Host(object):
-	def __init__(self, useTestNet, configFile=None):
+	def __init__(self, useTestNet, dataDirectory, configFile=None):
 		if configFile is None:
 			configFile = path.join(path.expanduser("~"), '.litecoin', 'litecoin.conf')
 
@@ -41,7 +41,8 @@ class Host(object):
 
 		self._rpcHost = RPC.Host('http://' + RPC_USER + ':' + RPC_PASSWORD + '@' + RPC_HOST + ':' + str(RPC_PORT))
 		self._cachedBlockHash = None
-		self._wallet = Wallet.Wallet('wallet.txt')
+		assert path.isdir(dataDirectory)
+		self._wallet = Wallet.Wallet(path.join(dataDirectory, 'wallet.txt'))
 
 # unspents, addresses, transaction encode and send
 

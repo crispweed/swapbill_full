@@ -203,7 +203,7 @@ class Test(unittest.TestCase):
 	def test_bad_invocations(self):
 		host = InitHost()
 		self.assertRaisesRegexp(ExceptionReportedToUser, 'No pending exchange with the specified ID', RunClient, host, ['complete_ltc_sell', '--pending_exchange_id', '123'])
-		self.assertRaisesRegexp(ExceptionReportedToUser, 'not a directory', RunClient, host, ['--data-directory=dontMakeADirectoryCalledThis', 'get_balance'])
+		self.assertRaisesRegexp(ExceptionReportedToUser, 'The following path [(]specified for data directory parameter[)] is not a valid path to an existing directory', RunClient, host, ['--data-directory=dontMakeADirectoryCalledThis', 'get_balance'])
 
 	def test_burn_and_pay(self):
 		host = InitHost()
@@ -311,7 +311,7 @@ class Test(unittest.TestCase):
 		host.holdNewTransactions = True
 		info = GetStateInfo(host)
 		self.assertEqual(info['balances'], {'02:1': 1000000})
-		self.assertRaisesRegexp(ExceptionReportedToUser, 'no active swapbill balance currently available', RunClient, host, ['pay', '--quantity', '100', '--toAddress', payTargetAddress])
+		self.assertRaisesRegexp(ExceptionReportedToUser, 'No active swapbill balance currently available', RunClient, host, ['pay', '--quantity', '100', '--toAddress', payTargetAddress])
 		host.holdNewTransactions = False
 		info = GetStateInfo(host)
 		self.assertEqual(info['balances'], {'03:1': 999900, '03:2':100})

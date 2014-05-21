@@ -33,7 +33,7 @@ class TransactionBuildLayer(object):
 				best = account
 				bestAmount = amount
 		if best is None:
-			raise ExceptionReportedToUser('no active swapbill balance currently available (you may need to wait for a transaction in progress to complete)')
+			raise ExceptionReportedToUser('No active swapbill balance currently available (you may need to wait for a transaction in progress to complete).')
 		self._scriptPubKeyLookup[best] = self._ownedAccounts[best][2]
 		self._privateKeys.append(self._ownedAccounts[best][1])
 		return best

@@ -5,6 +5,7 @@ if PY3:
 	import io
 else:
 	import StringIO as io
+from os import path
 from SwapBill import RawTransaction, Address, TransactionFee
 from SwapBill import TransactionEncoding, BuildHostedTransaction, Sync, Host, TransactionBuildLayer
 from SwapBill import FormatTransactionForUserDisplay
@@ -60,6 +61,9 @@ subparsers.add_parser('get_state_info', help='get some general state information
 
 def Main(startBlockIndex, startBlockHash, commandLineArgs=sys.argv[1:], host=None, out=sys.stdout):
 	args = parser.parse_args(commandLineArgs)
+
+	if not path.isdir(args.data_directory):
+		raise ExceptionReportedToUser("The following path (specified for data directory parameter) is not a valid path to an existing directory: " + args.data_directory)
 
 	if host is None:
 		host = Host.Host(useTestNet=True, configFile=args.config_file)

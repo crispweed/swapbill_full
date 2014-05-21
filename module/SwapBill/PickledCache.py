@@ -6,7 +6,6 @@ if PY3:
 else:
 	import cPickle as pickle
 from os import path
-from SwapBill.ExceptionReportedToUser import ExceptionReportedToUser
 
 class LoadFailedException(Exception):
 	pass
@@ -17,8 +16,7 @@ else:
 	cacheSuffix = '.cache'
 
 def Load(cacheDirectory, cacheName, desiredVersion):
-	if not path.isdir(cacheDirectory):
-		raise ExceptionReportedToUser("not a directory", cacheDirectory)
+	assert path.isdir(cacheDirectory)
 	cacheFile = path.join(cacheDirectory, cacheName + cacheSuffix)
 	if not path.exists(cacheFile):
 		raise LoadFailedException('no cache file found')
@@ -29,8 +27,7 @@ def Load(cacheDirectory, cacheName, desiredVersion):
 		return pickle.load(f)
 
 def Save(data, dataVersion, cacheDirectory, cacheName):
-	if not path.isdir(cacheDirectory):
-		raise ExceptionReportedToUser("not a directory", cacheDirectory)
+	assert path.isdir(cacheDirectory)
 	cacheFile = path.join(cacheDirectory, cacheName + cacheSuffix)
 	try:
 		with open(cacheFile, mode='wb') as f:
