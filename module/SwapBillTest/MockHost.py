@@ -41,8 +41,12 @@ def MakeTXID(i):
 
 
 class MockHost(object):
-	def __init__(self, id=''):
-		self._id = id
+	defaultOwner = '0'
+
+	def __init__(self, ownerID=None):
+		if ownerID is None:
+			ownerID = self.defaultOwner
+		self._id = ownerID
 		self._nextChange = 0
 		self._nextSwapBill = 0
 		# start block is zero, already confirmed, contains no transactions

@@ -12,49 +12,16 @@ from SwapBill.BuildHostedTransaction import InsufficientFunds
 from SwapBill.ClientMain import TransactionNotSuccessfulAgainstCurrentState
 from SwapBill.ExceptionReportedToUser import ExceptionReportedToUser
 
-#def GetAddressForUnspent(host, formattedAccount):
-	##print('trying to match', formattedAccount)
-	#for entry in host.getUnspent():
-		#txID = entry['txid']
-		#vOut = entry['vout']
-		#formattedAccountForEntry = host.formatAccountForEndUser((txID, vOut))
-		##print(formattedAccountForEntry)
-		#if formattedAccountForEntry == formattedAccount:
-			#return entry['address']
-	#raise Exception('not found')
-
-#def GetOwnerBalances(host, ownerList, balances):
-	#result = {}
-	#ownerAtStart = host._getOwner()
-	#for owner in ownerList:
-		#host._setOwner(owner)
-		#unspent = host.getUnspent()
-		#ownerBalance = 0
-		#for entry in unspent:
-			#account = (entry['txid'], entry['vout'])
-			#key = host.formatAccountForEndUser(account)
-			#ownerBalance += balances.get(key, 0)
-		#if ownerBalance > 0:
-			#result[owner] = ownerBalance
-	#host._setOwner(ownerAtStart)
-	#return result
-
 def GetOwnerBalances(host, ownerList, balances):
 	result = {}
 	ownerAtStart = host._getOwner()
 	for owner in ownerList:
 		host._setOwner(owner)
-		output, info = RunClient_Rescan(host, ['get_balance'])
+		output, info = RunClient(host, ['get_balance'])
 		if info['total'] != 0:
 			result[owner] = info['total']
 	host._setOwner(ownerAtStart)
 	return result
-
-#def CheckEachBalanceHasUnspent(host, balances):
-	#for formattedAccount in balances:
-		#account = host._accountFromEndUserFormat(formattedAccount)
-		##print(account)
-		#host._checkAccountHasUnspent(account)
 
 def GetOwnerBackingAmounts(host, ownerList, balances):
 	result = {}
@@ -75,25 +42,31 @@ def GetOwnerBackingAmounts(host, ownerList, balances):
 
 dataDirectory = 'dataDirectoryForTests'
 
-def InitHost():
+def InitHost(owners=None):
+	if owners is None:
+		owners = [MockHost.defaultOwner]
 	if path.exists(dataDirectory):
 		assert path.isdir(dataDirectory)
 		shutil.rmtree(dataDirectory)
 	os.mkdir(dataDirectory)
+	for owner in owners:
+		ownerDir = path.join(dataDirectory, owner)
+		os.mkdir(ownerDir)
 	return MockHost()
 
 def RunClient(host, args):
-	fullArgs = ['--data-directory', dataDirectory] + args
+	ownerDir = path.join(dataDirectory, host._getOwner())
+	fullArgs = ['--data-directory', ownerDir] + args
 	out = io.StringIO()
 	result = ClientMain.Main(startBlockIndex=0, startBlockHash=host.getBlockHash(0), commandLineArgs=fullArgs, host=host, out=out)
 	return out.getvalue(), result
 
-def RunClient_Rescan(host, args):
-	if path.exists(dataDirectory):
-		assert path.isdir(dataDirectory)
-		shutil.rmtree(dataDirectory)
-	os.mkdir(dataDirectory)
-	return RunClient(host, args)
+#def RunClient(host, args):
+	#if path.exists(dataDirectory):
+		#assert path.isdir(dataDirectory)
+		#shutil.rmtree(dataDirectory)
+	#os.mkdir(dataDirectory)
+	#return RunClient(host, args)
 
 def GetStateInfo(host):
 	output, info = RunClient(host, ['get_state_info'])
@@ -125,7 +98,7 @@ class Test(unittest.TestCase):
 
 		host._setOwner('recipient')
 		payTargetAddress = host.formatAddressForEndUser(host.getNewSwapBillAddress())
-		host._setOwner('')
+		host._setOwner(host.defaultOwner)
 
 		output = RunClient(host, ['pay', '--quantity', '1', '--toAddress', payTargetAddress])
 		self.assertTrue(info['syncOutput'].startswith('Loaded cached state data successfully\nStarting from block 0\n'))
@@ -206,7 +179,7 @@ class Test(unittest.TestCase):
 		self.assertRaisesRegexp(ExceptionReportedToUser, 'The following path [(]specified for data directory parameter[)] is not a valid path to an existing directory', RunClient, host, ['--data-directory=dontMakeADirectoryCalledThis', 'get_balance'])
 
 	def test_burn_and_pay(self):
-		host = InitHost()
+		host = InitHost((MockHost.defaultOwner, 'recipient'))
 
 		nextTX = 1
 
@@ -236,10 +209,10 @@ class Test(unittest.TestCase):
 
 		host._setOwner('recipient')
 		payTargetAddress = host.formatAddressForEndUser(host.getNewSwapBillAddress())
-		host._setOwner('')
+		host._setOwner(host.defaultOwner)
 
 		self.assertRaisesRegexp(ClientMain.BadAddressArgument, 'An address argument is not valid', RunClient, host, ['pay', '--quantity', '100', '--toAddress', 'madeUpAddress'])
-		RunClient_Rescan(host, ['pay', '--quantity', '100', '--toAddress', payTargetAddress])
+		RunClient(host, ['pay', '--quantity', '100', '--toAddress', payTargetAddress])
 		payChange = "0" + str(nextTX) + ":1"
 		payTarget = "0" + str(nextTX) + ":2"
 		nextTX += 1
@@ -249,7 +222,7 @@ class Test(unittest.TestCase):
 		#self.assertEqual(host.formatAddressForEndUser(GetAddressForUnspent(host, payTarget)), payTargetAddress)
 		output, info = RunClient(host, ['get_balance'])
 		self.assertDictEqual(info, {'in active account': 100, 'total': 100})
-		host._setOwner('')
+		host._setOwner(host.defaultOwner)
 
 		# and this should not submit because there are not enough funds for the payment
 		self.assertRaises(TransactionNotSuccessfulAgainstCurrentState, RunClient, host, ['pay', '--quantity', '160000', '--toAddress', payTargetAddress])
@@ -306,7 +279,7 @@ class Test(unittest.TestCase):
 		self.assertEqual(info['balances'], {'02:1': 1000000})
 		host._setOwner('recipient')
 		payTargetAddress = host.formatAddressForEndUser(host.getNewSwapBillAddress())
-		host._setOwner('')
+		host._setOwner(host.defaultOwner)
 		RunClient(host, ['pay', '--quantity', '100', '--toAddress', payTargetAddress])
 		host.holdNewTransactions = True
 		info = GetStateInfo(host)
@@ -321,24 +294,24 @@ class Test(unittest.TestCase):
 		self.assertEqual(info['balances'], {'04:1': 999800, '04:2':100, '03:2':100})
 
 	def test_two_owners(self):
-		host = InitHost()
-
+		host = InitHost(('1','2'))
 		host._setOwner('1')
 		host._addUnspent(100000000)
 		RunClient(host, ['burn', '--quantity', '1000000'])
 		host._setOwner('2')
 		host._addUnspent(100000000)
-		RunClient_Rescan(host, ['burn', '--quantity', '2000000'])
+		RunClient(host, ['burn', '--quantity', '2000000'])
 		info = GetStateInfo(host)
 		self.assertEqual(info['balances'], {'02:1':1000000, '04:1':2000000})
 		output, info = RunClient(host, ['get_balance'])
 		self.assertDictEqual(info, {'in active account': 2000000, 'total': 2000000})
 		host._setOwner('1')
-		output, info = RunClient_Rescan(host, ['get_balance'])
+		output, info = RunClient(host, ['get_balance'])
 		self.assertDictEqual(info, {'in active account': 1000000, 'total': 1000000})
 
 	def test_ltc_trading(self):
-		host = InitHost()
+		ownerList = ('alice', 'bob', 'clive', 'dave')
+		host = InitHost(ownerList)
 
 		## initialise some account balances
 		host._setOwner('alice')
@@ -346,17 +319,16 @@ class Test(unittest.TestCase):
 		RunClient(host, ['burn', '--quantity', '30000000'])
 		host._setOwner('bob')
 		host._addUnspent(20200000)
-		RunClient_Rescan(host, ['burn', '--quantity', '20000000'])
+		RunClient(host, ['burn', '--quantity', '20000000'])
 		host._setOwner('clive')
 		host._addUnspent(50200000)
-		RunClient_Rescan(host, ['burn', '--quantity', '50000000'])
+		RunClient(host, ['burn', '--quantity', '50000000'])
 		host._setOwner('dave')
 		host._addUnspent(60300000) ## will have 100000 backing funds left over
-		RunClient_Rescan(host, ['burn', '--quantity', '60000000'])
+		RunClient(host, ['burn', '--quantity', '60000000'])
 		info = GetStateInfo(host)
 		#print('dave unspent:')
 		#print(host.getUnspent())
-		ownerList = ('alice', 'bob', 'clive', 'dave', 'bob')
 		ownerBalances = GetOwnerBalances(host, ownerList, info['balances'])
 		#print(ownerBalances)
 		self.assertDictEqual(ownerBalances, {'bob': 20000000, 'clive': 50000000, 'alice': 30000000, 'dave': 60000000})
@@ -371,7 +343,7 @@ class Test(unittest.TestCase):
 
 		host._setOwner('alice')
 		host._addUnspent(100000000)
-		RunClient_Rescan(host, ['post_ltc_buy', '--quantity', '30000000', '--exchangeRate', '0.5'])
+		RunClient(host, ['post_ltc_buy', '--quantity', '30000000', '--exchangeRate', '0.5'])
 		info = GetStateInfo(host)
 		self.assertEqual(info['numberOfLTCBuyOffers'], 1)
 		self.assertEqual(info['numberOfLTCSellOffers'], 0)
@@ -379,17 +351,17 @@ class Test(unittest.TestCase):
 		ownerBalances = GetOwnerBalances(host, ownerList, info['balances'])
 		self.assertDictEqual(ownerBalances, {'bob': 20000000, 'clive': 50000000, 'dave': 60000000})
 
-		output, result = RunClient_Rescan(host, ['get_buy_offers'])
+		output, result = RunClient(host, ['get_buy_offers'])
 		self.assertEqual(result, [('exchange rate', 0.5, {'ltc equivalent': 15000000, 'mine': True, 'swapbill offered': 30000000})])
 
 		## bob makes better offer, but with smaller amount
 
 		host._setOwner('bob')
-		output, result = RunClient_Rescan(host, ['get_buy_offers'])
+		output, result = RunClient(host, ['get_buy_offers'])
 		self.assertEqual(result, [('exchange rate', 0.5, {'ltc equivalent': 15000000, 'mine': False, 'swapbill offered': 30000000})])
 
 		host._addUnspent(100000000)
-		RunClient_Rescan(host, ['post_ltc_buy', '--quantity', '10000000', '--exchangeRate', '0.25'])
+		RunClient(host, ['post_ltc_buy', '--quantity', '10000000', '--exchangeRate', '0.25'])
 		info = GetStateInfo(host)
 		ownerBalances = GetOwnerBalances(host, ownerList, info['balances'])
 		self.assertDictEqual(ownerBalances, {'bob': 10000000, 'clive': 50000000, 'dave': 60000000})
@@ -408,7 +380,7 @@ class Test(unittest.TestCase):
 
 		host._setOwner('clive')
 		host._addUnspent(100000000)
-		RunClient_Rescan(host, ['post_ltc_sell', '--quantity', '10000000', '--exchangeRate', '0.25'])
+		RunClient(host, ['post_ltc_sell', '--quantity', '10000000', '--exchangeRate', '0.25'])
 		cliveCompletionPaymentExpiry = host._nextBlock + 50 # note that RunClient posts the transaction, and then the transaction will go through in the next block
 		info = GetStateInfo(host)
 		ownerBalances = GetOwnerBalances(host, ownerList, info['balances'])
@@ -436,7 +408,7 @@ class Test(unittest.TestCase):
 
 		host._setOwner('bob')
 
-		output, result = RunClient_Rescan(host, ['get_pending_exchanges'])
+		output, result = RunClient(host, ['get_pending_exchanges'])
 		# (as above, but identifies bob as buyer instead of seller)
 		expectedResult = [
 		    ('pending exchange index', 0, {
@@ -459,7 +431,7 @@ class Test(unittest.TestCase):
 
 		host._setOwner('dave')
 		host._addUnspent(100000000)
-		RunClient_Rescan(host, ['post_ltc_sell', '--quantity', '20000000', '--exchangeRate', '0.26953125'])
+		RunClient(host, ['post_ltc_sell', '--quantity', '20000000', '--exchangeRate', '0.26953125'])
 		info = GetStateInfo(host)
 		ownerBalances = GetOwnerBalances(host, ownerList, info['balances'])
 		self.assertDictEqual(ownerBalances, {'clive': 49375000, 'dave': 58750000})
@@ -498,7 +470,7 @@ class Test(unittest.TestCase):
 
 		#dave is more on the ball, and makes his completion payment
 		host._setOwner('dave')
-		RunClient_Rescan(host, ['complete_ltc_sell', '--pending_exchange_id', '1'])
+		RunClient(host, ['complete_ltc_sell', '--pending_exchange_id', '1'])
 
 		info = GetStateInfo(host)
 		#dave gets credited bob's exchange funds, and is also refunded his exchange deposit
@@ -509,15 +481,15 @@ class Test(unittest.TestCase):
 		self.assertEqual(info['numberOfPendingExchanges'], 0)
 
 		host._setOwner('alice')
-		output, info = RunClient_Rescan(host, ['get_balance'])
+		output, info = RunClient(host, ['get_balance'])
 		self.assertDictEqual(info, {'in active account': 0, 'total': 0})
 		host._setOwner('bob')
-		output, info = RunClient_Rescan(host, ['get_balance'])
+		output, info = RunClient(host, ['get_balance'])
 		self.assertDictEqual(info, {'in active account': 10625000, 'total': 10625000})
 		host._setOwner('clive')
-		output, info = RunClient_Rescan(host, ['get_balance'])
+		output, info = RunClient(host, ['get_balance'])
 		self.assertDictEqual(info, {'in active account': 49375000, 'total': 49375000})
 		host._setOwner('dave')
-		output, info = RunClient_Rescan(host, ['get_balance'])
+		output, info = RunClient(host, ['get_balance'])
 		self.assertDictEqual(info, {'in active account': 58750000, 'total': 58750000+10625000})
 
