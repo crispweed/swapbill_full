@@ -27,9 +27,9 @@ class SourceAddressUnseeded(ExceptionReportedToUser):
 
 parser = argparse.ArgumentParser(prog='SwapBillClient', description='the reference implementation of the SwapBill protocol')
 #parser.add_argument('-V', '--version', action='version', version="SwapBillClient version %s" % config.clientVersion)
-parser.add_argument('--config-file', help='the location of the configuration file')
-parser.add_argument('--data-directory', help='the location of the data directory', default='.')
-parser.add_argument('--include_pending', help='include transactions that have been submitted but not yet confirmed (based on host memory pool)', action='store_true')
+parser.add_argument('--configfile', help='the location of the configuration file')
+parser.add_argument('--datadir', help='the location of the data directory', default='.')
+parser.add_argument('-i', '--includepending', help='include transactions that have been submitted but not yet confirmed (based on host memory pool)', action='store_true')
 subparsers = parser.add_subparsers(dest='action', help='the action to be taken')
 
 sp = subparsers.add_parser('burn', help='destroy litecoin to create swapbill')
@@ -63,16 +63,16 @@ subparsers.add_parser('get_state_info', help='get some general state information
 def Main(startBlockIndex, startBlockHash, commandLineArgs=sys.argv[1:], host=None, out=sys.stdout):
 	args = parser.parse_args(commandLineArgs)
 
-	if not path.isdir(args.data_directory):
-		raise ExceptionReportedToUser("The following path (specified for data directory parameter) is not a valid path to an existing directory: " + args.data_directory)
+	if not path.isdir(args.datadir):
+		raise ExceptionReportedToUser("The following path (specified for data directory parameter) is not a valid path to an existing directory: " + args.datadir)
 
 	if host is None:
-		host = Host.Host(useTestNet=True, dataDirectory=args.data_directory, configFile=args.config_file)
+		host = Host.Host(useTestNet=True, dataDirectory=args.datadir, configFile=args.configfile)
 		print("current litecoind block count = {}".format(host._rpcHost.call('getblockcount')), file=out)
 
 	if args.action == 'get_state_info':
 		syncOut = io.StringIO()
-		state, ownedAccounts = SyncAndReturnStateAndOwnedAccounts(args.data_directory, startBlockIndex, startBlockHash, host, includePending=args.include_pending, out=syncOut)
+		state, ownedAccounts = SyncAndReturnStateAndOwnedAccounts(args.datadir, startBlockIndex, startBlockHash, host, includePending=args.includepending, out=syncOut)
 		formattedBalances = {}
 		for account in state._balances:
 			key = host.formatAccountForEndUser(account)
@@ -87,7 +87,7 @@ def Main(startBlockIndex, startBlockHash, commandLineArgs=sys.argv[1:], host=Non
 		}
 		return info
 
-	state, ownedAccounts = SyncAndReturnStateAndOwnedAccounts(args.data_directory, startBlockIndex, startBlockHash, host, includePending=args.include_pending, out=out)
+	state, ownedAccounts = SyncAndReturnStateAndOwnedAccounts(args.datadir, startBlockIndex, startBlockHash, host, includePending=args.includepending, out=out)
 	print("state updated to end of block {}".format(state._currentBlockIndex - 1), file=out)
 
 	transactionBuildLayer = TransactionBuildLayer.TransactionBuildLayer(host, ownedAccounts)

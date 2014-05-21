@@ -54,7 +54,7 @@ def RunClient(host, args):
 	ownerDir = path.join(dataDirectory, host._getOwner())
 	if not path.exists(ownerDir):
 		os.mkdir(ownerDir)
-	fullArgs = ['--data-directory', ownerDir] + args
+	fullArgs = ['--datadir', ownerDir] + args
 	out = io.StringIO()
 	result = ClientMain.Main(startBlockIndex=0, startBlockHash=host.getBlockHash(0), commandLineArgs=fullArgs, host=host, out=out)
 	return out.getvalue(), result
@@ -176,7 +176,7 @@ class Test(unittest.TestCase):
 	def test_bad_invocations(self):
 		host = InitHost()
 		self.assertRaisesRegexp(ExceptionReportedToUser, 'No pending exchange with the specified ID', RunClient, host, ['complete_ltc_sell', '--pending_exchange_id', '123'])
-		self.assertRaisesRegexp(ExceptionReportedToUser, 'The following path [(]specified for data directory parameter[)] is not a valid path to an existing directory', RunClient, host, ['--data-directory=dontMakeADirectoryCalledThis', 'get_balance'])
+		self.assertRaisesRegexp(ExceptionReportedToUser, 'The following path [(]specified for data directory parameter[)] is not a valid path to an existing directory', RunClient, host, ['--datadir=dontMakeADirectoryCalledThis', 'get_balance'])
 
 	def test_burn_and_pay(self):
 		host = InitHost()
@@ -301,8 +301,12 @@ class Test(unittest.TestCase):
 		RunClient(host, ['burn', '--quantity', '2000000'])
 		info = GetStateInfo(host)
 		self.assertEqual(info['balances'], {})
-		output, info = RunClient(host, ['--include_pending', 'get_state_info'])
+		output, info = RunClient(host, ['--includepending', 'get_state_info'])
 		self.assertEqual(info['balances'], {'02:1': 1000000, '03:1': 2000000})
+		output, info = RunClient(host, ['-i', 'get_state_info'])
+		self.assertEqual(info['balances'], {'02:1': 1000000, '03:1': 2000000})
+		output, info = RunClient(host, ['get_state_info'])
+		self.assertEqual(info['balances'], {})
 
 	def test_two_owners(self):
 		host = InitHost()
