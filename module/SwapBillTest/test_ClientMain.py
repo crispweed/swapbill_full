@@ -42,20 +42,18 @@ def GetOwnerBackingAmounts(host, ownerList, balances):
 
 dataDirectory = 'dataDirectoryForTests'
 
-def InitHost(owners=None):
-	if owners is None:
-		owners = [MockHost.defaultOwner]
+def InitHost():
 	if path.exists(dataDirectory):
 		assert path.isdir(dataDirectory)
 		shutil.rmtree(dataDirectory)
 	os.mkdir(dataDirectory)
-	for owner in owners:
-		ownerDir = path.join(dataDirectory, owner)
-		os.mkdir(ownerDir)
 	return MockHost()
 
 def RunClient(host, args):
+	assert path.isdir(dataDirectory)
 	ownerDir = path.join(dataDirectory, host._getOwner())
+	if not path.exists(ownerDir):
+		os.mkdir(ownerDir)
 	fullArgs = ['--data-directory', ownerDir] + args
 	out = io.StringIO()
 	result = ClientMain.Main(startBlockIndex=0, startBlockHash=host.getBlockHash(0), commandLineArgs=fullArgs, host=host, out=out)
@@ -179,7 +177,7 @@ class Test(unittest.TestCase):
 		self.assertRaisesRegexp(ExceptionReportedToUser, 'The following path [(]specified for data directory parameter[)] is not a valid path to an existing directory', RunClient, host, ['--data-directory=dontMakeADirectoryCalledThis', 'get_balance'])
 
 	def test_burn_and_pay(self):
-		host = InitHost((MockHost.defaultOwner, 'recipient'))
+		host = InitHost()
 
 		nextTX = 1
 
@@ -294,7 +292,7 @@ class Test(unittest.TestCase):
 		self.assertEqual(info['balances'], {'04:1': 999800, '04:2':100, '03:2':100})
 
 	def test_two_owners(self):
-		host = InitHost(('1','2'))
+		host = InitHost()
 		host._setOwner('1')
 		host._addUnspent(100000000)
 		RunClient(host, ['burn', '--quantity', '1000000'])
@@ -310,8 +308,9 @@ class Test(unittest.TestCase):
 		self.assertDictEqual(info, {'in active account': 1000000, 'total': 1000000})
 
 	def test_ltc_trading(self):
+		host = InitHost()
+
 		ownerList = ('alice', 'bob', 'clive', 'dave')
-		host = InitHost(ownerList)
 
 		## initialise some account balances
 		host._setOwner('alice')
