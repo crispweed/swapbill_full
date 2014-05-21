@@ -17,8 +17,10 @@ class Host(object):
 			configFileBuffer = f.read()
 		clientConfig = ParseConfig.Parse(configFileBuffer)
 
-		assert useTestNet
-		self._addressVersion = b'\x6f'
+		if useTestNet:
+			self._addressVersion = b'\x6f'
+		else:
+			self._addressVersion = b'\x30'
 
 		RPC_HOST = clientConfig.get('externalip', 'localhost')
 
@@ -119,15 +121,19 @@ class Host(object):
 		block = self._getBlock_Cached(blockHash)
 		return block.get('nextblockhash', None)
 	def getBlockTransactions(self, blockHash):
-		if self._hasExtendTransactionsInBlockQuery:
-			return self._rpcHost.call('getrawtransactionsinblock', blockHash)[1:]
-		block = self._getBlock_Cached(blockHash)
-		transactions = block['tx']
-		assert len(transactions) >= 1
 		result = []
-		for txHash in transactions[1:]:
-			txHex = self._rpcHost.call('getrawtransaction', txHash)
-			result.append((txHash, txHex))
+		if self._hasExtendTransactionsInBlockQuery:
+			transactions = self._rpcHost.call('getrawtransactionsinblock', blockHash)[1:]
+			assert len(transactions) >= 1
+			for entry in transactions[1:]:
+				result.append((entry['txid'], entry['hex']))
+		else:
+			block = self._getBlock_Cached(blockHash)
+			transactions = block['tx']
+			assert len(transactions) >= 1
+			for txHash in transactions[1:]:
+				txHex = self._rpcHost.call('getrawtransaction', txHash)
+				result.append((txHash, txHex))
 		return result
 
 	def getMemPoolTransactions(self):

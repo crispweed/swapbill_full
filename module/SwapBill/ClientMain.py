@@ -60,14 +60,14 @@ subparsers.add_parser('get_sell_offers', help='get list of currently active lite
 subparsers.add_parser('get_pending_exchanges', help='get current SwapBill pending exchange payments')
 subparsers.add_parser('get_state_info', help='get some general state information')
 
-def Main(startBlockIndex, startBlockHash, commandLineArgs=sys.argv[1:], host=None, out=sys.stdout):
+def Main(startBlockIndex, startBlockHash, useTestNet, commandLineArgs=sys.argv[1:], host=None, out=sys.stdout):
 	args = parser.parse_args(commandLineArgs)
 
 	if not path.isdir(args.datadir):
 		raise ExceptionReportedToUser("The following path (specified for data directory parameter) is not a valid path to an existing directory: " + args.datadir)
 
 	if host is None:
-		host = Host.Host(useTestNet=True, dataDirectory=args.datadir, configFile=args.configfile)
+		host = Host.Host(useTestNet=useTestNet, dataDirectory=args.datadir, configFile=args.configfile)
 		print("current litecoind block count = {}".format(host._rpcHost.call('getblockcount')), file=out)
 
 	if args.action == 'get_state_info':

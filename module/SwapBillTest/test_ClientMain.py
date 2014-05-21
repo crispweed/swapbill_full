@@ -56,7 +56,7 @@ def RunClient(host, args):
 		os.mkdir(ownerDir)
 	fullArgs = ['--datadir', ownerDir] + args
 	out = io.StringIO()
-	result = ClientMain.Main(startBlockIndex=0, startBlockHash=host.getBlockHash(0), commandLineArgs=fullArgs, host=host, out=out)
+	result = ClientMain.Main(startBlockIndex=0, startBlockHash=host.getBlockHash(0), useTestNet=True, commandLineArgs=fullArgs, host=host, out=out)
 	return out.getvalue(), result
 
 #def RunClient(host, args):
