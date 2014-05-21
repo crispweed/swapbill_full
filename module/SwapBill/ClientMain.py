@@ -66,7 +66,7 @@ def Main(startBlockIndex, startBlockHash, commandLineArgs=sys.argv[1:], host=Non
 		raise ExceptionReportedToUser("The following path (specified for data directory parameter) is not a valid path to an existing directory: " + args.data_directory)
 
 	if host is None:
-		host = Host.Host(useTestNet=True, configFile=args.config_file)
+		host = Host.Host(useTestNet=True, dataDirectory=args.data_directory, configFile=args.config_file)
 		print("current litecoind block count = {}".format(host._rpcHost.call('getblockcount')), file=out)
 
 	if args.action == 'get_state_info':
