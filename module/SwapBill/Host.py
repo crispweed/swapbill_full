@@ -123,7 +123,7 @@ class Host(object):
 	def getBlockTransactions(self, blockHash):
 		result = []
 		if self._hasExtendTransactionsInBlockQuery:
-			transactions = self._rpcHost.call('getrawtransactionsinblock', blockHash)[1:]
+			transactions = self._rpcHost.call('getrawtransactionsinblock', blockHash)
 			assert len(transactions) >= 1
 			for entry in transactions[1:]:
 				result.append((entry['txid'], entry['hex']))

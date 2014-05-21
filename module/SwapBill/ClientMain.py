@@ -1,5 +1,5 @@
 from __future__ import print_function
-import sys, argparse, binascii, traceback, struct
+import sys, argparse, binascii, traceback, struct, time
 PY3 = sys.version_info.major > 2
 if PY3:
 	import io
@@ -72,7 +72,9 @@ def Main(startBlockIndex, startBlockHash, useTestNet, commandLineArgs=sys.argv[1
 
 	if args.action == 'get_state_info':
 		syncOut = io.StringIO()
+		startTime = time.clock()
 		state, ownedAccounts = SyncAndReturnStateAndOwnedAccounts(args.datadir, startBlockIndex, startBlockHash, host, includePending=args.includepending, out=syncOut)
+		elapsedTime = time.clock() - startTime
 		formattedBalances = {}
 		for account in state._balances:
 			key = host.formatAccountForEndUser(account)
@@ -80,6 +82,7 @@ def Main(startBlockIndex, startBlockHash, useTestNet, commandLineArgs=sys.argv[1
 		info = {
 		    'totalCreated':state._totalCreated,
 		    'atEndOfBlock':state._currentBlockIndex - 1, 'balances':formattedBalances, 'syncOutput':syncOut.getvalue(),
+		    'syncTime':elapsedTime,
 		    'numberOfLTCBuyOffers':state._LTCBuys.size(),
 		    'numberOfLTCSellOffers':state._LTCSells.size(),
 		    'numberOfPendingExchanges':len(state._pendingExchanges),
