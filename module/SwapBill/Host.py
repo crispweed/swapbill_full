@@ -44,6 +44,13 @@ class Host(object):
 		assert path.isdir(dataDirectory)
 		self._wallet = Wallet.Wallet(path.join(dataDirectory, 'wallet.txt'))
 
+		blockHashForBlockZero = self._rpcHost.call('getblockhash', 0)
+		self._hasExtendTransactionsInBlockQuery = True
+		try:
+			transactionsInBlockZero = self._rpcHost.call('getrawtransactionsinblock', blockHashForBlockZero)
+		except RPC.MethodNotFoundException:
+			self._hasExtendTransactionsInBlockQuery = False
+
 # unspents, addresses, transaction encode and send
 
 	def getUnspent(self):
@@ -112,6 +119,8 @@ class Host(object):
 		block = self._getBlock_Cached(blockHash)
 		return block.get('nextblockhash', None)
 	def getBlockTransactions(self, blockHash):
+		if self._hasExtendTransactionsInBlockQuery:
+			return self._rpcHost.call('getrawtransactionsinblock', blockHash)[1:]
 		block = self._getBlock_Cached(blockHash)
 		transactions = block['tx']
 		assert len(transactions) >= 1

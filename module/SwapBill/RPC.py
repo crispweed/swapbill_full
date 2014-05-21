@@ -3,6 +3,8 @@ import time, requests, json
 
 class RPCFailureException(Exception):
 	pass
+class MethodNotFoundException(Exception):
+	pass
 
 class Host(object):
 	def __init__(self, url):
@@ -23,6 +25,8 @@ class Host(object):
 				if hadConnectionFailures:
 					print('Connected for remote procedure call on retry after connection failure.')
 				break
+		if response.status_code == -32601:
+			raise MethodNotFoundException(rpcMethod)
 		if not response.status_code in (200, 500):
 			raise RPCFailureException('status code: ' + str(response.status_code) + ', reason: ' + response.reason)
 		responseJSON = response.json()
