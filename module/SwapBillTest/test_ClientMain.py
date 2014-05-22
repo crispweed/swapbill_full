@@ -178,6 +178,24 @@ class Test(unittest.TestCase):
 		# but the refund account is locked, because it may need to be credited with other amounts depending on how the trade plays out
 		# so can't spend or collect this yet
 		self.assertRaisesRegexp(ExceptionReportedToUser, 'There are currently less than two owned swapbill outputs', RunClient, host, ['collect'])
+	def test_receiving_account_locked_during_trade(self):
+		host = InitHost()
+		host._setOwner('1')
+		host._addUnspent(500000000)
+		RunClient(host, ['burn', '--quantity', '100000000'])
+		RunClient(host, ['post_ltc_sell', '--quantity', '29900000', '--exchangeRate', '0.5'])
+		output, result = RunClient(host, ['get_balance'])
+		self.assertDictEqual(result, {'total': 98131250, 'in active account': 98131250})
+		host._setOwner('2')
+		host._addUnspent(500000000)
+		RunClient(host, ['burn', '--quantity', '200000000'])
+		RunClient(host, ['post_ltc_buy', '--quantity', '30000000', '--exchangeRate', '0.5'])
+		output, result = RunClient(host, ['get_balance'])
+		# 2 gets partially refunded straight away, as offers don't match exactly, and remainder is below minimum threshold
+		self.assertDictEqual(result, {'total': 170100000, 'in active account': 170000000})
+		# but the refund account is locked, because it may need to be credited with other amounts depending on how the trade plays out
+		# so can't spend or collect this yet
+		self.assertRaisesRegexp(ExceptionReportedToUser, 'There are currently less than two owned swapbill outputs', RunClient, host, ['collect'])
 
 	def test_burn_less_than_dust_limit(self):
 		host = InitHost()
