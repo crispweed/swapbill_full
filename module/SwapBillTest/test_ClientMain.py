@@ -178,6 +178,13 @@ class Test(unittest.TestCase):
 		# but the refund account is locked, because it may need to be credited with other amounts depending on how the trade plays out
 		# so can't spend or collect this yet
 		self.assertRaisesRegexp(ExceptionReportedToUser, 'There are currently less than two owned swapbill outputs', RunClient, host, ['collect'])
+		host._setOwner('recipient')
+		payTargetAddress = host.formatAddressForEndUser(host.getNewSwapBillAddress())
+		host._setOwner('1')
+		RunClient(host, ['pay', '--quantity', '98125000', '--toAddress', payTargetAddress]) # active account can be spent
+		output, result = RunClient(host, ['get_balance'])
+		self.assertDictEqual(result, {'total': 98131250, 'in active account': 98125000})
+		#self.assertRaisesRegexp(ExceptionReportedToUser, 'There are currently less than two owned swapbill outputs', RunClient, host, ['pay'])
 	def test_receiving_account_locked_during_trade(self):
 		host = InitHost()
 		host._setOwner('1')
