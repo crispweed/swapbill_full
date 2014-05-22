@@ -2,6 +2,7 @@ import binascii
 from SwapBill import RawTransaction, TransactionFee
 from SwapBill import Host ## just for insufficient fee exception
 from SwapBill import Address ## just for bad address exception
+from SwapBill.ExceptionReportedToUser import ExceptionReportedToUser
 
 addressPrefix = 'adr_'
 privateKeyPrefix = 'privateKey_'
@@ -57,6 +58,7 @@ class MockHost(object):
 		self._nextSuppliedOutput = 0
 		self._unspent = []
 		self.holdNewTransactions = False
+		self.hideMemPool = False
 
 	def _setOwner(self, id):
 		assert not '_' in id
@@ -103,6 +105,8 @@ class MockHost(object):
 		return self._transactionsByBlock.get(i, [])
 
 	def getMemPoolTransactions(self):
+		if self.hideMemPool:
+			return []
 		return self._transactionsByBlock.get(self._nextBlock, [])
 
 	def _advance(self, numberOfBlocks):
@@ -142,7 +146,8 @@ class MockHost(object):
 				found = entry
 			else:
 				unspentAfter.append(entry)
-		assert found is not None
+		if found is None:
+			raise ExceptionReportedToUser('RPC error sending signed transaction: (from Mock Host, no unspent found for input, maybe already spent?)')
 		pubKeyHash = found['address']
 		if self.addressIsMine(pubKeyHash):
 			requiredPrivateKey = None

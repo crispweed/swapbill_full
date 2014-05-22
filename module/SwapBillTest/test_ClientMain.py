@@ -72,6 +72,10 @@ def GetStateInfo(host):
 	return info
 
 class Test(unittest.TestCase):
+	def assertBalancesEqual(self, host, expected):
+		info = GetStateInfo(host)
+		self.assertSetEqual(set(info['balances'].values()), set(expected))
+
 	def test(self):
 		host = InitHost()
 
@@ -154,6 +158,44 @@ class Test(unittest.TestCase):
 		host = InitHost()
 		host._addUnspent(500000000)
 		self.assertRaisesRegexp(ExceptionReportedToUser, 'Burn amount is below dust limit', RunClient, host, ['burn', '--quantity', '1000'])
+
+	def test_simultaneous_collect_and_pay(self):
+		# attempted to trigger potential issue with consume failing if one of the inputs is already spent,
+		# but it turns out the host blockchain takes care of this for us
+		host = InitHost()
+		host._addUnspent(500000000)
+		RunClient(host, ['burn', '--quantity', '1000000'])
+		RunClient(host, ['burn', '--quantity', '2000000'])
+		RunClient(host, ['burn', '--quantity', '3000000'])
+		self.assertBalancesEqual(host, [1000000,2000000,3000000])
+		host._setOwner('recipient')
+		payTargetAddress = host.formatAddressForEndUser(host.getNewSwapBillAddress())
+		host._setOwner(host.defaultOwner)
+		output = RunClient(host, ['pay', '--quantity', '100', '--toAddress', payTargetAddress])
+		host.holdNewTransactions = True
+		# we have to 'hide' the mem pool, otherwise the collect knows that one of the outputs is no longer available
+		host.hideMemPool = True
+		# but then, there is an attempted double spend on one of the inputs
+		# (which would be detected by real host, also)
+		self.assertRaisesRegexp(ExceptionReportedToUser, 'no unspent found for input, maybe already spent', RunClient, host, ['collect'])
+	def test_simultaneous_collect_and_pay2(self):
+		# as above, but mem pool is not hidden
+		host = InitHost()
+		host._addUnspent(500000000)
+		RunClient(host, ['burn', '--quantity', '1000000'])
+		RunClient(host, ['burn', '--quantity', '2000000'])
+		RunClient(host, ['burn', '--quantity', '3000000'])
+		self.assertBalancesEqual(host, [1000000,2000000,3000000])
+		host._setOwner('recipient')
+		payTargetAddress = host.formatAddressForEndUser(host.getNewSwapBillAddress())
+		host._setOwner(host.defaultOwner)
+		output = RunClient(host, ['pay', '--quantity', '100', '--toAddress', payTargetAddress])
+		host.holdNewTransactions = True
+		output = RunClient(host, ['collect'])
+		host.holdNewTransactions = False
+		output, result = RunClient(host, ['get_balance'])
+		self.assertEqual(result['total'], 5999900)
+
 
 	def test_burn_funding(self):
 		host = InitHost()
