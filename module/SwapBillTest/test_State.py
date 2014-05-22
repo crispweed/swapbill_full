@@ -241,9 +241,17 @@ class Test(unittest.TestCase):
 
 		# bad max block
 		details['maxBlock'] = 99
-		reason = self.Apply_AssertFails(state, 'LTCBuyOffer', **details)
+		canApply, reason = state.checkTransaction('LTCBuyOffer', ('change','refund'), details)
+		self.assertEqual(canApply, True)
+		self.assertEqual(reason, 'max block for transaction has been exceeded')
+		self.assertEqual(state._balances, {burnA:100000000, burnB:200000000, burnC:200000000})
+		self.assertEqual(state._LTCBuys.size(), 0)
+		expiredBuyOfferChange = (self.TXID(), 1)
+		state.applyTransaction('LTCBuyOffer', expiredBuyOfferChange[0], ('change','refund'), details)
+		self.assertEqual(state._balances, {expiredBuyOfferChange:100000000, burnB:200000000, burnC:200000000})
+		self.assertEqual(state._LTCBuys.size(), 0)
 		details['maxBlock'] = 100
-		self.assertEqual(reason, 'max block for transaction has been exceeded' )
+		details['sourceAccount'] = expiredBuyOfferChange
 
 		# try offering more than available
 		details['swapBillOffered'] = 3000000000
@@ -255,7 +263,7 @@ class Test(unittest.TestCase):
 		reason = self.Apply_AssertFails(state, 'LTCBuyOffer', **details)
 		self.assertEqual(reason, 'zero amount not permitted')
 
-		self.assertEqual(state._balances, {burnA:100000000, burnB:200000000, burnC:200000000})
+		self.assertEqual(state._balances, {expiredBuyOfferChange:100000000, burnB:200000000, burnC:200000000})
 		self.assertEqual(state._LTCBuys.size(), 0)
 
 		# reasonable buy offer that should go through
@@ -289,21 +297,34 @@ class Test(unittest.TestCase):
 
 		# bad max block
 		details['maxBlock'] = 99
-		reason = self.Apply_AssertFails(state, 'LTCSellOffer', **details)
+		canApply, reason = state.checkTransaction('LTCSellOffer', ('change','receiving'), details)
+		self.assertEqual(canApply, True)
+		self.assertEqual(reason, 'max block for transaction has been exceeded')
+		self.assertEqual(state._balances, {changeA:70000000, burnB:200000000, burnC:200000000, refundA:0})
+		self.assertEqual(state._LTCSells.size(), 0)
+		expiredSellOfferChange = (self.TXID(), 1)
+		state.applyTransaction('LTCSellOffer', expiredSellOfferChange[0], ('change','receiving'), details)
+		self.assertEqual(state._balances, {changeA:70000000, expiredSellOfferChange:200000000, burnC:200000000, refundA:0})
+		self.assertEqual(state._LTCSells.size(), 0)
 		details['maxBlock'] = 100
-		self.assertEqual(reason, 'max block for transaction has been exceeded' )
+		details['sourceAccount'] = expiredSellOfferChange
+
+		#details['maxBlock'] = 99
+		#reason = self.Apply_AssertFails(state, 'LTCSellOffer', **details)
+		#details['maxBlock'] = 100
+		#self.assertEqual(reason, 'max block for transaction has been exceeded' )
 
 		# try offering more than available
 		details['swapBillDesired'] = 40000000000
 		reason = self.Apply_AssertFails(state, 'LTCSellOffer', **details)
 		self.assertEqual(reason, 'insufficient balance for deposit in source account (offer not posted)')
-		self.assertEqual(state._balances, {changeA:70000000, burnB:200000000, burnC:200000000, refundA:0})
+		self.assertEqual(state._balances, {changeA:70000000, expiredSellOfferChange:200000000, burnC:200000000, refundA:0})
 
 		# zero amount
 		details['swapBillDesired'] = 0
 		reason = self.Apply_AssertFails(state, 'LTCSellOffer', **details)
 		self.assertEqual(reason, 'zero amount not permitted')
-		self.assertEqual(state._balances, {changeA:70000000, burnB:200000000, burnC:200000000, refundA:0})
+		self.assertEqual(state._balances, {changeA:70000000, expiredSellOfferChange:200000000, burnC:200000000, refundA:0})
 
 		self.assertEqual(state._LTCBuys.size(), 1)
 		self.assertEqual(state._LTCSells.size(), 0)

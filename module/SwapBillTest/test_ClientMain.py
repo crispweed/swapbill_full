@@ -235,9 +235,73 @@ class Test(unittest.TestCase):
 		# (transaction was added from mem pool in the above)
 		self.assertEqual(host._nextBlock, 7)
 		host.holdNewTransactions = False
-		output, result = RunClient(host, ['-i', 'get_balance'])
+		output, result = RunClient(host, ['get_balance'])
 		self.assertEqual(result['total'], 3000000)
 		self.assertEqual(host._nextBlock, 8)
+	def test_expired_ltc_buy(self):
+		host = InitHost()
+		host._addUnspent(500000000)
+		RunClient(host, ['burn', '--quantity', '3000000'])
+		RunClient(host, ['post_ltc_buy', '--quantity', '3000000', '--exchangeRate', '0.5', '--blocksUntilExpiry', '4', '--blocksUntilOfferEnds', '5'])
+		host.holdNewTransactions = True
+		# two blocks advanced so far, one for burn, one for sell offer
+		host._advance(4)
+		self.assertEqual(host._nextBlock, 6)
+		# max block for the pay is calculated as state._currentBlockIndex (which equals next block after end of synch at time of submit) + blocksUntilExpiry
+		# so this should be 6
+		# so didn't expire yet, on block 6
+		output, result = RunClient(host, ['-i', 'get_balance'])
+		self.assertEqual(result['total'], 0)
+		output, result = RunClient(host, ['-i', 'get_buy_offers'])
+		self.assertEqual(result, [('exchange rate', 0.5, {'ltc equivalent': 1500000, 'mine': True, 'swapbill offered': 3000000})])
+		host._advance(1)
+		self.assertEqual(host._nextBlock, 7)
+		# but expires on block 7
+		output, result = RunClient(host, ['-i', 'get_balance'])
+		self.assertEqual(result['total'], 3000000)
+		output, result = RunClient(host, ['-i', 'get_buy_offers'])
+		self.assertEqual(result, [])
+		# still on block 7
+		# (transaction was added from mem pool in the above)
+		self.assertEqual(host._nextBlock, 7)
+		host.holdNewTransactions = False
+		output, result = RunClient(host, ['get_balance'])
+		self.assertEqual(result['total'], 3000000)
+		self.assertEqual(host._nextBlock, 8)
+		output, result = RunClient(host, ['get_buy_offers'])
+		self.assertEqual(result, [])
+	def test_expired_ltc_sell(self):
+		host = InitHost()
+		host._addUnspent(500000000)
+		RunClient(host, ['burn', '--quantity', '3000000'])
+		RunClient(host, ['post_ltc_sell', '--quantity', '3000000', '--exchangeRate', '0.5', '--blocksUntilExpiry', '4', '--blocksUntilOfferEnds', '5'])
+		host.holdNewTransactions = True
+		# two blocks advanced so far, one for burn, one for sell offer
+		host._advance(4)
+		self.assertEqual(host._nextBlock, 6)
+		# max block for the pay is calculated as state._currentBlockIndex (which equals next block after end of synch at time of submit) + blocksUntilExpiry
+		# so this should be 6
+		# so didn't expire yet, on block 6
+		output, result = RunClient(host, ['-i', 'get_balance'])
+		self.assertEqual(result['total'], 2812500)
+		output, result = RunClient(host, ['-i', 'get_sell_offers'])
+		self.assertEqual(result, [('exchange rate', 0.5, {'ltc equivalent': 1500000, 'mine': True, 'swapbill desired': 3000000, 'deposit paid': 187500})])
+		host._advance(1)
+		self.assertEqual(host._nextBlock, 7)
+		# but expires on block 7
+		output, result = RunClient(host, ['-i', 'get_balance'])
+		self.assertEqual(result['total'], 3000000)
+		output, result = RunClient(host, ['-i', 'get_sell_offers'])
+		self.assertEqual(result, [])
+		# still on block 7
+		# (transaction was added from mem pool in the above)
+		self.assertEqual(host._nextBlock, 7)
+		host.holdNewTransactions = False
+		output, result = RunClient(host, ['get_balance'])
+		self.assertEqual(result['total'], 3000000)
+		self.assertEqual(host._nextBlock, 8)
+		output, result = RunClient(host, ['get_sell_offers'])
+		self.assertEqual(result, [])
 
 	def test_burn_funding(self):
 		host = InitHost()

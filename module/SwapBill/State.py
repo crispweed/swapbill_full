@@ -161,17 +161,20 @@ class State(object):
 		assert maxBlockOffset >= 0
 		if swapBillOffered == 0:
 			return False, 'zero amount not permitted'
-		if maxBlock < self._currentBlockIndex:
-			return False, 'max block for transaction has been exceeded'
 		if not sourceAccount in self._balances:
 			return False, 'source account does not exist'
 		if self._balances[sourceAccount] < swapBillOffered:
 			return False, 'insufficient balance in source account (offer not posted)'
 		if not LTCTrading.SatisfiesMinimumExchange(exchangeRate, swapBillOffered):
 			return False, 'does not satisfy minimum exchange amount (offer not posted)'
+		if maxBlock < self._currentBlockIndex:
+			return True, 'max block for transaction has been exceeded'
 		return True, ''
 	def _apply_LTCBuyOffer(self, txID, sourceAccount, swapBillOffered, exchangeRate, maxBlockOffset, receivingAddress, maxBlock):
 		available = self._consumeAccount(sourceAccount)
+		if maxBlock < self._currentBlockIndex:
+			self._addAccount((txID, 1), available)
+			return
 		if available > swapBillOffered:
 			self._addAccount((txID, 1), available - swapBillOffered)
 		buyDetails = BuyDetails()
@@ -197,8 +200,6 @@ class State(object):
 		assert maxBlockOffset >= 0
 		if swapBillDesired == 0:
 			return False, 'zero amount not permitted'
-		if maxBlock < self._currentBlockIndex:
-			return False, 'max block for transaction has been exceeded'
 		if not sourceAccount in self._balances:
 			return False, 'source account does not exist'
 		swapBillDeposit = swapBillDesired // LTCTrading.depositDivisor
@@ -206,10 +207,15 @@ class State(object):
 			return False, 'insufficient balance for deposit in source account (offer not posted)'
 		if not LTCTrading.SatisfiesMinimumExchange(exchangeRate, swapBillDesired):
 			return False, 'does not satisfy minimum exchange amount (offer not posted)'
+		if maxBlock < self._currentBlockIndex:
+			return True, 'max block for transaction has been exceeded'
 		return True, ''
 	def _apply_LTCSellOffer(self, txID, sourceAccount, swapBillDesired, exchangeRate, maxBlockOffset, maxBlock):
 		swapBillDeposit = swapBillDesired // LTCTrading.depositDivisor
 		available = self._consumeAccount(sourceAccount)
+		if maxBlock < self._currentBlockIndex:
+			self._addAccount((txID, 1), available)
+			return
 		if available > swapBillDeposit:
 			self._addAccount((txID, 1), available - swapBillDeposit)
 		sellDetails = SellDetails()
