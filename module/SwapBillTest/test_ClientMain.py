@@ -67,10 +67,10 @@ def RunClient(host, args):
 	#return RunClient(host, args)
 
 def GetStateInfo(host, includePending=False):
+	args = ['get_state_info']
 	if includePending:
-		output, info = RunClient(host, ['-i', 'get_state_info'])
-	else:
-		output, info = RunClient(host, ['get_state_info'])
+		args.append('-i')
+	output, info = RunClient(host, args)
 	#CheckEachBalanceHasUnspent(host, info['balances'])
 	return info
 
@@ -216,19 +216,19 @@ class Test(unittest.TestCase):
 		host._advance(4)
 		self.assertEqual(host._nextBlock, 6)
 		# so didn't expire yet, on block 6
-		output, result = RunClient(host, ['-i', 'get_balance'])
+		output, result = RunClient(host, ['get_balance', '-i'])
 		self.assertEqual(result['total'], 2000000)
 		host._setOwner('recipient')
-		output, result = RunClient(host, ['-i', 'get_balance'])
+		output, result = RunClient(host, ['get_balance', '-i'])
 		self.assertEqual(result['total'], 1000000)
 		host._setOwner(host.defaultOwner)
 		host._advance(1)
 		self.assertEqual(host._nextBlock, 7)
 		# but expires on block 7
-		output, result = RunClient(host, ['-i', 'get_balance'])
+		output, result = RunClient(host, ['get_balance', '-i'])
 		self.assertEqual(result['total'], 3000000)
 		host._setOwner('recipient')
-		output, result = RunClient(host, ['-i', 'get_balance'])
+		output, result = RunClient(host, ['get_balance', '-i'])
 		self.assertEqual(result['total'], 0)
 		host._setOwner(host.defaultOwner)
 		# still on block 7
@@ -250,16 +250,16 @@ class Test(unittest.TestCase):
 		# max block for the pay is calculated as state._currentBlockIndex (which equals next block after end of synch at time of submit) + blocksUntilExpiry
 		# so this should be 6
 		# so didn't expire yet, on block 6
-		output, result = RunClient(host, ['-i', 'get_balance'])
+		output, result = RunClient(host, ['get_balance', '-i'])
 		self.assertEqual(result['total'], 0)
-		output, result = RunClient(host, ['-i', 'get_buy_offers'])
+		output, result = RunClient(host, ['get_buy_offers', '-i'])
 		self.assertEqual(result, [('exchange rate', 0.5, {'ltc equivalent': 1500000, 'mine': True, 'swapbill offered': 3000000})])
 		host._advance(1)
 		self.assertEqual(host._nextBlock, 7)
 		# but expires on block 7
-		output, result = RunClient(host, ['-i', 'get_balance'])
+		output, result = RunClient(host, ['get_balance', '-i'])
 		self.assertEqual(result['total'], 3000000)
-		output, result = RunClient(host, ['-i', 'get_buy_offers'])
+		output, result = RunClient(host, ['get_buy_offers', '-i'])
 		self.assertEqual(result, [])
 		# still on block 7
 		# (transaction was added from mem pool in the above)
@@ -282,16 +282,16 @@ class Test(unittest.TestCase):
 		# max block for the pay is calculated as state._currentBlockIndex (which equals next block after end of synch at time of submit) + blocksUntilExpiry
 		# so this should be 6
 		# so didn't expire yet, on block 6
-		output, result = RunClient(host, ['-i', 'get_balance'])
+		output, result = RunClient(host, ['get_balance', '-i'])
 		self.assertEqual(result['total'], 2812500)
-		output, result = RunClient(host, ['-i', 'get_sell_offers'])
+		output, result = RunClient(host, ['get_sell_offers', '-i'])
 		self.assertEqual(result, [('exchange rate', 0.5, {'ltc equivalent': 1500000, 'mine': True, 'swapbill desired': 3000000, 'deposit paid': 187500})])
 		host._advance(1)
 		self.assertEqual(host._nextBlock, 7)
 		# but expires on block 7
-		output, result = RunClient(host, ['-i', 'get_balance'])
+		output, result = RunClient(host, ['get_balance', '-i'])
 		self.assertEqual(result['total'], 3000000)
-		output, result = RunClient(host, ['-i', 'get_sell_offers'])
+		output, result = RunClient(host, ['get_sell_offers', '-i'])
 		self.assertEqual(result, [])
 		# still on block 7
 		# (transaction was added from mem pool in the above)
@@ -454,9 +454,9 @@ class Test(unittest.TestCase):
 		RunClient(host, ['burn', '--quantity', '2000000'])
 		info = GetStateInfo(host)
 		self.assertEqual(info['balances'], {})
-		output, info = RunClient(host, ['--includepending', 'get_state_info'])
+		output, info = RunClient(host, ['get_state_info', '--includepending'])
 		self.assertEqual(info['balances'], {'02:1': 1000000, '03:1': 2000000})
-		output, info = RunClient(host, ['-i', 'get_state_info'])
+		output, info = RunClient(host, ['get_state_info', '-i'])
 		self.assertEqual(info['balances'], {'02:1': 1000000, '03:1': 2000000})
 		output, info = RunClient(host, ['get_state_info'])
 		self.assertEqual(info['balances'], {})

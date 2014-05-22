@@ -29,7 +29,6 @@ parser = argparse.ArgumentParser(prog='SwapBillClient', description='the referen
 #parser.add_argument('-V', '--version', action='version', version="SwapBillClient version %s" % config.clientVersion)
 parser.add_argument('--configfile', help='the location of the configuration file')
 parser.add_argument('--datadir', help='the location of the data directory', default='.')
-parser.add_argument('-i', '--includepending', help='include transactions that have been submitted but not yet confirmed (based on host memory pool)', action='store_true')
 subparsers = parser.add_subparsers(dest='action', help='the action to be taken')
 
 sp = subparsers.add_parser('burn', help='destroy litecoin to create swapbill')
@@ -59,11 +58,20 @@ subparsers.add_parser('collect', help='combine all current owned swapbill output
 
 subparsers.add_parser('get_receive_address', help='generate a new key pair for the swapbill wallet and display the corresponding public payment address')
 
-subparsers.add_parser('get_balance', help='get current SwapBill balance')
-subparsers.add_parser('get_buy_offers', help='get list of currently active litecoin buy offers')
-subparsers.add_parser('get_sell_offers', help='get list of currently active litecoin sell offers')
-subparsers.add_parser('get_pending_exchanges', help='get current SwapBill pending exchange payments')
-subparsers.add_parser('get_state_info', help='get some general state information')
+sp = subparsers.add_parser('get_balance', help='get current SwapBill balance')
+sp.add_argument('-i', '--includepending', help='include transactions that have been submitted but not yet confirmed (based on host memory pool)', action='store_true')
+
+sp = subparsers.add_parser('get_buy_offers', help='get list of currently active litecoin buy offers')
+sp.add_argument('-i', '--includepending', help='include transactions that have been submitted but not yet confirmed (based on host memory pool)', action='store_true')
+
+sp = subparsers.add_parser('get_sell_offers', help='get list of currently active litecoin sell offers')
+sp.add_argument('-i', '--includepending', help='include transactions that have been submitted but not yet confirmed (based on host memory pool)', action='store_true')
+
+sp = subparsers.add_parser('get_pending_exchanges', help='get current SwapBill pending exchange payments')
+sp.add_argument('-i', '--includepending', help='include transactions that have been submitted but not yet confirmed (based on host memory pool)', action='store_true')
+
+sp = subparsers.add_parser('get_state_info', help='get some general state information')
+sp.add_argument('-i', '--includepending', help='include transactions that have been submitted but not yet confirmed (based on host memory pool)', action='store_true')
 
 def Main(startBlockIndex, startBlockHash, useTestNet, commandLineArgs=sys.argv[1:], host=None, out=sys.stdout):
 	args = parser.parse_args(commandLineArgs)
@@ -75,10 +83,12 @@ def Main(startBlockIndex, startBlockHash, useTestNet, commandLineArgs=sys.argv[1
 		host = Host.Host(useTestNet=useTestNet, dataDirectory=args.datadir, configFile=args.configfile)
 		print("current litecoind block count = {}".format(host._rpcHost.call('getblockcount')), file=out)
 
+	includePending = hasattr(args, 'includepending') and args.includepending
+
 	if args.action == 'get_state_info':
 		syncOut = io.StringIO()
 		startTime = time.clock()
-		state, ownedAccounts = SyncAndReturnStateAndOwnedAccounts(args.datadir, startBlockIndex, startBlockHash, host, includePending=args.includepending, out=syncOut)
+		state, ownedAccounts = SyncAndReturnStateAndOwnedAccounts(args.datadir, startBlockIndex, startBlockHash, host, includePending=includePending, out=syncOut)
 		elapsedTime = time.clock() - startTime
 		formattedBalances = {}
 		for account in state._balances:
@@ -95,7 +105,7 @@ def Main(startBlockIndex, startBlockHash, useTestNet, commandLineArgs=sys.argv[1
 		}
 		return info
 
-	state, ownedAccounts = SyncAndReturnStateAndOwnedAccounts(args.datadir, startBlockIndex, startBlockHash, host, includePending=args.includepending, out=out)
+	state, ownedAccounts = SyncAndReturnStateAndOwnedAccounts(args.datadir, startBlockIndex, startBlockHash, host, includePending=includePending, out=out)
 	print("state updated to end of block {}".format(state._currentBlockIndex - 1), file=out)
 
 	transactionBuildLayer = TransactionBuildLayer.TransactionBuildLayer(host, ownedAccounts)
