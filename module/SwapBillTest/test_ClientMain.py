@@ -95,7 +95,7 @@ class Test(unittest.TestCase):
 		self.assertEqual(info['balances'], {"02:1": 1000000})
 		self.assertTrue(info['syncOutput'].startswith('Loaded cached state data successfully\nStarting from block 0\n'))
 
-		output = RunClient(host, ['burn', '--quantity', '2000000'])
+		RunClient(host, ['burn', '--quantity', '2000000'])
 		#print(output)
 
 		info = GetStateInfo(host)
@@ -105,21 +105,21 @@ class Test(unittest.TestCase):
 		payTargetAddress = host.formatAddressForEndUser(host.getNewSwapBillAddress())
 		host._setOwner(host.defaultOwner)
 
-		output = RunClient(host, ['pay', '--quantity', '1', '--toAddress', payTargetAddress])
+		RunClient(host, ['pay', '--quantity', '1', '--toAddress', payTargetAddress])
 		self.assertTrue(info['syncOutput'].startswith('Loaded cached state data successfully\nStarting from block 0\n'))
 
 		info = GetStateInfo(host)
 		self.assertEqual(info['balances'], {'02:1': 1000000, '04:2': 1, '04:1': 1999999})
 
 		host._addUnspent(800000000)
-		output = RunClient(host, ['burn', '--quantity', '400000000'])
-		output = RunClient(host, ['burn', '--quantity', '100000000'])
+		RunClient(host, ['burn', '--quantity', '400000000'])
+		RunClient(host, ['burn', '--quantity', '100000000'])
 		#print(output)
 
 		info = GetStateInfo(host)
 		self.assertEqual(info['balances'], {'02:1': 1000000, '04:2': 1, '04:1': 1999999, '06:1': 400000000, '07:1': 100000000})
 
-		output = RunClient(host, ['post_ltc_buy', '--quantity', '400000000', '--exchangeRate', "0.5"])
+		RunClient(host, ['post_ltc_buy', '--quantity', '400000000', '--exchangeRate', "0.5"])
 
 		info = GetStateInfo(host)
 		#print(info)
@@ -131,7 +131,7 @@ class Test(unittest.TestCase):
 		# deposit of 12500000 moved in to sell offer, 87500000 change
 		self.assertEqual(info['balances'], {'02:1': 1000000, '04:2': 1, '04:1': 1999999, '09:1': 87500000, '08:2': 0, '09:2': 0})
 
-		output = RunClient(host, ['complete_ltc_sell', '--pending_exchange_id', "0"])
+		RunClient(host, ['complete_ltc_sell', '--pending_exchange_id', "0"])
 
 		info = GetStateInfo(host)
 		# exchange completed successfully
@@ -157,6 +157,28 @@ class Test(unittest.TestCase):
 		# TODO - clean up that zero outstanding balance!
 		self.assertEqual(info['balances'], {'04:2': 0, '04:1': 68125000, '03:2': 31875000})
 
+	def test_refund_account_locked_during_trade(self):
+		host = InitHost()
+		host._setOwner('1')
+		host._addUnspent(500000000)
+		RunClient(host, ['burn', '--quantity', '100000000'])
+		RunClient(host, ['post_ltc_sell', '--quantity', '30000000', '--exchangeRate', '0.5'])
+		output, result = RunClient(host, ['get_balance'])
+		self.assertDictEqual(result, {'total': 98125000, 'in active account': 98125000})
+		host._setOwner('2')
+		host._addUnspent(500000000)
+		RunClient(host, ['burn', '--quantity', '200000000'])
+		RunClient(host, ['post_ltc_buy', '--quantity', '29900000', '--exchangeRate', '0.5'])
+		output, result = RunClient(host, ['get_balance'])
+		self.assertDictEqual(result, {'total': 170100000, 'in active account': 170100000})
+		# 1 gets partially refunded, as offers don't match exactly, and remainder is below minimum threshold
+		host._setOwner('1')
+		output, result = RunClient(host, ['get_balance'])
+		self.assertDictEqual(result, {'total': 98131250, 'in active account': 98125000})
+		# but the refund account is locked, because it may need to be credited with other amounts depending on how the trade plays out
+		# so can't spend or collect this yet
+		self.assertRaisesRegexp(ExceptionReportedToUser, 'There are currently less than two owned swapbill outputs', RunClient, host, ['collect'])
+
 	def test_burn_less_than_dust_limit(self):
 		host = InitHost()
 		host._addUnspent(500000000)
@@ -174,7 +196,7 @@ class Test(unittest.TestCase):
 		host._setOwner('recipient')
 		payTargetAddress = host.formatAddressForEndUser(host.getNewSwapBillAddress())
 		host._setOwner(host.defaultOwner)
-		output = RunClient(host, ['pay', '--quantity', '100', '--toAddress', payTargetAddress])
+		RunClient(host, ['pay', '--quantity', '100', '--toAddress', payTargetAddress])
 		host.holdNewTransactions = True
 		# we have to 'hide' the mem pool, otherwise the collect knows that one of the outputs is no longer available
 		host.hideMemPool = True
@@ -192,9 +214,9 @@ class Test(unittest.TestCase):
 		host._setOwner('recipient')
 		payTargetAddress = host.formatAddressForEndUser(host.getNewSwapBillAddress())
 		host._setOwner(host.defaultOwner)
-		output = RunClient(host, ['pay', '--quantity', '100', '--toAddress', payTargetAddress])
+		RunClient(host, ['pay', '--quantity', '100', '--toAddress', payTargetAddress])
 		host.holdNewTransactions = True
-		output = RunClient(host, ['collect'])
+		RunClient(host, ['collect'])
 		host.holdNewTransactions = False
 		output, result = RunClient(host, ['get_balance'])
 		self.assertEqual(result['total'], 5999900)

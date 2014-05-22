@@ -31,6 +31,10 @@ class State(object):
 	def balanceIsSpendable(self, account):
 		assert account in self._balances
 		return not account in self._balanceRefCounts
+	def getSpendableAmount(self, account):
+		if account in self._balanceRefCounts:
+			return 0
+		return self._balances.get(account, 0)
 
 	def startBlockMatches(self, startBlockHash):
 		return self._startBlockHash == startBlockHash

@@ -25,22 +25,25 @@ class TransactionBuildLayer(object):
 			asInputs.append((output['txid'], output['vout']))
 		return amounts, asInputs
 
-	def getActiveAccount(self, balances):
+	def getActiveAccount(self, state):
 		best = None
+		bestAmount = 0
 		for account in self._ownedAccounts:
-			amount = balances[account]
-			if best is None or amount > bestAmount:
+			amount = state.getSpendableAmount(account)
+			if amount > bestAmount:
 				best = account
 				bestAmount = amount
-		if best is None:
+		if bestAmount == 0:
 			raise ExceptionReportedToUser('No active swapbill balance currently available (you may need to wait for a transaction in progress to complete).')
 		self._scriptPubKeyLookup[best] = self._ownedAccounts[best][2]
 		self._privateKeys.append(self._ownedAccounts[best][1])
 		return best
 
-	def getAllOwned(self):
+	def getAllOwnedAndSpendable(self, state):
 		result = []
 		for account in self._ownedAccounts:
+			if not state.balanceIsSpendable(account):
+				continue
 			self._scriptPubKeyLookup[account] = self._ownedAccounts[account][2]
 			self._privateKeys.append(self._ownedAccounts[account][1])
 			result.append(account)

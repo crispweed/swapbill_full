@@ -170,7 +170,7 @@ def Main(startBlockIndex, startBlockHash, useTestNet, commandLineArgs=sys.argv[1
 		outputPubKeyHashes = (host.getNewSwapBillAddress(), CheckAndReturnPubKeyHash(args.toAddress))
 		transactionBuildLayer.startTransactionConstruction()
 		details = {
-		    'sourceAccount':transactionBuildLayer.getActiveAccount(state._balances),
+		    'sourceAccount':transactionBuildLayer.getActiveAccount(state),
 		    'amount':int(args.quantity),
 		    'maxBlock':state._currentBlockIndex + args.blocksUntilExpiry
 		}
@@ -185,7 +185,7 @@ def Main(startBlockIndex, startBlockHash, useTestNet, commandLineArgs=sys.argv[1
 		outputPubKeyHashes = (host.getNewSwapBillAddress(), host.getNewSwapBillAddress())
 		transactionBuildLayer.startTransactionConstruction()
 		details = {
-		    'sourceAccount':transactionBuildLayer.getActiveAccount(state._balances),
+		    'sourceAccount':transactionBuildLayer.getActiveAccount(state),
 		    'swapBillOffered':int(args.quantity),
 		    'exchangeRate':int(float(args.exchangeRate) * 0x100000000),
 		    'receivingAddress':host.getNewNonSwapBillAddress(),
@@ -203,7 +203,7 @@ def Main(startBlockIndex, startBlockHash, useTestNet, commandLineArgs=sys.argv[1
 		outputPubKeyHashes = (host.getNewSwapBillAddress(), host.getNewSwapBillAddress())
 		transactionBuildLayer.startTransactionConstruction()
 		details = {
-		    'sourceAccount':transactionBuildLayer.getActiveAccount(state._balances),
+		    'sourceAccount':transactionBuildLayer.getActiveAccount(state),
 		    'swapBillDesired':int(args.quantity),
 		    'exchangeRate':int(float(args.exchangeRate) * 0x100000000),
 		    'maxBlock':state._currentBlockIndex + args.blocksUntilExpiry,
@@ -230,7 +230,7 @@ def Main(startBlockIndex, startBlockHash, useTestNet, commandLineArgs=sys.argv[1
 	elif args.action == 'collect':
 		transactionType = 'Collect'
 		transactionBuildLayer.startTransactionConstruction()
-		sourceAccounts = transactionBuildLayer.getAllOwned()
+		sourceAccounts = transactionBuildLayer.getAllOwnedAndSpendable(state)
 		if len(sourceAccounts) < 2:
 			raise ExceptionReportedToUser('There are currently less than two owned swapbill outputs.')
 		outputs = ('destination',)
