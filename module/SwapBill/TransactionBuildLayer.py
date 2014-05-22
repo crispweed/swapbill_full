@@ -42,7 +42,7 @@ class TransactionBuildLayer(object):
 	def getAllOwnedAndSpendable(self, state):
 		result = []
 		for account in self._ownedAccounts:
-			if not state.balanceIsSpendable(account):
+			if state.getSpendableAmount(account) == 0:
 				continue
 			self._scriptPubKeyLookup[account] = self._ownedAccounts[account][2]
 			self._privateKeys.append(self._ownedAccounts[account][1])

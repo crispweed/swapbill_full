@@ -150,12 +150,9 @@ class Test(unittest.TestCase):
 		info = GetStateInfo(host)
 		RunClient(host, ['post_ltc_buy', '--quantity', '30000000', '--exchangeRate', '0.5'])
 		info = GetStateInfo(host)
-		#host._logConsumeUnspent = True
 		RunClient(host, ['complete_ltc_sell', '--pending_exchange_id', '0'])
 		info = GetStateInfo(host)
-		#print(host._unspent)
-		# TODO - clean up that zero outstanding balance!
-		self.assertEqual(info['balances'], {'04:2': 0, '04:1': 68125000, '03:2': 31875000})
+		self.assertEqual(info['balances'], {'04:1': 68125000, '03:2': 31875000})
 
 	def test_refund_account_locked_during_trade(self):
 		host = InitHost()

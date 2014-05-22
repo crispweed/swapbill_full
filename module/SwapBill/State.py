@@ -28,9 +28,6 @@ class State(object):
 		self._nextExchangeIndex = 0
 		self._pendingExchanges = {}
 
-	def balanceIsSpendable(self, account):
-		assert account in self._balances
-		return not account in self._balanceRefCounts
 	def getSpendableAmount(self, account):
 		if account in self._balanceRefCounts:
 			return 0
@@ -82,12 +79,10 @@ class State(object):
 		assert self._balanceRefCounts[account] > 0
 		if self._balanceRefCounts[account] == 1:
 			self._balanceRefCounts.pop(account)
+			if self._balances[account] == 0:
+				self._balances.pop(account)
 		else:
 			self._balanceRefCounts[account] -= 1
-		# **** TODO - clean up these 0 amount balances!
-		# **** but first, what to do about the owned outputs tracked for these balances?
-		#if self._balances[account] == 0:
-			#self._balances.pop(account)
 
 	def _matchLTC(self):
 		while True:
