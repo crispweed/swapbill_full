@@ -38,15 +38,19 @@ sp.add_argument('--quantity', required=True, help='quantity of LTC to be destroy
 sp = subparsers.add_parser('pay', help='make a swapbill payment')
 sp.add_argument('--quantity', required=True, help='quantity of swapbill to be paid (in swapbill satoshis)')
 sp.add_argument('--toAddress', required=True, help='pay to this address')
-sp.add_argument('--blocksUntilExpiry', type=int, default=8, help='if the transaction takes longer than this to go through then the payment expires (no payment is made and the full amount is returned as change)')
+sp.add_argument('--blocksUntilExpiry', type=int, default=8, help='if the transaction takes longer than this to go through then the transaction expires (in which case no payment is made and the full amount is returned as change)')
 
 sp = subparsers.add_parser('post_ltc_buy', help='make an offer to buy litecoin with swapbill')
 sp.add_argument('--quantity', required=True, help='amount of swapbill offered')
 sp.add_argument('--exchangeRate', required=True, help='the exchange rate (positive integer, SWP/LTC * 0x100000000, must be less than 0x100000000)')
+sp.add_argument('--blocksUntilExpiry', type=int, default=200, help='if the transaction takes longer than this to go through then the transaction expires (in which case no payment is made and the full amount is returned as change)')
+sp.add_argument('--blocksUntilOfferEnds', type=int, default=200, help='after this block the offer expires (and the swapbill remaining in any unmatched part of the offer is returned)')
 
 sp = subparsers.add_parser('post_ltc_sell', help='make an offer to sell litecoin for swapbill')
 sp.add_argument('--quantity', required=True, help='amount of swapbill to buy (deposit of 1/16 of this amount will be paid in to the offer)')
 sp.add_argument('--exchangeRate', required=True, help='the exchange rate SWP/LTC (must be greater than 0 and less than 1)')
+sp.add_argument('--blocksUntilExpiry', type=int, default=4, help='if the transaction takes longer than this to go through then the transaction expires (in which case no payment is made and the full amount is returned as change)')
+sp.add_argument('--blocksUntilOfferEnds', type=int, default=6, help='after this block the offer expires (and the swapbill deposit remaining in any unmatched part of the offer is returned)')
 
 sp = subparsers.add_parser('complete_ltc_sell', help='complete an ltc exchange by fulfilling a pending exchange payment')
 sp.add_argument('--pending_exchange_id', required=True, help='the id of the pending exchange payment to fulfill')
@@ -163,6 +167,9 @@ def Main(startBlockIndex, startBlockHash, useTestNet, commandLineArgs=sys.argv[1
 		return CheckAndSend(transactionType, outputs, outputPubKeyHashes, details)
 
 	elif args.action == 'post_ltc_buy':
+		if args.blocksUntilExpiry > args.blocksUntilOfferEnds:
+			raise ExceptionReportedToUser('blocksUntilOfferEnds must not be less than blocksUntilExpiry')
+		maxBlockOffset = args.blocksUntilOfferEnds - args.blocksUntilExpiry
 		transactionType = 'LTCBuyOffer'
 		outputs = ('change', 'refund')
 		outputPubKeyHashes = (host.getNewSwapBillAddress(), host.getNewSwapBillAddress())
@@ -172,12 +179,15 @@ def Main(startBlockIndex, startBlockHash, useTestNet, commandLineArgs=sys.argv[1
 		    'swapBillOffered':int(args.quantity),
 		    'exchangeRate':int(float(args.exchangeRate) * 0x100000000),
 		    'receivingAddress':host.getNewNonSwapBillAddress(),
-		    'maxBlock':0xffffffff,
-		    'maxBlockOffset':0
+		    'maxBlock':state._currentBlockIndex + args.blocksUntilExpiry,
+		    'maxBlockOffset':maxBlockOffset
 		}
 		return CheckAndSend(transactionType, outputs, outputPubKeyHashes, details)
 
 	elif args.action == 'post_ltc_sell':
+		if args.blocksUntilExpiry > args.blocksUntilOfferEnds:
+			raise ExceptionReportedToUser('blocksUntilOfferEnds must not be less than blocksUntilExpiry')
+		maxBlockOffset = args.blocksUntilOfferEnds - args.blocksUntilExpiry
 		transactionType = 'LTCSellOffer'
 		outputs = ('change', 'receiving')
 		outputPubKeyHashes = (host.getNewSwapBillAddress(), host.getNewSwapBillAddress())
@@ -186,8 +196,8 @@ def Main(startBlockIndex, startBlockHash, useTestNet, commandLineArgs=sys.argv[1
 		    'sourceAccount':transactionBuildLayer.getActiveAccount(state._balances),
 		    'swapBillDesired':int(args.quantity),
 		    'exchangeRate':int(float(args.exchangeRate) * 0x100000000),
-		    'maxBlock':0xffffffff,
-		    'maxBlockOffset':0
+		    'maxBlock':state._currentBlockIndex + args.blocksUntilExpiry,
+		    'maxBlockOffset':maxBlockOffset
 		}
 		return CheckAndSend(transactionType, outputs, outputPubKeyHashes, details)
 

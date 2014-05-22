@@ -536,7 +536,8 @@ class Test(unittest.TestCase):
 
 		host._setOwner('dave')
 		host._addUnspent(100000000)
-		RunClient(host, ['post_ltc_sell', '--quantity', '20000000', '--exchangeRate', '0.26953125'])
+		RunClient(host, ['post_ltc_sell', '--quantity', '20000000', '--exchangeRate', '0.26953125', '--blocksUntilExpiry', '1', '--blocksUntilOfferEnds', '100'])
+		#RunClient(host, ['post_ltc_sell', '--quantity', '20000000', '--exchangeRate', '0.26953125'])
 		info = GetStateInfo(host)
 		ownerBalances = GetOwnerBalances(host, ownerList, info['balances'])
 		self.assertDictEqual(ownerBalances, {'clive': 49375000, 'dave': 58750000})
