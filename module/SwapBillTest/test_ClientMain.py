@@ -150,6 +150,11 @@ class Test(unittest.TestCase):
 		# TODO - clean up that zero outstanding balance!
 		self.assertEqual(info['balances'], {'04:2': 0, '04:1': 68125000, '03:2': 31875000})
 
+	def test_burn_less_than_dust_limit(self):
+		host = InitHost()
+		host._addUnspent(500000000)
+		self.assertRaisesRegexp(ExceptionReportedToUser, 'Burn amount is below dust limit', RunClient, host, ['burn', '--quantity', '1000'])
+
 	def test_burn_funding(self):
 		host = InitHost()
 		dustLimit = 100000

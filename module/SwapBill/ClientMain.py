@@ -140,6 +140,8 @@ def Main(startBlockIndex, startBlockHash, useTestNet, commandLineArgs=sys.argv[1
 		return pubKeyHash
 
 	if args.action == 'burn':
+		if int(args.quantity) < TransactionFee.dustLimit:
+			raise ExceptionReportedToUser('Burn amount is below dust limit.')
 		transactionType = 'Burn'
 		outputs = ('destination',)
 		outputPubKeyHashes = (host.getNewSwapBillAddress(),)
