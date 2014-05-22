@@ -38,6 +38,7 @@ sp.add_argument('--quantity', required=True, help='quantity of LTC to be destroy
 sp = subparsers.add_parser('pay', help='make a swapbill payment')
 sp.add_argument('--quantity', required=True, help='quantity of swapbill to be paid (in swapbill satoshis)')
 sp.add_argument('--toAddress', required=True, help='pay to this address')
+sp.add_argument('--blocksUntilExpiry', type=int, default=8, help='if the transaction takes longer than this to go through then the payment expires (no payment is made and the full amount is returned as change)')
 
 sp = subparsers.add_parser('post_ltc_buy', help='make an offer to buy litecoin with swapbill')
 sp.add_argument('--quantity', required=True, help='amount of swapbill offered')
@@ -157,7 +158,7 @@ def Main(startBlockIndex, startBlockHash, useTestNet, commandLineArgs=sys.argv[1
 		details = {
 		    'sourceAccount':transactionBuildLayer.getActiveAccount(state._balances),
 		    'amount':int(args.quantity),
-		    'maxBlock':0xffffffff
+		    'maxBlock':state._currentBlockIndex + args.blocksUntilExpiry
 		}
 		return CheckAndSend(transactionType, outputs, outputPubKeyHashes, details)
 

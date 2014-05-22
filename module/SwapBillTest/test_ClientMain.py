@@ -196,6 +196,19 @@ class Test(unittest.TestCase):
 		output, result = RunClient(host, ['get_balance'])
 		self.assertEqual(result['total'], 5999900)
 
+	def test_expired_pay(self):
+		host = InitHost()
+		host._addUnspent(500000000)
+		RunClient(host, ['burn', '--quantity', '1000000'])
+		host._setOwner('recipient')
+		payTargetAddress = host.formatAddressForEndUser(host.getNewSwapBillAddress())
+		host._setOwner(host.defaultOwner)
+		#host.blocksForRoundTrip = 6
+		self.assertBalancesEqual(host, [1000000])
+		output = RunClient(host, ['pay', '--quantity', '100', '--toAddress', payTargetAddress, '--blocksUntilExpiry', '4'])
+		#self.assertBalancesEqual(host, [1000000])
+		host._advance(1)
+
 	def test_burn_funding(self):
 		host = InitHost()
 		dustLimit = 100000
@@ -309,7 +322,7 @@ class Test(unittest.TestCase):
 		RunClient(host, ['burn', '--quantity', '1000000'])
 		# just some randon transaction taken off the litecoin testnet
 		# so, inputs will not be valid for our fake blockchain, but we depend on that not being checked for the purpose of this test
-		host.addTransaction("6bc0c859176a50540778c03b6c8f28268823a68cd1cd75d4afe2edbcf50ea8d1", "0100000001566b10778dc28b7cc82e43794bfb26c47ab54a85e1f8e9c8dc04f261024b108c000000006b483045022100aaf6244b7df18296917f430dbb9fa42e159eb79eb3bad8e15a0dfbe84830e08c02206ff81a4cf2cdcd7910c67c13a0694064aec91ae6897d7382dc1e9400b2193bb5012103475fb57d448091d9ca790af2d6d9aca798393199aa70471f38dc359f9f30b50cffffffff0264000000000000001976a914e512a5846125405e009b6f22ac274289f69e185588acb83e5c02000000001976a9147cc3f7daeffe2cfb39630310fad6d0a9fbb4b6aa88ac00000000")
+		host._addTransaction("6bc0c859176a50540778c03b6c8f28268823a68cd1cd75d4afe2edbcf50ea8d1", "0100000001566b10778dc28b7cc82e43794bfb26c47ab54a85e1f8e9c8dc04f261024b108c000000006b483045022100aaf6244b7df18296917f430dbb9fa42e159eb79eb3bad8e15a0dfbe84830e08c02206ff81a4cf2cdcd7910c67c13a0694064aec91ae6897d7382dc1e9400b2193bb5012103475fb57d448091d9ca790af2d6d9aca798393199aa70471f38dc359f9f30b50cffffffff0264000000000000001976a914e512a5846125405e009b6f22ac274289f69e185588acb83e5c02000000001976a9147cc3f7daeffe2cfb39630310fad6d0a9fbb4b6aa88ac00000000")
 		info = GetStateInfo(host)
 		self.assertEqual(info['balances'], {'02:1':1000000})
 

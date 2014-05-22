@@ -54,6 +54,7 @@ class MockHost(object):
 		# block 1 will be confirmed when it has transactions and next block is queried
 		self._nextBlock = 1
 		self._transactionsByBlock = {0:[]}
+		self._memPool = []
 		self._nextTXID = 0
 		self._nextSuppliedOutput = 0
 		self._unspent = []
@@ -79,10 +80,8 @@ class MockHost(object):
 		toAdd['amount'] = amount
 		self._unspent.append(toAdd)
 
-	def addTransaction(self, txid, unsignedTransactionHex):
-		if not self._nextBlock in self._transactionsByBlock:
-			self._transactionsByBlock[self._nextBlock] = []
-		self._transactionsByBlock[self._nextBlock].append((txid, unsignedTransactionHex))
+	def _addTransaction(self, txid, unsignedTransactionHex):
+		self._memPool.append((txid, unsignedTransactionHex))
 
 	def getBlockHash(self, blockIndex):
 		assert blockIndex < self._nextBlock
@@ -92,11 +91,14 @@ class MockHost(object):
 		if nextBlock < self._nextBlock:
 			return str(nextBlock)
 		assert nextBlock == self._nextBlock
-		if self.holdNewTransactions:
+		if self.holdNewTransactions or len(self._memPool) == 0:
 			return None
+		if not self._nextBlock in self._transactionsByBlock:
+			self._transactionsByBlock[self._nextBlock] = []
+		for entry in self._memPool:
+			self._transactionsByBlock[self._nextBlock].append(entry)
+		self._memPool = []
 		pendingTransactions = self._transactionsByBlock.get(self._nextBlock, [])
-		if len(pendingTransactions) == 0:
-			return None
 		result = str(self._nextBlock)
 		self._nextBlock += 1
 		return result
@@ -107,7 +109,7 @@ class MockHost(object):
 	def getMemPoolTransactions(self):
 		if self.hideMemPool:
 			return []
-		return self._transactionsByBlock.get(self._nextBlock, [])
+		return self._memPool
 
 	def _advance(self, numberOfBlocks):
 		self._nextBlock += numberOfBlocks
@@ -210,7 +212,7 @@ class MockHost(object):
 			print('transactionFee:', transactionFee)
 			print('feeRequired:', feeRequired)
 		assert transactionFee < feeRequired + TransactionFee.dustLimit ## can potentially overspend, in theory, but will be nice to see the actual test case info that causes this
-		self.addTransaction(txid, unsignedTransactionHex)
+		self._addTransaction(txid, unsignedTransactionHex)
 
 	def formatAddressForEndUser(self,  pubKeyHash):
 		return PubKeyHashAsText(pubKeyHash)
