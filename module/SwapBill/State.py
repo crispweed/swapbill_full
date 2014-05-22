@@ -20,6 +20,7 @@ class State(object):
 		self._startBlockHash = startBlockHash
 		self._currentBlockIndex = startBlockIndex
 		self._balances = {}
+		self._balanceRefCounts = {}
 		self._totalCreated = 0
 		self._totalForwarded = 0
 		self._LTCBuys = TradeOfferHeap.Heap(startBlockIndex, False) # lower exchange rate is better offer
@@ -27,12 +28,20 @@ class State(object):
 		self._nextExchangeIndex = 0
 		self._pendingExchanges = {}
 
+	def balanceIsSpendable(self, account):
+		assert account in self._balances
+		return not account in self._balanceRefCounts
+
 	def startBlockMatches(self, startBlockHash):
 		return self._startBlockHash == startBlockHash
 
 	def advanceToNextBlock(self):
-		self._LTCBuys.advanceToNextBlock()
-		self._LTCSells.advanceToNextBlock()
+		expired = self._LTCBuys.advanceToNextBlock()
+		for buyDetails in expired:
+			self._removeAccountRef(buyDetails.refundAccount)
+		expired = self._LTCSells.advanceToNextBlock()
+		for sellDetails in expired:
+			self._removeAccountRef(sellDetails.receivingAccount)
 		## TODO currently iterates through all pending exchanges each block added
 		## (sort out scaling issues with this!)
 		toDelete = []
@@ -44,6 +53,8 @@ class State(object):
 				#print("refundAmount:", exchange.swapBillAmount + exchange.swapBillDeposit)
 				## refund buyers funds locked up in the exchange, plus sellers deposit (as penalty for failing to make exchange)
 				self._addToAccount(exchange.buyerAddress, exchange.swapBillAmount + exchange.swapBillDeposit)
+				self._removeAccountRef(exchange.buyerAddress)
+				self._removeAccountRef(exchange.sellerReceivingAccount)
 				toDelete.append(key)
 		for key in toDelete:
 			self._pendingExchanges.pop(key)
@@ -63,6 +74,17 @@ class State(object):
 		self._balances.pop(account)
 		return amount
 
+	def _removeAccountRef(self, account):
+		assert self._balanceRefCounts[account] > 0
+		if self._balanceRefCounts[account] == 1:
+			self._balanceRefCounts.pop(account)
+		else:
+			self._balanceRefCounts[account] -= 1
+		# **** TODO - clean up these 0 amount balances!
+		# **** but first, what to do about the owned outputs tracked for these balances?
+		#if self._balances[account] == 0:
+			#self._balances.pop(account)
+
 	def _matchLTC(self):
 		while True:
 			if self._LTCBuys.empty() or self._LTCSells.empty():
@@ -75,14 +97,18 @@ class State(object):
 			sellRate = self._LTCSells.currentBestExchangeRate()
 			sellExpiry = self._LTCSells.currentBestExpiry()
 			sellDetails = self._LTCSells.popCurrentBest()
+			assert self._balanceRefCounts[sellDetails.receivingAccount] > 0
+			assert self._balanceRefCounts[buyDetails.refundAccount] > 0
 			exchange, buyDetails, sellDetails = LTCTrading.Match(buyRate, buyExpiry, buyDetails, sellRate, sellExpiry, sellDetails)
 			exchange.expiry = self._currentBlockIndex + 50
 			key = self._nextExchangeIndex
 			self._nextExchangeIndex += 1
+			# the account refs from buy and sell details effectively transfer into this exchange object
 			self._pendingExchanges[key] = exchange
 			if not buyDetails is None:
 				if LTCTrading.SatisfiesMinimumExchange(buyRate, buyDetails.swapBillAmount):
 					self._LTCBuys.addOffer(buyRate, buyExpiry, buyDetails)
+					self._balanceRefCounts[buyDetails.refundAccount] += 1
 					continue # may need to match against a second offer
 				else:
 					## small remaining buy offer is discarded
@@ -91,6 +117,7 @@ class State(object):
 			if not sellDetails is None:
 				if LTCTrading.SatisfiesMinimumExchange(sellRate, sellDetails.swapBillAmount):
 					self._LTCSells.addOffer(sellRate, sellExpiry, sellDetails)
+					self._balanceRefCounts[sellDetails.receivingAccount] += 1
 					continue
 				else:
 					## small remaining sell offer is discarded
@@ -180,8 +207,11 @@ class State(object):
 		buyDetails = BuyDetails()
 		buyDetails.swapBillAmount = swapBillOffered
 		buyDetails.receivingAccount = receivingAddress
-		self._addAccount((txID, 2), 0)
-		buyDetails.refundAccount = (txID, 2) ## TODO - warn or fail if we try to spend this account before exchange completed
+		refundAccount = (txID, 2)
+		self._addAccount(refundAccount, 0)
+		buyDetails.refundAccount = refundAccount
+		assert not refundAccount in self._balanceRefCounts
+		self._balanceRefCounts[refundAccount] = 1
 		expiry = maxBlock + maxBlockOffset
 		if expiry > 0xffffffff:
 			expiry = 0xffffffff
@@ -221,8 +251,11 @@ class State(object):
 		sellDetails = SellDetails()
 		sellDetails.swapBillAmount = swapBillDesired
 		sellDetails.swapBillDeposit = swapBillDeposit
-		self._addAccount((txID, 2), 0)
-		sellDetails.receivingAccount = (txID, 2) ## TODO - don't permit spending this account before exchange completion
+		receivingAccount = (txID, 2)
+		self._addAccount(receivingAccount, 0)
+		sellDetails.receivingAccount = receivingAccount
+		assert not receivingAccount in self._balanceRefCounts
+		self._balanceRefCounts[receivingAccount] = 1
 		expiry = maxBlock + maxBlockOffset
 		if expiry > 0xffffffff:
 			expiry = 0xffffffff
@@ -248,6 +281,8 @@ class State(object):
 		## the seller completed their side of the exchange, so credit them the buyers swapbill
 		## and the seller is also refunded their deposit here
 		self._addToAccount(exchangeDetails.sellerReceivingAccount, exchangeDetails.swapBillAmount + exchangeDetails.swapBillDeposit)
+		self._removeAccountRef(exchangeDetails.buyerAddress)
+		self._removeAccountRef(exchangeDetails.sellerReceivingAccount)
 		self._pendingExchanges.pop(pendingExchangeIndex)
 
 	def _check_ForwardToFutureNetworkVersion(self, outputs, sourceAccount, amount, maxBlock):

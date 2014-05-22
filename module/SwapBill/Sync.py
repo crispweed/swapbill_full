@@ -5,7 +5,7 @@ from collections import deque
 from SwapBill import State, DecodeTransaction, TransactionEncoding, PickledCache
 from SwapBill import FormatTransactionForUserDisplay
 
-stateVersion = 0.7
+stateVersion = 0.8
 ownedAccountsVersion = 0.1
 
 def _processTransactions(host, state, ownedAccounts, transactions, applyToState, out):

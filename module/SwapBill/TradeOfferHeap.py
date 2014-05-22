@@ -28,18 +28,19 @@ class Heap(object):
 		assert advanceTo >= self._blockCount
 		self._blockCount = advanceTo
 		if not self._hasExpiredOffers():
-			return
+			return []
 		expired = []
 		unexpired = []
 		for offer in self._offerByExchangeRate:
 			if self._hasExpired(offer[2]):
-				expired.append(offer)
+				expired.append(offer[3])
 			else:
 				unexpired.append(offer)
 		heapq.heapify(unexpired)
 		self._offerByExchangeRate = unexpired
+		return expired
 	def advanceToNextBlock(self):
-		self.advanceToBlock(self._blockCount + 1)
+		return self.advanceToBlock(self._blockCount + 1)
 
 	def size(self):
 		return len(self._offerByExchangeRate)
