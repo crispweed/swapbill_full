@@ -133,11 +133,6 @@ def Main(startBlockIndex, startBlockHash, useTestNet, commandLineArgs=sys.argv[1
 		change = host.getNewNonSwapBillAddress()
 		print('attempting to send ' + FormatTransactionForUserDisplay.Format(host, transactionType, outputs, outputPubKeys, details), file=out)
 		backingUnspent = transactionBuildLayer.getUnspent()
-		#if transactionType == 'LTCExchangeCompletion':
-			#print('balances:')
-			#print(state._balances)
-			#print('backingUnspent:')
-			#print(backingUnspent)
 		baseTX = TransactionEncoding.FromStateTransaction(transactionType, outputs, outputPubKeys, details)
 		baseInputsAmount = 0
 		for i in range(baseTX.numberOfInputs()):
