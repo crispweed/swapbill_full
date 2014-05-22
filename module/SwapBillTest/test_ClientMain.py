@@ -66,14 +66,17 @@ def RunClient(host, args):
 	#os.mkdir(dataDirectory)
 	#return RunClient(host, args)
 
-def GetStateInfo(host):
-	output, info = RunClient(host, ['get_state_info'])
+def GetStateInfo(host, includePending=False):
+	if includePending:
+		output, info = RunClient(host, ['-i', 'get_state_info'])
+	else:
+		output, info = RunClient(host, ['get_state_info'])
 	#CheckEachBalanceHasUnspent(host, info['balances'])
 	return info
 
 class Test(unittest.TestCase):
-	def assertBalancesEqual(self, host, expected):
-		info = GetStateInfo(host)
+	def assertBalancesEqual(self, host, expected, includePending=False):
+		info = GetStateInfo(host, includePending)
 		self.assertSetEqual(set(info['balances'].values()), set(expected))
 
 	def test(self):
@@ -199,15 +202,29 @@ class Test(unittest.TestCase):
 	def test_expired_pay(self):
 		host = InitHost()
 		host._addUnspent(500000000)
-		RunClient(host, ['burn', '--quantity', '1000000'])
+		RunClient(host, ['burn', '--quantity', '2000000'])
 		host._setOwner('recipient')
 		payTargetAddress = host.formatAddressForEndUser(host.getNewSwapBillAddress())
 		host._setOwner(host.defaultOwner)
-		#host.blocksForRoundTrip = 6
-		self.assertBalancesEqual(host, [1000000])
-		output = RunClient(host, ['pay', '--quantity', '100', '--toAddress', payTargetAddress, '--blocksUntilExpiry', '4'])
-		#self.assertBalancesEqual(host, [1000000])
+		self.assertBalancesEqual(host, [2000000])
+		output = RunClient(host, ['pay', '--quantity', '1000000', '--toAddress', payTargetAddress, '--blocksUntilExpiry', '4'])
+		host.holdNewTransactions = True
+		self.assertBalancesEqual(host, [2000000])
+		self.assertBalancesEqual(host, [1000000], includePending=True)
+		# two blocks advanced so far, one for burn, one for pay
+		self.assertEqual(host._nextBlock, 2)
+		# max block for the pay is calculated as state._currentBlockIndex (which equals next block after end of synch at time of submit) + blocksUntilExpiry
+		# so this should be 6
+		host._advance(4)
+		self.assertEqual(host._nextBlock, 6)
+		# so didn't expire yet, on block 6
+		self.assertBalancesEqual(host, [2000000])
+		self.assertBalancesEqual(host, [1000000], includePending=True)
 		host._advance(1)
+		self.assertEqual(host._nextBlock, 7)
+		# but expires on block 7
+		self.assertBalancesEqual(host, [2000000])
+		self.assertBalancesEqual(host, [2000000], includePending=True)
 
 	def test_burn_funding(self):
 		host = InitHost()

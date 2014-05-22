@@ -19,6 +19,8 @@ def _processTransactions(host, state, ownedAccounts, transactions, applyToState,
 			continue
 		except TransactionEncoding.UnsupportedTransaction:
 			continue
+		if not state.checkTransaction(transactionType, outputs, transactionDetails)[0]:
+			continue
 		if applyToState:
 			outputPubKeyHashes = []
 			for i in range(len(outputs)):
@@ -98,6 +100,9 @@ def SyncAndReturnStateAndOwnedAccounts(cacheDirectory, startBlockIndex, startBlo
 		blockHash = popped
 
 	_processBlock(host, state, ownedAccounts, blockHash, out=out)
+	blockIndex += 1
+
+	assert state._currentBlockIndex == blockIndex
 
 	# note that the best block chain may have changed during the above
 	# and so the following set of memory pool transactions may not correspond to the actual block chain endpoint we synchronised to
