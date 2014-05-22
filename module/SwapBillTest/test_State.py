@@ -178,19 +178,18 @@ class Test(unittest.TestCase):
 		self.assertEqual(state._balances, {('tx1',1):10, ('tx2',1):20, ('tx3',1):30})
 		sourceAccounts = [('tx1',1),('tx2',1),('tx3',1)]
 		# bad output specs
-		self.assertRaises(OutputsSpecDoesntMatch, state.checkTransaction, 'Collect', (), {'sourceAccounts':sourceAccounts, 'maxBlock':200})
-		self.assertRaises(OutputsSpecDoesntMatch, state.checkTransaction, 'Collect', ('madeUpOutput'), {'sourceAccounts':sourceAccounts, 'maxBlock':200})
-		self.assertRaises(OutputsSpecDoesntMatch, state.checkTransaction, 'Collect', ('destination', 'madeUpOutput'), {'sourceAccounts':sourceAccounts, 'maxBlock':200})
-		# max block limit
-		reason = self.Apply_AssertFails(state, 'Collect', sourceAccounts=sourceAccounts, maxBlock=99)
-		self.assertEqual(reason, 'max block for transaction has been exceeded')
-		self.assertEqual(state._balances, {('tx1',1):10, ('tx2',1):20, ('tx3',1):30})
+		self.assertRaises(OutputsSpecDoesntMatch, state.checkTransaction, 'Collect', (), {'sourceAccounts':sourceAccounts})
+		self.assertRaises(OutputsSpecDoesntMatch, state.checkTransaction, 'Collect', ('madeUpOutput'), {'sourceAccounts':sourceAccounts})
+		self.assertRaises(OutputsSpecDoesntMatch, state.checkTransaction, 'Collect', ('destination', 'madeUpOutput'), {'sourceAccounts':sourceAccounts})
+		# no max block limit parameter
+		self.assertRaises(InvalidTransactionParameters, state.checkTransaction, 'Collect', ('destination'), {'sourceAccounts':sourceAccounts, 'maxBlock':200})
+		self.assertRaises(InvalidTransactionParameters, state.applyTransaction, 'Collect', 'madeUpTXID', ('destination'), {'sourceAccounts':sourceAccounts, 'maxBlock':200})
 		# bad source account
-		reason = self.Apply_AssertFails(state, 'Collect', sourceAccounts=[('tx1',1),('tx2',1),('madeUpTX',1)], maxBlock=100)
+		reason = self.Apply_AssertFails(state, 'Collect', sourceAccounts=[('tx1',1),('tx2',1),('madeUpTX',1)])
 		self.assertEqual(reason, 'at least one source account does not exist')
 		self.assertEqual(state._balances, {('tx1',1):10, ('tx2',1):20, ('tx3',1):30})
 		# successful transaction
-		self.Apply_AssertSucceeds(state, 'Collect', sourceAccounts=sourceAccounts, maxBlock=100)
+		self.Apply_AssertSucceeds(state, 'Collect', sourceAccounts=sourceAccounts)
 		self.assertEqual(state._balances, {('tx4',1):60})
 
 	def test_minimum_exchange_amount(self):

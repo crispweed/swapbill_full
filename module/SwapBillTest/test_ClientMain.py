@@ -196,7 +196,6 @@ class Test(unittest.TestCase):
 		output, result = RunClient(host, ['get_balance'])
 		self.assertEqual(result['total'], 5999900)
 
-
 	def test_burn_funding(self):
 		host = InitHost()
 		dustLimit = 100000

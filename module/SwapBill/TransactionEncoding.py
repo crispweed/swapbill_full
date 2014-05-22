@@ -23,7 +23,7 @@ _mappingByTypeCode = (
      ()
 	),
     ('LTCExchangeCompletion', 0, (('pendingExchangeIndex', 6, None, 10), None), (), (('destinationAddress', 'destinationAmount'),)),
-    ('Collect', None, (('_numberOfSources', 2, 'maxBlock', 4, None, 10), None), ('destination',), ()),
+    ('Collect', None, (('_numberOfSources', 2, None, 14), None), ('destination',), ()),
 	)
 
 _forwardCompatibilityMapping = ('ForwardToFutureNetworkVersion', 1, (('amount', 6, 'maxBlock', 4, None, 6), None), ('change',), ())
@@ -86,11 +86,14 @@ def ToStateTransaction(tx):
 	assert pos == 20
 	if amountMapping is not None:
 		details[amountMapping] = tx.outputAmount(0)
-	if meta['_numberOfSources'] == 1:
+	numberOfSources = meta['_numberOfSources']
+	if numberOfSources > tx.numberOfInputs():
+		raise NotValidSwapBillTransaction('not enough inputs, or bad meta data for number of inputs')
+	if numberOfSources == 1:
 		details['sourceAccount'] = (tx.inputTXID(0), tx.inputVOut(0))
-	elif meta['_numberOfSources'] != 0:
+	elif numberOfSources != 0:
 		details['sourceAccounts'] = []
-		for i in range(meta['_numberOfSources']):
+		for i in range(numberOfSources):
 			details['sourceAccounts'].append((tx.inputTXID(i), tx.inputVOut(i)))
 	outputs = mapping[3]
 	destinations = mapping[4]

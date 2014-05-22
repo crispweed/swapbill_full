@@ -214,10 +214,7 @@ def Main(startBlockIndex, startBlockHash, useTestNet, commandLineArgs=sys.argv[1
 			raise ExceptionReportedToUser('There are currently less than two owned swapbill outputs.')
 		outputs = ('destination',)
 		outputPubKeyHashes = (host.getNewSwapBillAddress(),)
-		details = {
-		    'sourceAccounts':sourceAccounts,
-		    'maxBlock':0xffffffff
-		}
+		details = {'sourceAccounts':sourceAccounts}
 		return CheckAndSend(transactionType, outputs, outputPubKeyHashes, details)
 
 	elif args.action == 'get_receive_address':

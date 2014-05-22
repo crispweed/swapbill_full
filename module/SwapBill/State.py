@@ -132,16 +132,14 @@ class State(object):
 		if available > amount:
 			self._addAccount((txID, 1), available - amount)
 
-	def _check_Collect(self, outputs, sourceAccounts, maxBlock):
+	def _check_Collect(self, outputs, sourceAccounts):
 		if outputs != ('destination',):
 			raise OutputsSpecDoesntMatch()
-		if maxBlock < self._currentBlockIndex:
-			return False, 'max block for transaction has been exceeded'
 		for sourceAccount in sourceAccounts:
 			if not sourceAccount in self._balances:
 				return False, 'at least one source account does not exist'
 		return True, ''
-	def _apply_Collect(self, txID, sourceAccounts, maxBlock):
+	def _apply_Collect(self, txID, sourceAccounts):
 		amount = 0
 		for sourceAccount in sourceAccounts:
 			amount += self._consumeAccount(sourceAccount)

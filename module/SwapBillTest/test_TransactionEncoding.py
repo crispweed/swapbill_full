@@ -9,11 +9,23 @@ class Test(unittest.TestCase):
 		assert tx._outputs[0][0].startswith(b'SWP')
 		transactionType, outputs, details = TransactionEncoding.ToStateTransaction(tx)
 		for fillByte in (b'\xff', b'\x00', b'\x80'):
-			tx._outputs[0] = (tx._outputs[0][0][:-numberOfIgnoredBytes] + fillByte * numberOfIgnoredBytes, tx._outputs[0][1])
-			transactionType_Check, outputs_Check, details_Check = TransactionEncoding.ToStateTransaction(tx)
-			self.assertEqual(transactionType, transactionType_Check)
-			self.assertEqual(outputs, outputs_Check)
-			self.assertDictEqual(details, details_Check)
+			if numberOfIgnoredBytes > 0:
+				tx._outputs[0] = (tx._outputs[0][0][:-numberOfIgnoredBytes] + fillByte * numberOfIgnoredBytes, tx._outputs[0][1])
+				transactionType_Check, outputs_Check, details_Check = TransactionEncoding.ToStateTransaction(tx)
+				self.assertEqual(transactionType, transactionType_Check)
+				self.assertEqual(outputs, outputs_Check)
+				self.assertDictEqual(details, details_Check)
+		try:
+			for fillByte in (b'\xff', b'\x00', b'\x80'):
+				tx._outputs[0] = (tx._outputs[0][0][:-(numberOfIgnoredBytes + 1)] + fillByte * (numberOfIgnoredBytes + 1), tx._outputs[0][1])
+				transactionType_Check, outputs_Check, details_Check = TransactionEncoding.ToStateTransaction(tx)
+				self.assertEqual(transactionType, transactionType_Check)
+				self.assertEqual(outputs, outputs_Check)
+				self.assertDictEqual(details, details_Check)
+		except (TransactionEncoding.NotValidSwapBillTransaction, AssertionError):
+			pass
+		else:
+			raise Exception('Expected decoding failure with extra byte overwrite!')
 
 	def EncodeInt_CheckDecode(self, value, numberOfBytes):
 		result = TransactionEncoding._encodeInt(value, numberOfBytes)
@@ -60,33 +72,30 @@ class Test(unittest.TestCase):
 		tx = FromStateTransaction('Pay', ('change','destination'), ('changePKH','destinationPKH'), {'sourceAccount':('sourceTXID',4), 'amount':20, 'maxBlock':100})
 		self.assertDictEqual(tx.__dict__, {'_inputs': [('sourceTXID', 4)], '_outputs': [(b'SWP\x01\x14\x00\x00\x00\x00\x00d\x00\x00\x00\x00\x00\x00\x00\x00\x00', 0), ('changePKH', 0), ('destinationPKH', 0)]})
 		self.checkIgnoredBytes(tx, 6)
-		self.assertRaises(AssertionError, self.checkIgnoredBytes, tx, 7)
 		tx = FromStateTransaction(
 		    'LTCBuyOffer', ('change','refund'), ('changePKH','refundPKH'),
 		    {'sourceAccount':('sourceTXID',5), 'receivingAddress':'receivingPKH', 'swapBillOffered':22, 'maxBlock':0, 'exchangeRate':123, 'maxBlockOffset':345}
 		)
 		self.assertDictEqual(tx.__dict__, {'_outputs': [(b'SWP\x02\x16\x00\x00\x00\x00\x00\x00\x00\x00\x00{\x00\x00\x00Y\x01', 0), ('changePKH', 0), ('refundPKH', 0), ('receivingPKH', 0)], '_inputs': [('sourceTXID', 5)]} )
-		self.assertRaises(AssertionError, self.checkIgnoredBytes, tx, 1)
+		self.checkIgnoredBytes(tx, 0)
 		tx = FromStateTransaction(
 		    'LTCSellOffer', ('change','receiving'), ('changePKH','receivingPKH'),
 		    {'sourceAccount':('sourceTXID',3), 'swapBillDesired':22, 'maxBlock':0, 'exchangeRate':123, 'maxBlockOffset':345}
 		)
 		self.assertDictEqual(tx.__dict__, {'_inputs': [('sourceTXID', 3)], '_outputs': [(b'SWP\x03\x16\x00\x00\x00\x00\x00\x00\x00\x00\x00{\x00\x00\x00Y\x01', 0), ('changePKH', 0), ('receivingPKH', 0)]} )
-		self.assertRaises(AssertionError, self.checkIgnoredBytes, tx, 1)
+		self.checkIgnoredBytes(tx, 0)
 		tx = FromStateTransaction(
 		    'LTCExchangeCompletion', (), (),
 		    {'pendingExchangeIndex':32, 'destinationAddress':'destinationPKH', 'destinationAmount':999}
 		)
 		self.assertDictEqual(tx.__dict__, {'_inputs': [], '_outputs': [(b'SWP\x04 \x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00', 0), ('destinationPKH', 999)]} )
 		self.checkIgnoredBytes(tx, 10)
-		self.assertRaises(AssertionError, self.checkIgnoredBytes, tx, 11)
 		tx = FromStateTransaction(
 		    'Collect', ('destination',), ('destinationPKH',),
-		    {'sourceAccounts':[('sourceTXID1',5), ('sourceTXID2',6), ('sourceTXID3',7)], 'maxBlock':345}
+		    {'sourceAccounts':[('sourceTXID1',5), ('sourceTXID2',6), ('sourceTXID3',7)]}
 		)
-		self.assertDictEqual(tx.__dict__, {'_inputs': [('sourceTXID1', 5), ('sourceTXID2', 6), ('sourceTXID3', 7)], '_outputs': [(b'SWP\x05\x03\x00Y\x01\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00', 0), ('destinationPKH', 0)]} )
-		self.checkIgnoredBytes(tx, 10)
-		self.assertRaises(AssertionError, self.checkIgnoredBytes, tx, 11)
+		self.assertDictEqual(tx.__dict__, {'_inputs': [('sourceTXID1', 5), ('sourceTXID2', 6), ('sourceTXID3', 7)], '_outputs': [(b'SWP\x05\x03\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00', 0), ('destinationPKH', 0)]} )
+		self.checkIgnoredBytes(tx, 14)
 
 	def test_forwarding(self):
 		# cannot encode forward to future network version transactions explicitly from state transactions
