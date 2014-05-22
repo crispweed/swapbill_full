@@ -150,6 +150,8 @@ class State(object):
 			return False, 'source account does not exist'
 		if self._balances[sourceAccount] < amount:
 			return False, 'insufficient balance in source account (transaction ignored)'
+		if sourceAccount in self._balanceRefCounts:
+			return False, "source account is linked to an outstanding trade offer or pending exchange and can't be spent until the trade is completed or expires"
 		if maxBlock < self._currentBlockIndex:
 			return True, 'max block for transaction has been exceeded'
 		return True, ''
@@ -168,6 +170,8 @@ class State(object):
 		for sourceAccount in sourceAccounts:
 			if not sourceAccount in self._balances:
 				return False, 'at least one source account does not exist'
+			if sourceAccount in self._balanceRefCounts:
+				return False, "at least one source account is linked to an outstanding trade offer or pending exchange and can't be spent until the trade is completed or expires"
 		return True, ''
 	def _apply_Collect(self, txID, sourceAccounts):
 		amount = 0
@@ -192,6 +196,8 @@ class State(object):
 			return False, 'source account does not exist'
 		if self._balances[sourceAccount] < swapBillOffered:
 			return False, 'insufficient balance in source account (offer not posted)'
+		if sourceAccount in self._balanceRefCounts:
+			return False, "source account is linked to an outstanding trade offer or pending exchange and can't be spent until the trade is completed or expires"
 		if not LTCTrading.SatisfiesMinimumExchange(exchangeRate, swapBillOffered):
 			return False, 'does not satisfy minimum exchange amount (offer not posted)'
 		if maxBlock < self._currentBlockIndex:
@@ -235,6 +241,8 @@ class State(object):
 		swapBillDeposit = swapBillDesired // LTCTrading.depositDivisor
 		if self._balances[sourceAccount] < swapBillDeposit:
 			return False, 'insufficient balance for deposit in source account (offer not posted)'
+		if sourceAccount in self._balanceRefCounts:
+			return False, "source account is linked to an outstanding trade offer or pending exchange and can't be spent until the trade is completed or expires"
 		if not LTCTrading.SatisfiesMinimumExchange(exchangeRate, swapBillDesired):
 			return False, 'does not satisfy minimum exchange amount (offer not posted)'
 		if maxBlock < self._currentBlockIndex:
@@ -298,6 +306,8 @@ class State(object):
 			return False, 'source account does not exist'
 		if self._balances[sourceAccount] < amount:
 			return False, 'insufficient balance in source account (transaction ignored)'
+		if sourceAccount in self._balanceRefCounts:
+			return False, "source account is linked to an outstanding trade offer or pending exchange and can't be spent until the trade is completed or expires"
 		return True, ''
 	def _apply_ForwardToFutureNetworkVersion(self, txID, sourceAccount, amount, maxBlock):
 		available = self._consumeAccount(sourceAccount)
