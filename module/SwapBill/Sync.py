@@ -13,6 +13,10 @@ def _processTransactions(host, state, ownedAccounts, transactions, applyToState,
 		hostTX, scriptPubKeys = DecodeTransaction.Decode(hostTXHex)
 		if hostTX == None:
 			continue
+		for i in range(hostTX.numberOfInputs()):
+			spentAccount = (hostTX.inputTXID(i), hostTX.inputVOut(i))
+			if spentAccount in ownedAccounts:
+				ownedAccounts.pop(spentAccount)
 		try:
 			transactionType, outputs, transactionDetails = TransactionEncoding.ToStateTransaction(hostTX)
 		except TransactionEncoding.NotValidSwapBillTransaction:
@@ -20,6 +24,10 @@ def _processTransactions(host, state, ownedAccounts, transactions, applyToState,
 		except TransactionEncoding.UnsupportedTransaction:
 			continue
 		if not state.checkTransaction(transactionType, outputs, transactionDetails)[0]:
+			outputPubKeyHashes = []
+			for i in range(len(outputs)):
+				outputPubKeyHashes.append(hostTX.outputPubKeyHash(i + 1))
+			print('Transaction fails:'+ FormatTransactionForUserDisplay.Format(host, transactionType, outputs, outputPubKeyHashes, transactionDetails), file=out)
 			continue
 		if applyToState:
 			outputPubKeyHashes = []
@@ -27,10 +35,6 @@ def _processTransactions(host, state, ownedAccounts, transactions, applyToState,
 				outputPubKeyHashes.append(hostTX.outputPubKeyHash(i + 1))
 			state.applyTransaction(transactionType, txID, outputs, transactionDetails)
 			print('applied ' + FormatTransactionForUserDisplay.Format(host, transactionType, outputs, outputPubKeyHashes, transactionDetails), file=out)
-		for i in range(hostTX.numberOfInputs()):
-			spentAccount = (hostTX.inputTXID(i), hostTX.inputVOut(i))
-			if spentAccount in ownedAccounts:
-				ownedAccounts.pop(spentAccount)
 		if applyToState:
 			for i in range(len(outputs)):
 				newOwnedAccount = (txID, i + 1)

@@ -157,14 +157,18 @@ class Test(unittest.TestCase):
 		self.Apply_AssertSucceeds(state, 'Pay', sourceAccount=('tx1',1), amount=10, maxBlock=200)
 		self.assertEqual(state._balances, {('tx2',1):20, ('tx4',1):10, ('tx4',2):20, ('tx5',2):10})
 
-		# transaction with maxBlock before current block fails
-		reason = self.Apply_AssertFails(state, 'Pay', sourceAccount=('tx2',1), amount=20, maxBlock=99)
+		# transaction with maxBlock before current block
+		canApply, reason = state.checkTransaction('Pay', ('change','destination'), {'sourceAccount':('tx2',1), 'amount':10, 'maxBlock':99})
+		self.assertEqual(canApply, True)
 		self.assertEqual(reason, 'max block for transaction has been exceeded')
 		self.assertEqual(state._balances, {('tx2',1):20, ('tx4',1):10, ('tx4',2):20, ('tx5',2):10})
+		payTX = self.TXID()
+		state.applyTransaction('Pay', payTX, ('change','destination'), {'sourceAccount':('tx2',1), 'amount':10, 'maxBlock':99})
+		self.assertEqual(state._balances, {(payTX,1):20, ('tx4',1):10, ('tx4',2):20, ('tx5',2):10})
 
 		# but maxBlock exactly equal to current block is ok
-		self.Apply_AssertSucceeds(state, 'Pay', sourceAccount=('tx2',1), amount=20, maxBlock=200)
-		self.assertEqual(state._balances, {('tx6',2):20, ('tx4',1):10, ('tx4',2):20, ('tx5',2):10})
+		self.Apply_AssertSucceeds(state, 'Pay', sourceAccount=('tx5',2), amount=10, maxBlock=100)
+		self.assertEqual(state._balances, {(payTX,1):20, ('tx4',1):10, ('tx4',2):20, ('tx7',2):10})
 
 	def test_burn_and_collect(self):
 		state = State.State(100, 'mockhash')

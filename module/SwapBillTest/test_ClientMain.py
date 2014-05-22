@@ -202,15 +202,13 @@ class Test(unittest.TestCase):
 	def test_expired_pay(self):
 		host = InitHost()
 		host._addUnspent(500000000)
-		RunClient(host, ['burn', '--quantity', '2000000'])
+		RunClient(host, ['burn', '--quantity', '3000000'])
 		host._setOwner('recipient')
 		payTargetAddress = host.formatAddressForEndUser(host.getNewSwapBillAddress())
 		host._setOwner(host.defaultOwner)
-		self.assertBalancesEqual(host, [2000000])
-		output = RunClient(host, ['pay', '--quantity', '1000000', '--toAddress', payTargetAddress, '--blocksUntilExpiry', '4'])
+		self.assertBalancesEqual(host, [3000000])
+		RunClient(host, ['pay', '--quantity', '1000000', '--toAddress', payTargetAddress, '--blocksUntilExpiry', '4'])
 		host.holdNewTransactions = True
-		self.assertBalancesEqual(host, [2000000])
-		self.assertBalancesEqual(host, [1000000], includePending=True)
 		# two blocks advanced so far, one for burn, one for pay
 		self.assertEqual(host._nextBlock, 2)
 		# max block for the pay is calculated as state._currentBlockIndex (which equals next block after end of synch at time of submit) + blocksUntilExpiry
@@ -218,13 +216,28 @@ class Test(unittest.TestCase):
 		host._advance(4)
 		self.assertEqual(host._nextBlock, 6)
 		# so didn't expire yet, on block 6
-		self.assertBalancesEqual(host, [2000000])
-		self.assertBalancesEqual(host, [1000000], includePending=True)
+		output, result = RunClient(host, ['-i', 'get_balance'])
+		self.assertEqual(result['total'], 2000000)
+		host._setOwner('recipient')
+		output, result = RunClient(host, ['-i', 'get_balance'])
+		self.assertEqual(result['total'], 1000000)
+		host._setOwner(host.defaultOwner)
 		host._advance(1)
 		self.assertEqual(host._nextBlock, 7)
 		# but expires on block 7
-		self.assertBalancesEqual(host, [2000000])
-		self.assertBalancesEqual(host, [2000000], includePending=True)
+		output, result = RunClient(host, ['-i', 'get_balance'])
+		self.assertEqual(result['total'], 3000000)
+		host._setOwner('recipient')
+		output, result = RunClient(host, ['-i', 'get_balance'])
+		self.assertEqual(result['total'], 0)
+		host._setOwner(host.defaultOwner)
+		# still on block 7
+		# (transaction was added from mem pool in the above)
+		self.assertEqual(host._nextBlock, 7)
+		host.holdNewTransactions = False
+		output, result = RunClient(host, ['-i', 'get_balance'])
+		self.assertEqual(result['total'], 3000000)
+		self.assertEqual(host._nextBlock, 8)
 
 	def test_burn_funding(self):
 		host = InitHost()

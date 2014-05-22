@@ -119,16 +119,19 @@ class State(object):
 		assert amount >= 0
 		if amount == 0:
 			return False, 'zero amount not permitted'
-		if maxBlock < self._currentBlockIndex:
-			return False, 'max block for transaction has been exceeded'
 		if not sourceAccount in self._balances:
 			return False, 'source account does not exist'
 		if self._balances[sourceAccount] < amount:
 			return False, 'insufficient balance in source account (transaction ignored)'
+		if maxBlock < self._currentBlockIndex:
+			return True, 'max block for transaction has been exceeded'
 		return True, ''
 	def _apply_Pay(self, txID, sourceAccount, amount, maxBlock):
 		available = self._consumeAccount(sourceAccount)
-		self._addAccount((txID, 2), amount)
+		if maxBlock < self._currentBlockIndex:
+			amount = 0
+		else:
+			self._addAccount((txID, 2), amount)
 		if available > amount:
 			self._addAccount((txID, 1), available - amount)
 
