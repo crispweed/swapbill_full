@@ -226,7 +226,7 @@ def Main(startBlockIndex, startBlockHash, useTestNet, commandLineArgs=sys.argv[1
 		transactionBuildLayer.startTransactionConstruction()
 		sourceAccounts = transactionBuildLayer.getAllOwnedAndSpendable(state)
 		if len(sourceAccounts) < 2:
-			raise ExceptionReportedToUser('There are currently less than two owned swapbill outputs.')
+			raise ExceptionReportedToUser('There are currently less than two spendable swapbill outputs.')
 		outputs = ('destination',)
 		outputPubKeyHashes = (host.getNewSwapBillAddress(),)
 		details = {'sourceAccounts':sourceAccounts}

@@ -80,10 +80,9 @@ class State(object):
 
 	def _removeAccountRef(self, account):
 		assert self._balanceRefCounts[account] > 0
+		assert self._balances[account] > 0
 		if self._balanceRefCounts[account] == 1:
 			self._balanceRefCounts.pop(account)
-			if self._balances[account] == 0:
-				self._balances.pop(account)
 		else:
 			self._balanceRefCounts[account] -= 1
 
@@ -198,7 +197,7 @@ class State(object):
 			return False, 'zero amount not permitted'
 		if not sourceAccount in self._balances:
 			return False, 'source account does not exist'
-		if self._balances[sourceAccount] < swapBillOffered:
+		if self._balances[sourceAccount] < swapBillOffered + self._minimumBalance:
 			return False, 'insufficient balance in source account (offer not posted)'
 		if sourceAccount in self._balanceRefCounts:
 			return False, "source account is linked to an outstanding trade offer or pending exchange and can't be spent until the trade is completed or expires"
@@ -212,13 +211,19 @@ class State(object):
 		if maxBlock < self._currentBlockIndex:
 			self._addAccount((txID, 1), available)
 			return
-		if available > swapBillOffered:
-			self._addAccount((txID, 1), available - swapBillOffered)
+		changeAccount = (txID, 1)
+		refundAccount = (txID, 2)
+		assert available >= swapBillOffered + self._minimumBalance
+		available -= swapBillOffered
+		self._addAccount(refundAccount, self._minimumBalance)
+		available -= self._minimumBalance
+		if available >= self._minimumBalance:
+			self._addAccount(changeAccount, available)
+		else:
+			self._addToAccount(refundAccount, available)
 		buyDetails = BuyDetails()
 		buyDetails.swapBillAmount = swapBillOffered
 		buyDetails.receivingAccount = receivingAddress
-		refundAccount = (txID, 2)
-		self._addAccount(refundAccount, 0)
 		buyDetails.refundAccount = refundAccount
 		assert not refundAccount in self._balanceRefCounts
 		self._balanceRefCounts[refundAccount] = 1
@@ -243,8 +248,8 @@ class State(object):
 		if not sourceAccount in self._balances:
 			return False, 'source account does not exist'
 		swapBillDeposit = swapBillDesired // LTCTrading.depositDivisor
-		if self._balances[sourceAccount] < swapBillDeposit:
-			return False, 'insufficient balance for deposit in source account (offer not posted)'
+		if self._balances[sourceAccount] < swapBillDeposit + self._minimumBalance:
+			return False, 'insufficient balance in source account (offer not posted)'
 		if sourceAccount in self._balanceRefCounts:
 			return False, "source account is linked to an outstanding trade offer or pending exchange and can't be spent until the trade is completed or expires"
 		if not LTCTrading.SatisfiesMinimumExchange(exchangeRate, swapBillDesired):
@@ -258,13 +263,19 @@ class State(object):
 		if maxBlock < self._currentBlockIndex:
 			self._addAccount((txID, 1), available)
 			return
-		if available > swapBillDeposit:
-			self._addAccount((txID, 1), available - swapBillDeposit)
+		changeAccount = (txID, 1)
+		receivingAccount = (txID, 2)
+		assert available >= swapBillDeposit + self._minimumBalance
+		available -= swapBillDeposit
+		self._addAccount(receivingAccount, self._minimumBalance)
+		available -= self._minimumBalance
+		if available >= self._minimumBalance:
+			self._addAccount(changeAccount, available)
+		else:
+			self._addToAccount(receivingAccount, available)
 		sellDetails = SellDetails()
 		sellDetails.swapBillAmount = swapBillDesired
 		sellDetails.swapBillDeposit = swapBillDeposit
-		receivingAccount = (txID, 2)
-		self._addAccount(receivingAccount, 0)
 		sellDetails.receivingAccount = receivingAccount
 		assert not receivingAccount in self._balanceRefCounts
 		self._balanceRefCounts[receivingAccount] = 1
