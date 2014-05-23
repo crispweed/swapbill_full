@@ -487,11 +487,28 @@ class Test(unittest.TestCase):
 		self.assertEqual(state._balances, {changeB:9375000-1, receiveB:1, changeA:3, refundA:100000+1})
 		self.assertEqual(len(state._pendingExchanges), 1)
 		# but refund account can't be spent yet as this is locked until exchange completed
+		# (bunch of tests for stuff not being able to use this follow)
 		reason = self.Apply_AssertFails(state, 'Pay', sourceAccount=refundA, amount=1, maxBlock=200)
 		self.assertEqual(reason, "source account is linked to an outstanding trade offer or pending exchange and can't be spent until the trade is completed or expires")
 		self.assertEqual(state.getSpendableAmount(refundA), 0)
 		reason = self.Apply_AssertFails(state, 'Collect', sourceAccounts=[changeA, refundA])
 		self.assertEqual(reason, "at least one source account is linked to an outstanding trade offer or pending exchange and can't be spent until the trade is completed or expires")
+		details = {
+		    'sourceAccount':refundA,
+		    'swapBillOffered':100000, 'exchangeRate':0x80000000,
+		    'maxBlock':100, 'maxBlockOffset':0,
+		    'receivingAddress':'madeUpAddressButNotUsed'
+		}
+		reason = self.Apply_AssertFails(state, 'LTCBuyOffer', **details)
+		self.assertEqual(reason, "source account is linked to an outstanding trade offer or pending exchange and can't be spent until the trade is completed or expires")
+		details = {
+		    'sourceAccount':refundA,
+		    'swapBillDesired':100000, 'exchangeRate':0x80000000,
+		    'maxBlock':100, 'maxBlockOffset':0
+		}
+		reason = self.Apply_AssertFails(state, 'LTCSellOffer', **details)
+		self.assertEqual(reason, "source account is linked to an outstanding trade offer or pending exchange and can't be spent until the trade is completed or expires")
+		# (end of bunch of tests for stuff not being able to use refund account)
 		self.assertEqual(state._balances, {changeB:9375000-1, receiveB:1, changeA:3, refundA:100000+1})
 		self.Completion(state, 0, 'receiveLTC', 10000000 // 2)
 		self.assertEqual(len(state._pendingExchanges), 0)
