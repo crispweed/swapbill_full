@@ -103,7 +103,7 @@ class Test(unittest.TestCase):
 		RunClient(host, ['post_ltc_buy', '--quantity', 4*e(8), '--exchangeRate', "0.5"])
 		info = GetStateInfo(host)
 		self.assertEqual(info['balances'], {'02:1': 1*e(7), '04:2': 1, '04:1': 2*e(7)-1, '07:1': 1*e(8), '08:2': 0})
-		RunClient(host, ['post_ltc_sell', '--quantity', '200000000', '--exchangeRate', "0.5"])
+		RunClient(host, ['post_ltc_sell', '--quantity', 2*e(8), '--exchangeRate', "0.5"])
 		info = GetStateInfo(host)
 		# deposit of 12500000 moved in to sell offer, 87500000 change
 		self.assertEqual(info['balances'], {'02:1': 1*e(7), '04:2': 1, '04:1': 2*e(7)-1, '09:1': 87500000, '08:2': 0, '09:2': 0})
@@ -111,7 +111,7 @@ class Test(unittest.TestCase):
 		info = GetStateInfo(host)
 		# exchange completed successfully
 		# deposit + swapcoin counterparty credited to ltc seller
-		## TODO left over zero balance account should be cleaned up
+		# but part of buy offer remains outstanding
 		self.assertEqual(info['balances'], {'02:1': 1*e(7), '04:2': 1, '04:1': 2*e(7)-1, '09:1': 87500000, '08:2': 0, '09:2': 212500000})
 
 	def test_ltc_sell_missing_unspent_regression(self):
