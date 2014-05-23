@@ -237,7 +237,7 @@ def Main(startBlockIndex, startBlockHash, useTestNet, commandLineArgs=sys.argv[1
 			total += amount
 			if amount > activeAccountAmount:
 				activeAccountAmount = amount
-		return {'total':total, 'in active account':activeAccountAmount}
+		return {'total':total, 'active':activeAccountAmount}
 
 	elif args.action == 'get_buy_offers':
 		result = []
