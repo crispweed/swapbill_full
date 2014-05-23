@@ -692,5 +692,88 @@ class Test(unittest.TestCase):
 		self.assertEqual(state._LTCBuys.size(), 0)
 		self.assertEqual(state.totalAccountedFor(), state._totalCreated)
 
-# TODO tests for offer matching multiple other offers
+	def test_buy_matches_multiple_sells(self):
+		state = State.State(100, 'starthash', minimumBalance=1)
+		self.state = state
+		changeOutputs = []
+		receiveOutputs = []
+		expectedBalances = {}
+		for i in range(4):
+			burn = self.Burn(1*e(7))
+			changeOutput, receiveOutput = self.SellOffer(state, burn, swapBillDesired=1*e(7), exchangeRate=0x80000000)
+			changeOutputs.append(changeOutput)
+			receiveOutputs.append(receiveOutput)
+			# deposit is 10000000 // 16 = 625000
+			expectedBalances[changeOutput] = 1*e(7)-625000-1
+			expectedBalances[receiveOutput] = 1
+		self.assertEqual(state._balances, expectedBalances)
+		burn = self.Burn(3*e(7)+1)
+		self.assertEqual(state._LTCSells.size(), 4)
+		self.assertEqual(state._LTCBuys.size(), 0)
+		change, refund = self.BuyOffer(state, burn, 'receiveLTC', swapBillOffered=25*e(6), exchangeRate=0x80000000)
+		# 2 sellers matched completely
+		# 1 seller partially matched
+		expectedBalances[change] = 5*e(6)
+		expectedBalances[refund] = 1
+		self.assertEqual(state._LTCSells.size(), 2)
+		self.assertEqual(state._LTCBuys.size(), 0)
+		self.assertEqual(len(state._pendingExchanges), 3)
+		self.assertEqual(state._balances, expectedBalances)
+		self.Completion(state, 0, 'receiveLTC', 5*e(6))
+		# matched seller gets deposit refund + swapbill counterparty payment
+		expectedBalances[receiveOutputs[0]] += 1*e(7) + 625000
+		self.assertEqual(state._balances, expectedBalances)
+		self.assertEqual(len(state._pendingExchanges), 2)
+		self.Completion(state, 1, 'receiveLTC', 5*e(6))
+		# matched seller gets deposit refund + swapbill counterparty payment
+		expectedBalances[receiveOutputs[1]] += 1*e(7) + 625000
+		self.assertEqual(state._balances, expectedBalances)
+		self.assertEqual(len(state._pendingExchanges), 1)
+		self.Completion(state, 2, 'receiveLTC', 25*e(5))
+		# matched seller gets deposit refund + swapbill counterparty payment
+		expectedBalances[receiveOutputs[2]] += 5*e(6) + 312500
+		self.assertEqual(state._balances, expectedBalances)
+		self.assertEqual(len(state._pendingExchanges), 0)
+		self.assertEqual(state.totalAccountedFor(), state._totalCreated)
+
+	def test_sell_matches_multiple_buys(self):
+		state = State.State(100, 'starthash', minimumBalance=1)
+		self.state = state
+		refundOutputs = []
+		expectedBalances = {}
+		for i in range(4):
+			burn = self.Burn(1*e(7) + 1)
+			changeOutput, refundOutput = self.BuyOffer(state, burn, 'receiveLTC', swapBillOffered=1*e(7), exchangeRate=0x80000000)
+			refundOutputs.append(refundOutput)
+			expectedBalances[refundOutput] = 1
+		self.assertEqual(state._balances, expectedBalances)
+		burn = self.Burn(25*e(6)//16 + 1)
+		self.assertEqual(state._LTCBuys.size(), 4)
+		self.assertEqual(state._LTCSells.size(), 0)
+		change, receive = self.SellOffer(state, burn, swapBillDesired=25*e(6), exchangeRate=0x80000000)
+		# deposit is 25*e(6) // 16
+		# 2 buyers matched completely
+		# 1 buyer partially matched
+		expectedBalances[receive] = 1
+		self.assertEqual(state._LTCBuys.size(), 2)
+		self.assertEqual(state._LTCSells.size(), 0)
+		self.assertEqual(len(state._pendingExchanges), 3)
+		self.assertEqual(state._balances, expectedBalances)
+		self.Completion(state, 0, 'receiveLTC', 5*e(6))
+		# seller gets deposit refund + swapbill counterparty payment for this trade
+		expectedBalances[receive] += 1*e(7) + 625000
+		self.assertEqual(state._balances, expectedBalances)
+		self.assertEqual(len(state._pendingExchanges), 2)
+		self.Completion(state, 1, 'receiveLTC', 5*e(6))
+		# seller gets deposit refund + swapbill counterparty payment for this trade
+		expectedBalances[receive] += 1*e(7) + 625000
+		self.assertEqual(state._balances, expectedBalances)
+		self.assertEqual(len(state._pendingExchanges), 1)
+		self.Completion(state, 2, 'receiveLTC', 25*e(5))
+		# seller gets deposit refund + swapbill counterparty payment for this trade
+		expectedBalances[receive] += 5*e(6) + 312500
+		self.assertEqual(state._balances, expectedBalances)
+		self.assertEqual(len(state._pendingExchanges), 0)
+		self.assertEqual(state.totalAccountedFor(), state._totalCreated)
+
 
