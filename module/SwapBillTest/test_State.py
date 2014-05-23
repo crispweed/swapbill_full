@@ -550,19 +550,40 @@ class Test(unittest.TestCase):
 	def test_exact_match(self):
 		state = State.State(100, 'starthash', minimumBalance=1)
 		self.state = state
-		burnB = self.Burn(10000000)
-		changeB, receiveB = self.SellOffer(state, burnB, swapBillDesired=10000000, exchangeRate=0x80000000)
+		burnB = self.Burn(1*e(7))
+		changeB, receiveB = self.SellOffer(state, burnB, swapBillDesired=1*e(7), exchangeRate=0x80000000)
 		# deposit is 10000000 // 16 = 625000
-		self.assertEqual(state._balances, {changeB: 9375000-1, receiveB:1})
-		burnA = self.Burn(10000001)
-		changeA, refundA = self.BuyOffer(state, burnA, 'receiveLTC', swapBillOffered=10000000, exchangeRate=0x80000000)
+		self.assertEqual(state._balances, {changeB: 1*e(7)-625000-1, receiveB:1})
+		burnA = self.Burn(1*e(7)+1)
+		changeA, refundA = self.BuyOffer(state, burnA, 'receiveLTC', swapBillOffered=1*e(7), exchangeRate=0x80000000)
 		# nothing refunded, no change to balances
-		self.assertEqual(state._balances, {changeB:9375000-1, receiveB:1, refundA:1})
+		self.assertEqual(state._balances, {changeB:1*e(7)-625000-1, receiveB:1, refundA:1})
 		self.assertEqual(len(state._pendingExchanges), 1)
-		self.Completion(state, 0, 'receiveLTC', 10000000 // 2)
-		self.assertEqual(state.totalAccountedFor(), state._totalCreated)
+		self.Completion(state, 0, 'receiveLTC', 1*e(7) // 2)
 		self.assertEqual(len(state._pendingExchanges), 0)
-		self.assertEqual(state._balances, {changeB:9375000-1, receiveB:10625000+1, refundA:1})
+		self.assertEqual(state._balances, {changeB:1*e(7)-625000-1, receiveB:1*e(7)+625000+1, refundA:1})
+		self.assertEqual(state.totalAccountedFor(), state._totalCreated)
+
+	def test_pending_exchange_expires(self):
+		# based on test_exact_match, but with pending exchange left to expire
+		state = State.State(100, 'starthash', minimumBalance=1)
+		self.state = state
+		burnB = self.Burn(1*e(7))
+		changeB, receiveB = self.SellOffer(state, burnB, swapBillDesired=1*e(7), exchangeRate=0x80000000)
+		# deposit is 10000000 // 16 = 625000
+		self.assertEqual(state._balances, {changeB: 1*e(7)-625000-1, receiveB:1})
+		burnA = self.Burn(1*e(7)+1)
+		changeA, refundA = self.BuyOffer(state, burnA, 'receiveLTC', swapBillOffered=1*e(7), exchangeRate=0x80000000)
+		# nothing refunded, no change to balances
+		self.assertEqual(state._balances, {changeB:1*e(7)-625000-1, receiveB:1, refundA:1})
+		self.assertEqual(len(state._pendingExchanges), 1)
+		for i in range(50):
+			state.advanceToNextBlock()
+		self.assertEqual(len(state._pendingExchanges), 1)
+		state.advanceToNextBlock()
+		self.assertEqual(len(state._pendingExchanges), 0)
+		self.assertRaisesRegexp(AssertionError, 'no pending exchange with the specified index', self.Completion, state, 0, 'receiveLTC', 1*e(7) // 2)
+		self.assertEqual(state._balances, {changeB:1*e(7)-625000-1, receiveB:1, refundA:1*e(7)+625000+1})
 		self.assertEqual(state.totalAccountedFor(), state._totalCreated)
 
 	def test_offers_dont_meet(self):
@@ -672,5 +693,4 @@ class Test(unittest.TestCase):
 		self.assertEqual(state.totalAccountedFor(), state._totalCreated)
 
 # TODO tests for offer matching multiple other offers
-# TODO test for fail to complete due to pending exchange expiry
-# TODO test for transactions failing max block limit
+
