@@ -114,7 +114,7 @@ class Test(unittest.TestCase):
 		payTargetAddress = host.formatAddressForEndUser(host.getNewSwapBillAddress())
 		host._setOwner(host.defaultOwner)
 		self.assertRaisesRegexp(TransactionNotSuccessfulAgainstCurrentState, 'amount is below minimum balance', RunClient, host, ['pay', '--quantity', 1*e(7)-1, '--toAddress', payTargetAddress])
-		self.assertRaisesRegexp(TransactionNotSuccessfulAgainstCurrentState, 'payment transaction includes change, with change amount below minimum balance', RunClient, host, ['pay', '--quantity', 1*e(7)+1, '--toAddress', payTargetAddress])
+		self.assertRaisesRegexp(TransactionNotSuccessfulAgainstCurrentState, 'transaction includes change output, with change amount below minimum balance', RunClient, host, ['pay', '--quantity', 1*e(7)+1, '--toAddress', payTargetAddress])
 		# but can split exactly
 		RunClient(host, ['pay', '--quantity', 1*e(7), '--toAddress', payTargetAddress])
 		output, result = RunClient(host, ['get_balance'])

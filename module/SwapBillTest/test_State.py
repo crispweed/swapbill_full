@@ -120,6 +120,11 @@ class Test(unittest.TestCase):
 		self.assertEqual(state._balances, {change:99999990})
 		self.assertEqual(state.totalAccountedFor(), state._totalCreated)
 		self.assertEqual(state._totalForwarded, 10)
+		burn2 = self.Burn(20)
+		self.assertEqual(state._balances, {change:99999990, burn2:20})
+		details = {'sourceAccount':burn2, 'amount':11, 'maxBlock':200}
+		reason = self.Apply_AssertFails(state, 'ForwardToFutureNetworkVersion', **details)
+		self.assertEqual(reason, 'transaction includes change output, with change amount below minimum balance')
 
 	def test_burn_and_pay(self):
 		state = State.State(100, 'mochhash', minimumBalance=10)
@@ -143,7 +148,7 @@ class Test(unittest.TestCase):
 		self.assertEqual(reason, 'amount is below minimum balance')
 		# change amount below minimum balance
 		reason = self.Apply_AssertFails(state, 'Pay', sourceAccount=('tx2',1), amount=11, maxBlock=200)
-		self.assertEqual(reason, 'payment transaction includes change, with change amount below minimum balance')
+		self.assertEqual(reason, 'transaction includes change output, with change amount below minimum balance')
 
 		self.assertEqual(state._balances, {('tx1',1):10, ('tx2',1):20, ('tx3',1):30})
 

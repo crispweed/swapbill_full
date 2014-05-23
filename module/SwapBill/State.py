@@ -152,7 +152,7 @@ class State(object):
 		if self._balances[sourceAccount] < amount:
 			return False, 'insufficient balance in source account (transaction ignored)'
 		if self._balances[sourceAccount] > amount and self._balances[sourceAccount] < amount + self._minimumBalance:
-			return False, 'payment transaction includes change, with change amount below minimum balance'
+			return False, 'transaction includes change output, with change amount below minimum balance'
 		if sourceAccount in self._balanceRefCounts:
 			return False, "source account is linked to an outstanding trade offer or pending exchange and can't be spent until the trade is completed or expires"
 		if maxBlock < self._currentBlockIndex:
@@ -322,7 +322,7 @@ class State(object):
 		if self._balances[sourceAccount] < amount:
 			return False, 'insufficient balance in source account (transaction ignored)'
 		if self._balances[sourceAccount] > amount and self._balances[sourceAccount] < amount + self._minimumBalance:
-			return False, 'payment transaction includes change, with change amount below minimum balance'
+			return False, 'transaction includes change output, with change amount below minimum balance'
 		if sourceAccount in self._balanceRefCounts:
 			return False, "source account is linked to an outstanding trade offer or pending exchange and can't be spent until the trade is completed or expires"
 		return True, ''
