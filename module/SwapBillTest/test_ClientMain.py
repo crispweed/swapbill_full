@@ -114,6 +114,16 @@ class Test(unittest.TestCase):
 		# but part of buy offer remains outstanding
 		self.assertEqual(info['balances'], {'02:1': 2*e(7), '04:2': 1*e(7), '04:1': 25*e(6), '09:1': 87500000, '08:2': 0, '09:2': 212500000})
 
+	def test_minimum_balance(self):
+		host = InitHost()
+		host._addUnspent(500000000)
+		self.assertRaisesRegexp(TransactionNotSuccessfulAgainstCurrentState, 'burn amount is below minimum balance', RunClient, host, ['burn', '--quantity', 1*e(7)-1])
+		RunClient(host, ['burn', '--quantity', 2*e(7)])
+		host._setOwner('recipient')
+		payTargetAddress = host.formatAddressForEndUser(host.getNewSwapBillAddress())
+		host._setOwner(host.defaultOwner)
+		self.assertRaisesRegexp(TransactionNotSuccessfulAgainstCurrentState, 'amount is below minimum balance', RunClient, host, ['pay', '--quantity', 1*e(7)-1, '--toAddress', payTargetAddress])
+
 	def test_ltc_sell_missing_unspent_regression(self):
 		host = InitHost()
 		host._addUnspent(500000000)

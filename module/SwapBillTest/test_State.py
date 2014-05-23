@@ -119,7 +119,7 @@ class Test(unittest.TestCase):
 		self.assertEqual(state._totalForwarded, 1)
 
 	def test_burn_and_pay(self):
-		state = State.State(100, 'mochhash', minimumBalance=1)
+		state = State.State(100, 'mochhash', minimumBalance=10)
 		self.state = state
 		output1 = self.Burn(10)
 		self.assertEqual(state._balances, {output1:10})
@@ -133,8 +133,10 @@ class Test(unittest.TestCase):
 		self.assertRaises(OutputsSpecDoesntMatch, state.checkTransaction, 'Pay', ('madeUpOutput',), {'sourceAccount':('tx3',1), 'amount':0, 'maxBlock':200})
 		self.assertRaises(OutputsSpecDoesntMatch, state.checkTransaction, 'Pay', ('destination','change'), {'sourceAccount':('tx3',1), 'amount':0, 'maxBlock':200})
 
-		# zero amount
+		# destination amount below minimum balance
 		reason = self.Apply_AssertFails(state, 'Pay', sourceAccount=('tx3',1), amount=0, maxBlock=200)
+		self.assertEqual(reason, 'amount is below minimum balance')
+		reason = self.Apply_AssertFails(state, 'Pay', sourceAccount=('tx3',1), amount=9, maxBlock=200)
 		self.assertEqual(reason, 'amount is below minimum balance')
 		self.assertEqual(state._balances, {('tx1',1):10, ('tx2',1):20, ('tx3',1):30})
 
