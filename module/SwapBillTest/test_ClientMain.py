@@ -284,7 +284,7 @@ class Test(unittest.TestCase):
 		host = InitHost()
 		host._addUnspent(500000000)
 		RunClient(host, ['burn', '--quantity', 4*e(7)])
-		RunClient(host, ['post_ltc_buy', '--quantity', 3*e(7), '--exchangeRate', '0.5', '--blocksUntilExpiry', '4', '--blocksUntilOfferEnds', '5'])
+		RunClient(host, ['post_ltc_buy', '--quantity', 3*e(7), '--exchangeRate', '0.5', '--blocksUntilExpiry', '4'])
 		host.holdNewTransactions = True
 		# two blocks advanced so far, one for burn, one for sell offer
 		host._advance(4)
@@ -318,7 +318,7 @@ class Test(unittest.TestCase):
 		host = InitHost()
 		host._addUnspent(5*e(8))
 		RunClient(host, ['burn', '--quantity', 3*e(7)])
-		RunClient(host, ['post_ltc_sell', '--quantity', 3*e(7), '--exchangeRate', '0.5', '--blocksUntilExpiry', '4', '--blocksUntilOfferEnds', '5'])
+		RunClient(host, ['post_ltc_sell', '--quantity', 3*e(7), '--exchangeRate', '0.5', '--blocksUntilExpiry', '4'])
 		host.holdNewTransactions = True
 		# two blocks advanced so far, one for burn, one for sell offer
 		host._advance(4)
@@ -634,7 +634,7 @@ class Test(unittest.TestCase):
 		self.assertEqual(info['numberOfLTCSellOffers'], 0)
 		self.assertEqual(info['numberOfPendingExchanges'], 1)
 		host._setOwner('dave')
-		RunClient(host, ['post_ltc_sell', '--quantity', 2*e(7), '--exchangeRate', '0.26953125', '--blocksUntilExpiry', '1', '--blocksUntilOfferEnds', '100'])
+		RunClient(host, ['post_ltc_sell', '--quantity', 2*e(7), '--exchangeRate', '0.26953125', '--blocksUntilExpiry', '100'])
 		info = GetStateInfo(host)
 		ownerBalances = GetOwnerBalances(host, ownerList, info['balances'])
 		self.assertDictEqual(ownerBalances, {'alice': 1*e(7), 'bob': 2*e(7), 'clive': 5*e(7)-625000+1*e(7), 'dave': 7*e(7) - 1250000})

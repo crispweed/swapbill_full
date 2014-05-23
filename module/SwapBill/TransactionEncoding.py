@@ -12,13 +12,13 @@ _mappingByTypeCode = (
     ('Pay', 1, (('amount', 6, 'maxBlock', 4, None, 6), None), ('change','destination'), ()),
     ('LTCBuyOffer',
      1,
-     (('swapBillOffered', 6, 'maxBlock', 4, 'exchangeRate', 4, 'maxBlockOffset', 2), None),
+     (('swapBillOffered', 6, 'maxBlock', 4, 'exchangeRate', 4, None, 2), None),
      ('change', 'refund'),
      (('receivingAddress', None),)
 	),
     ('LTCSellOffer',
      1,
-     (('swapBillDesired', 6, 'maxBlock', 4, 'exchangeRate', 4, 'maxBlockOffset', 2), None),
+     (('swapBillDesired', 6, 'maxBlock', 4, 'exchangeRate', 4, None, 2), None),
      ('change', 'receiving'),
      ()
 	),

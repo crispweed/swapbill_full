@@ -185,7 +185,7 @@ class State(object):
 		if amount > 0:
 			self._addAccount((txID, 1), amount)
 
-	def _check_LTCBuyOffer(self, outputs, sourceAccount, swapBillOffered, exchangeRate, maxBlockOffset, receivingAddress, maxBlock):
+	def _check_LTCBuyOffer(self, outputs, sourceAccount, swapBillOffered, exchangeRate, receivingAddress, maxBlock):
 		if outputs != ('change', 'refund'):
 			raise OutputsSpecDoesntMatch()
 		assert type(swapBillOffered) is int
@@ -193,8 +193,8 @@ class State(object):
 		assert type(exchangeRate) is int
 		assert exchangeRate > 0
 		assert exchangeRate < 0x100000000
-		assert type(maxBlockOffset) is int
-		assert maxBlockOffset >= 0
+		assert type(maxBlock) is int
+		assert maxBlock >= 0
 		if swapBillOffered == 0:
 			return False, 'zero amount not permitted'
 		if not sourceAccount in self._balances:
@@ -208,7 +208,7 @@ class State(object):
 		if maxBlock < self._currentBlockIndex:
 			return True, 'max block for transaction has been exceeded'
 		return True, ''
-	def _apply_LTCBuyOffer(self, txID, sourceAccount, swapBillOffered, exchangeRate, maxBlockOffset, receivingAddress, maxBlock):
+	def _apply_LTCBuyOffer(self, txID, sourceAccount, swapBillOffered, exchangeRate, receivingAddress, maxBlock):
 		available = self._consumeAccount(sourceAccount)
 		if maxBlock < self._currentBlockIndex:
 			self._addAccount((txID, 1), available)
@@ -229,13 +229,10 @@ class State(object):
 		buyDetails.refundAccount = refundAccount
 		assert not refundAccount in self._balanceRefCounts
 		self._balanceRefCounts[refundAccount] = 1
-		expiry = maxBlock + maxBlockOffset
-		if expiry > 0xffffffff:
-			expiry = 0xffffffff
-		self._LTCBuys.addOffer(exchangeRate, expiry, buyDetails)
+		self._LTCBuys.addOffer(exchangeRate, maxBlock, buyDetails)
 		self._matchLTC()
 
-	def _check_LTCSellOffer(self, outputs, sourceAccount, swapBillDesired, exchangeRate, maxBlockOffset, maxBlock):
+	def _check_LTCSellOffer(self, outputs, sourceAccount, swapBillDesired, exchangeRate, maxBlock):
 		if outputs != ('change', 'receiving'):
 			raise OutputsSpecDoesntMatch()
 		assert type(swapBillDesired) is int
@@ -243,8 +240,8 @@ class State(object):
 		assert type(exchangeRate) is int
 		assert exchangeRate > 0
 		assert exchangeRate < 0x100000000
-		assert type(maxBlockOffset) is int
-		assert maxBlockOffset >= 0
+		assert type(maxBlock) is int
+		assert maxBlock >= 0
 		if swapBillDesired == 0:
 			return False, 'zero amount not permitted'
 		if not sourceAccount in self._balances:
@@ -259,7 +256,7 @@ class State(object):
 		if maxBlock < self._currentBlockIndex:
 			return True, 'max block for transaction has been exceeded'
 		return True, ''
-	def _apply_LTCSellOffer(self, txID, sourceAccount, swapBillDesired, exchangeRate, maxBlockOffset, maxBlock):
+	def _apply_LTCSellOffer(self, txID, sourceAccount, swapBillDesired, exchangeRate, maxBlock):
 		swapBillDeposit = swapBillDesired // LTCTrading.depositDivisor
 		available = self._consumeAccount(sourceAccount)
 		if maxBlock < self._currentBlockIndex:
@@ -281,10 +278,7 @@ class State(object):
 		sellDetails.receivingAccount = receivingAccount
 		assert not receivingAccount in self._balanceRefCounts
 		self._balanceRefCounts[receivingAccount] = 1
-		expiry = maxBlock + maxBlockOffset
-		if expiry > 0xffffffff:
-			expiry = 0xffffffff
-		self._LTCSells.addOffer(exchangeRate, expiry, sellDetails)
+		self._LTCSells.addOffer(exchangeRate, maxBlock, sellDetails)
 		self._matchLTC()
 
 	def _check_LTCExchangeCompletion(self, outputs, pendingExchangeIndex, destinationAddress, destinationAmount):

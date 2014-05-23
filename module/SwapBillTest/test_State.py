@@ -221,10 +221,10 @@ class Test(unittest.TestCase):
 		burnOutput = self.Burn(10000)
 		self.assertEqual(state._balances, {burnOutput:10000})
 		# cannot post buy or sell offers, because of minimum exchange amount constraint
-		reason = self.Apply_AssertFails(state, 'LTCBuyOffer', sourceAccount=burnOutput, swapBillOffered=100, exchangeRate=0x80000000, maxBlockOffset=0, receivingAddress='a_receive', maxBlock=200)
+		reason = self.Apply_AssertFails(state, 'LTCBuyOffer', sourceAccount=burnOutput, swapBillOffered=100, exchangeRate=0x80000000, receivingAddress='a_receive', maxBlock=200)
 		self.assertEqual(reason, 'does not satisfy minimum exchange amount (offer not posted)')
 		self.assertEqual(state._balances, {burnOutput:10000})
-		reason = self.Apply_AssertFails(state, 'LTCSellOffer', sourceAccount=burnOutput, swapBillDesired=100, exchangeRate=0x80000000, maxBlockOffset=0, maxBlock=200)
+		reason = self.Apply_AssertFails(state, 'LTCSellOffer', sourceAccount=burnOutput, swapBillDesired=100, exchangeRate=0x80000000, maxBlock=200)
 		self.assertEqual(reason, 'does not satisfy minimum exchange amount (offer not posted)')
 		self.assertEqual(state._balances, {burnOutput:10000})
 		self.assertEqual(state.totalAccountedFor(), state._totalCreated)
@@ -234,10 +234,10 @@ class Test(unittest.TestCase):
 		self.state = state
 		burnOutput = self.Burn(100000)
 		self.assertEqual(state._balances, {burnOutput:100000})
-		reason = self.Apply_AssertFails(state, 'LTCBuyOffer', sourceAccount=burnOutput, swapBillOffered=1000000, exchangeRate=0x80000000, maxBlockOffset=0, receivingAddress='a_receive', maxBlock=200)
+		reason = self.Apply_AssertFails(state, 'LTCBuyOffer', sourceAccount=burnOutput, swapBillOffered=1000000, exchangeRate=0x80000000, receivingAddress='a_receive', maxBlock=200)
 		self.assertEqual(reason, 'insufficient balance in source account (offer not posted)')
 		self.assertEqual(state._balances, {burnOutput:100000})
-		reason = self.Apply_AssertFails(state, 'LTCSellOffer', sourceAccount=burnOutput, swapBillDesired=1000000, exchangeRate=0x80000000, maxBlockOffset=0, maxBlock=200)
+		reason = self.Apply_AssertFails(state, 'LTCSellOffer', sourceAccount=burnOutput, swapBillDesired=1000000, exchangeRate=0x80000000, maxBlock=200)
 		self.assertEqual(reason, 'insufficient balance in source account (offer not posted)')
 		self.assertEqual(state._balances, {burnOutput:100000})
 		self.assertEqual(state.totalAccountedFor(), state._totalCreated)
@@ -257,7 +257,7 @@ class Test(unittest.TestCase):
 		details = {
 		    'sourceAccount':burnA,
 		    'swapBillOffered':30000000, 'exchangeRate':0x80000000,
-		    'maxBlock':100, 'maxBlockOffset':0,
+		    'maxBlock':100,
 		    'receivingAddress':'a_receive'
 		}
 
@@ -301,8 +301,6 @@ class Test(unittest.TestCase):
 
 		# reasonable buy offer that should go through
 		details['swapBillOffered'] = 30000000
-		details['maxBlock'] = 0xfffffff0 # these two details changed to add test coverage for expiry overflow
-		details['maxBlockOffset'] = 400
 		outputs = self.Apply_AssertSucceeds(state, 'LTCBuyOffer', **details)
 		changeA = outputs['change']
 		refundA = outputs['refund']
@@ -319,7 +317,7 @@ class Test(unittest.TestCase):
 		details = {
 		    'sourceAccount':burnB,
 		    'swapBillDesired':40000000, 'exchangeRate':0x80000000,
-		    'maxBlock':200, 'maxBlockOffset':0
+		    'maxBlock':200
 		}
 
 		self.assertRaises(OutputsSpecDoesntMatch, state.checkTransaction, 'LTCSellOffer', (), details)
@@ -369,8 +367,6 @@ class Test(unittest.TestCase):
 
 		# reasonable sell offer that should go through (and match)
 		details['swapBillDesired'] = 40000000
-		details['maxBlock'] = 0xfffffff0 # these two details changed to add test coverage for expiry overflow
-		details['maxBlockOffset'] = 400
 		outputs = self.Apply_AssertSucceeds(state, 'LTCSellOffer', **details)
 		changeB = outputs['change']
 		receivingB = outputs['receiving']
@@ -437,13 +433,13 @@ class Test(unittest.TestCase):
 		self.assertEqual(len(state._pendingExchanges), 0)
 		self.assertEqual(state.totalAccountedFor(), state._totalCreated)
 
-	def SellOffer(self, state, source, swapBillDesired, exchangeRate, maxBlock=200, maxBlockOffset=0):
-		details = {'sourceAccount':source, 'swapBillDesired':swapBillDesired, 'exchangeRate':exchangeRate, 'maxBlockOffset':maxBlockOffset, 'maxBlock':maxBlock}
+	def SellOffer(self, state, source, swapBillDesired, exchangeRate, maxBlock=200):
+		details = {'sourceAccount':source, 'swapBillDesired':swapBillDesired, 'exchangeRate':exchangeRate, 'maxBlock':maxBlock}
 		outputs = self.Apply_AssertSucceeds(state, 'LTCSellOffer', **details)
 		self.assertEqual(state.totalAccountedFor(), state._totalCreated)
 		return outputs['change'], outputs['receiving']
-	def BuyOffer(self, state, source, receiveAddress, swapBillOffered, exchangeRate, maxBlock=200, maxBlockOffset=0):
-		details = {'sourceAccount':source, 'receivingAddress':receiveAddress, 'swapBillOffered':swapBillOffered, 'exchangeRate':exchangeRate, 'maxBlockOffset':maxBlockOffset, 'maxBlock':maxBlock}
+	def BuyOffer(self, state, source, receiveAddress, swapBillOffered, exchangeRate, maxBlock=200):
+		details = {'sourceAccount':source, 'receivingAddress':receiveAddress, 'swapBillOffered':swapBillOffered, 'exchangeRate':exchangeRate, 'maxBlock':maxBlock}
 		outputs = self.Apply_AssertSucceeds(state, 'LTCBuyOffer', **details)
 		self.assertEqual(state.totalAccountedFor(), state._totalCreated)
 		return outputs['change'], outputs['refund']
@@ -519,7 +515,7 @@ class Test(unittest.TestCase):
 		details = {
 		    'sourceAccount':refundA,
 		    'swapBillOffered':100000, 'exchangeRate':0x80000000,
-		    'maxBlock':100, 'maxBlockOffset':0,
+		    'maxBlock':100,
 		    'receivingAddress':'madeUpAddressButNotUsed'
 		}
 		reason = self.Apply_AssertFails(state, 'LTCBuyOffer', **details)
@@ -527,7 +523,7 @@ class Test(unittest.TestCase):
 		details = {
 		    'sourceAccount':refundA,
 		    'swapBillDesired':100000, 'exchangeRate':0x80000000,
-		    'maxBlock':100, 'maxBlockOffset':0
+		    'maxBlock':100
 		}
 		reason = self.Apply_AssertFails(state, 'LTCSellOffer', **details)
 		self.assertEqual(reason, "source account is linked to an outstanding trade offer or pending exchange and can't be spent until the trade is completed or expires")
@@ -670,7 +666,7 @@ class Test(unittest.TestCase):
 		state = State.State(100, 'starthash', minimumBalance=1)
 		self.state = state
 		burnB = self.Burn(1*e(7))
-		changeB, receiveB = self.SellOffer(state, burnB, swapBillDesired=1*e(7), exchangeRate=0x80000000, maxBlock=100, maxBlockOffset=1)
+		changeB, receiveB = self.SellOffer(state, burnB, swapBillDesired=1*e(7), exchangeRate=0x80000000, maxBlock=101)
 		# deposit is 10000000 // 16 = 625000
 		self.assertEqual(state._balances, {changeB: 1*e(7)-625000-1, receiveB:1})
 		state.advanceToNextBlock()
@@ -680,7 +676,7 @@ class Test(unittest.TestCase):
 		self.assertEqual(state._LTCSells.size(), 0)
 		self.assertEqual(state._balances, {changeB: 1*e(7)-625000-1, receiveB:1+625000})
 		burnA = self.Burn(1*e(7)+1)
-		changeA, refundA = self.BuyOffer(state, burnA, 'receiveLTC', swapBillOffered=1*e(7), exchangeRate=0x80000000, maxBlock=103, maxBlockOffset=2)
+		changeA, refundA = self.BuyOffer(state, burnA, 'receiveLTC', swapBillOffered=1*e(7), exchangeRate=0x80000000, maxBlock=105)
 		self.assertEqual(state._balances, {changeB: 1*e(7)-625000-1, receiveB:1+625000, refundA:1})
 		state.advanceToNextBlock()
 		state.advanceToNextBlock()
