@@ -42,9 +42,11 @@ class State(object):
 	def advanceToNextBlock(self):
 		expired = self._LTCBuys.advanceToNextBlock()
 		for buyDetails in expired:
+			self._addToAccount(buyDetails.refundAccount, buyDetails.swapBillAmount)
 			self._removeAccountRef(buyDetails.refundAccount)
 		expired = self._LTCSells.advanceToNextBlock()
 		for sellDetails in expired:
+			self._addToAccount(sellDetails.receivingAccount, sellDetails.swapBillDeposit)
 			self._removeAccountRef(sellDetails.receivingAccount)
 		## TODO currently iterates through all pending exchanges each block added
 		## (sort out scaling issues with this!)
