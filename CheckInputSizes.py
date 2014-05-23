@@ -6,7 +6,6 @@ scriptPath = path.dirname(path.abspath(__file__))
 sys.path.append(path.join(scriptPath, 'module'))
 sys.dont_write_bytecode = True
 from SwapBill import RPC, Address, BlockChain
-from SwapBill.Amounts import ToSatoshis
 from SwapBill import ParseConfig
 
 class Config(object):

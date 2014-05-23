@@ -1,6 +1,7 @@
 from __future__ import print_function
 import binascii
 from SwapBill import TradeOfferHeap, LTCTrading
+from SwapBill.Amounts import e
 
 class InvalidTransactionParameters(Exception):
 	pass
@@ -15,6 +16,8 @@ class SellDetails(object):
 	pass
 
 class State(object):
+	#minimumBalance = 1*e(7)
+
 	def __init__(self, startBlockIndex, startBlockHash):
 		## state is initialised at the start of the block with startBlockIndex
 		self._startBlockHash = startBlockHash
