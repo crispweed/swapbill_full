@@ -16,12 +16,12 @@ class SellDetails(object):
 	pass
 
 class State(object):
-	#minimumBalance = 1*e(7)
-
-	def __init__(self, startBlockIndex, startBlockHash):
+	def __init__(self, startBlockIndex, startBlockHash, minimumBalance=1*e(7)):
 		## state is initialised at the start of the block with startBlockIndex
+		assert minimumBalance > 0
 		self._startBlockHash = startBlockHash
 		self._currentBlockIndex = startBlockIndex
+		self._minimumBalance = minimumBalance
 		self._balances = {}
 		self._balanceRefCounts = {}
 		self._totalCreated = 0
@@ -132,8 +132,8 @@ class State(object):
 			raise OutputsSpecDoesntMatch()
 		assert type(amount) is int
 		assert amount >= 0
-		if amount == 0:
-			return False, 'zero amount not permitted'
+		if amount < self._minimumBalance:
+			return False, 'burn amount below minimum balance'
 		return True, ''
 	def _apply_Burn(self, txID, amount):
 		self._totalCreated += amount
