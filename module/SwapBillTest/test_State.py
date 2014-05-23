@@ -69,10 +69,10 @@ class Test(unittest.TestCase):
 		self.assertRaises(OutputsSpecDoesntMatch, state.checkTransaction, 'Burn', ('destination','destination'), {'amount':0})
 		succeeds, reason = state.checkTransaction('Burn', ('destination',), {'amount':0})
 		self.assertEqual(succeeds, False)
-		self.assertEqual(reason, 'burn amount below minimum balance')
+		self.assertEqual(reason, 'burn amount is below minimum balance')
 		succeeds, reason = state.checkTransaction('Burn', ('destination',), {'amount':9})
 		self.assertEqual(succeeds, False)
-		self.assertEqual(reason, 'burn amount below minimum balance')
+		self.assertEqual(reason, 'burn amount is below minimum balance')
 		succeeds, reason = state.checkTransaction('Burn', ('destination',), {'amount':10})
 		self.assertEqual(succeeds, True)
 		self.assertEqual(reason, '')
@@ -135,7 +135,7 @@ class Test(unittest.TestCase):
 
 		# zero amount
 		reason = self.Apply_AssertFails(state, 'Pay', sourceAccount=('tx3',1), amount=0, maxBlock=200)
-		self.assertEqual(reason, 'zero amount not permitted')
+		self.assertEqual(reason, 'amount is below minimum balance')
 		self.assertEqual(state._balances, {('tx1',1):10, ('tx2',1):20, ('tx3',1):30})
 
 		self.Apply_AssertSucceeds(state, 'Pay', sourceAccount=('tx3',1), amount=20, maxBlock=200)

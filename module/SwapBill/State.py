@@ -133,7 +133,7 @@ class State(object):
 		assert type(amount) is int
 		assert amount >= 0
 		if amount < self._minimumBalance:
-			return False, 'burn amount below minimum balance'
+			return False, 'burn amount is below minimum balance'
 		return True, ''
 	def _apply_Burn(self, txID, amount):
 		self._totalCreated += amount
@@ -146,12 +146,14 @@ class State(object):
 			raise OutputsSpecDoesntMatch()
 		assert type(amount) is int
 		assert amount >= 0
-		if amount == 0:
-			return False, 'zero amount not permitted'
+		if amount < self._minimumBalance:
+			return False, 'amount is below minimum balance'
 		if not sourceAccount in self._balances:
 			return False, 'source account does not exist'
 		if self._balances[sourceAccount] < amount:
 			return False, 'insufficient balance in source account (transaction ignored)'
+		#if self._balances[sourceAccount] > amount and self._balances[sourceAccount] < amount + self._minimumBalance:
+			#return False, 'change amount is below minimum balance'
 		if sourceAccount in self._balanceRefCounts:
 			return False, "source account is linked to an outstanding trade offer or pending exchange and can't be spent until the trade is completed or expires"
 		if maxBlock < self._currentBlockIndex:
