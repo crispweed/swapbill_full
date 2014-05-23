@@ -228,14 +228,16 @@ def Main(startBlockIndex, startBlockHash, useTestNet, commandLineArgs=sys.argv[1
 
 	elif args.action == 'get_balance':
 		total = 0
+		spendable = 0
 		activeAccountAmount = 0
 		for account in ownedAccounts:
 			assert account in state._balances
 			amount = state._balances[account]
 			total += amount
+			spendable += state.getSpendableAmount(account)
 			if amount > activeAccountAmount:
 				activeAccountAmount = amount
-		return {'total':total, 'active':activeAccountAmount}
+		return {'spendable':spendable, 'total':total, 'active':activeAccountAmount}
 
 	elif args.action == 'get_buy_offers':
 		result = []

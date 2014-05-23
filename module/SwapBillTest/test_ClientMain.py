@@ -118,11 +118,11 @@ class Test(unittest.TestCase):
 		# but can split exactly
 		RunClient(host, ['pay', '--quantity', 1*e(7), '--toAddress', payTargetAddress])
 		output, result = RunClient(host, ['get_balance'])
-		self.assertDictEqual(result, {'total': 1*e(7), 'active': 1*e(7)})
+		self.assertDictEqual(result, {'total': 1*e(7), 'spendable': 1*e(7), 'active': 1*e(7)})
 		# or transfer full output amount
 		RunClient(host, ['pay', '--quantity', 1*e(7), '--toAddress', payTargetAddress])
 		output, result = RunClient(host, ['get_balance'])
-		self.assertDictEqual(result, {'total': 0, 'active': 0})
+		self.assertDictEqual(result, {'total': 0, 'spendable': 0, 'active': 0})
 
 	def test_ltc_sell_missing_unspent_regression(self):
 		host = InitHost()
@@ -147,17 +147,17 @@ class Test(unittest.TestCase):
 		RunClient(host, ['post_ltc_sell', '--quantity', '30000000', '--exchangeRate', '0.5'])
 		output, result = RunClient(host, ['get_balance'])
 		# receiving account is created, with minimumBalance, here
-		self.assertDictEqual(result, {'total': 98125000, 'active': 88125000})
+		self.assertDictEqual(result, {'total': 98125000, 'spendable': 88125000, 'active': 88125000})
 		host._setOwner('2')
 		host._addUnspent(500000000)
 		RunClient(host, ['burn', '--quantity', '200000000'])
 		RunClient(host, ['post_ltc_buy', '--quantity', '29900000', '--exchangeRate', '0.5'])
 		output, result = RunClient(host, ['get_balance'])
-		self.assertDictEqual(result, {'total': 170100000, 'active': 160100000})
+		self.assertDictEqual(result, {'total': 170100000, 'spendable': 160100000, 'active': 160100000})
 		# 1 gets partially refunded, as offers don't match exactly, and remainder is below minimum threshold
 		host._setOwner('1')
 		output, result = RunClient(host, ['get_balance'])
-		self.assertDictEqual(result, {'total': 98131250, 'active': 88125000})
+		self.assertDictEqual(result, {'total': 98131250, 'spendable': 88125000, 'active': 88125000})
 		# but the refund account is locked, because it may need to be credited with other amounts depending on how the trade plays out
 		# so can't spend or collect this yet
 		self.assertRaisesRegexp(ExceptionReportedToUser, 'There are currently less than two spendable swapbill outputs', RunClient, host, ['collect'])
@@ -167,7 +167,7 @@ class Test(unittest.TestCase):
 		# change output (active account) can be spent
 		RunClient(host, ['pay', '--quantity', '88125000', '--toAddress', payTargetAddress])
 		output, result = RunClient(host, ['get_balance'])
-		self.assertDictEqual(result, {'total': 10006250, 'active': 10006250})
+		self.assertDictEqual(result, {'total': 10006250, 'spendable': 0, 'active': 10006250})
 		# but not the refund
 		self.assertRaisesRegexp(ExceptionReportedToUser, 'No active swapbill balance currently available', RunClient, host, ['pay', '--quantity', '6250', '--toAddress', payTargetAddress])
 	def test_receiving_account_locked_during_trade(self):
@@ -178,14 +178,14 @@ class Test(unittest.TestCase):
 		RunClient(host, ['post_ltc_sell', '--quantity', '29900000', '--exchangeRate', '0.5'])
 		output, result = RunClient(host, ['get_balance'])
 		# refund account is created, with minimumBalance, here
-		self.assertDictEqual(result, {'total': 98131250, 'active': 88131250})
+		self.assertDictEqual(result, {'total': 98131250, 'spendable': 88131250, 'active': 88131250})
 		host._setOwner('2')
 		host._addUnspent(500000000)
 		RunClient(host, ['burn', '--quantity', '200000000'])
 		RunClient(host, ['post_ltc_buy', '--quantity', '30000000', '--exchangeRate', '0.5'])
 		output, result = RunClient(host, ['get_balance'])
 		# 2 gets partially refunded straight away, as offers don't match exactly, and remainder is below minimum threshold
-		self.assertDictEqual(result, {'total': 170100000, 'active': 160000000})
+		self.assertDictEqual(result, {'total': 170100000, 'spendable': 160000000, 'active': 160000000})
 		# but the refund account is locked, because it may need to be credited with other amounts depending on how the trade plays out
 		# so can't spend or collect this yet
 		self.assertRaisesRegexp(ExceptionReportedToUser, 'There are currently less than two spendable swapbill outputs', RunClient, host, ['collect'])
@@ -195,7 +195,7 @@ class Test(unittest.TestCase):
 		# change output (active account) can be spent
 		RunClient(host, ['pay', '--quantity', '160000000', '--toAddress', payTargetAddress])
 		output, result = RunClient(host, ['get_balance'])
-		self.assertDictEqual(result, {'total': 10100000, 'active': 10100000})
+		self.assertDictEqual(result, {'total': 10100000, 'spendable': 0, 'active': 10100000})
 		# but not the refund
 		self.assertRaisesRegexp(ExceptionReportedToUser, 'No active swapbill balance currently available', RunClient, host, ['pay', '--quantity', '100000', '--toAddress', payTargetAddress])
 
@@ -408,7 +408,7 @@ class Test(unittest.TestCase):
 		self.assertEqual(info['balances'], {firstBurnTarget:1*e(7), secondBurnTarget:15*e(6), payTarget:12*e(6), payChange:14*e(6)})
 		host._setOwner('recipient')
 		output, info = RunClient(host, ['get_balance'])
-		self.assertDictEqual(info, {'active': 12*e(6), 'total': 12*e(6)})
+		self.assertDictEqual(info, {'active': 12*e(6), 'spendable': 12*e(6), 'total': 12*e(6)})
 		host._setOwner(host.defaultOwner)
 		# and this should not submit because there is no single output large enough for the payment
 		self.assertRaises(TransactionNotSuccessfulAgainstCurrentState, RunClient, host, ['pay', '--quantity', 16*e(6), '--toAddress', payTargetAddress])
@@ -505,10 +505,10 @@ class Test(unittest.TestCase):
 		info = GetStateInfo(host)
 		self.assertEqual(info['balances'], {'02:1':10000000, '04:1':20000000})
 		output, info = RunClient(host, ['get_balance'])
-		self.assertDictEqual(info, {'active': 20000000, 'total': 20000000})
+		self.assertDictEqual(info, {'active': 20000000, 'total': 20000000, 'spendable': 20000000})
 		host._setOwner('1')
 		output, info = RunClient(host, ['get_balance'])
-		self.assertDictEqual(info, {'active': 10000000, 'total': 10000000})
+		self.assertDictEqual(info, {'active': 10000000, 'total': 10000000, 'spendable': 10000000})
 
 	def test_expected_dust_and_fees(self):
 		host = InitHost()
