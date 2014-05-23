@@ -230,9 +230,7 @@ def Main(startBlockIndex, startBlockHash, useTestNet, commandLineArgs=sys.argv[1
 		total = 0
 		activeAccountAmount = 0
 		for account in ownedAccounts:
-			if not account in state._balances:
-				# e.g. zero amount account for ltc trading that got cleaned up
-				continue
+			assert account in state._balances
 			amount = state._balances[account]
 			total += amount
 			if amount > activeAccountAmount:
