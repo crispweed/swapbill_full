@@ -729,11 +729,17 @@ class Test(unittest.TestCase):
 		expectedBalances[receiveOutputs[1]] += 1*e(7) + 625000
 		self.assertEqual(state._balances, expectedBalances)
 		self.assertEqual(len(state._pendingExchanges), 1)
+		# at this point, refund account should still be locked for the trade
+		reason = self.Apply_AssertFails(state, 'Pay', sourceAccount=refund, amount=1, maxBlock=200)
+		self.assertEqual(reason, "source account is linked to an outstanding trade offer or pending exchange and can't be spent until the trade is completed or expires")
+		# go ahead and complete last pending exchange
 		self.Completion(state, 2, 'receiveLTC', 25*e(5))
 		# matched seller gets deposit refund + swapbill counterparty payment
 		expectedBalances[receiveOutputs[2]] += 5*e(6) + 312500
 		self.assertEqual(state._balances, expectedBalances)
 		self.assertEqual(len(state._pendingExchanges), 0)
+		# and refund account can now be spent
+		self.Apply_AssertSucceeds(state, 'Pay', sourceAccount=refund, amount=1, maxBlock=200)
 		self.assertEqual(state.totalAccountedFor(), state._totalCreated)
 
 	def test_sell_matches_multiple_buys(self):
@@ -769,11 +775,17 @@ class Test(unittest.TestCase):
 		expectedBalances[receive] += 1*e(7) + 625000
 		self.assertEqual(state._balances, expectedBalances)
 		self.assertEqual(len(state._pendingExchanges), 1)
+		# at this point, receive account should still be locked for the trade
+		reason = self.Apply_AssertFails(state, 'Pay', sourceAccount=receive, amount=1, maxBlock=200)
+		self.assertEqual(reason, "source account is linked to an outstanding trade offer or pending exchange and can't be spent until the trade is completed or expires")
+		# go ahead and complete last pending exchange
 		self.Completion(state, 2, 'receiveLTC', 25*e(5))
 		# seller gets deposit refund + swapbill counterparty payment for this trade
 		expectedBalances[receive] += 5*e(6) + 312500
 		self.assertEqual(state._balances, expectedBalances)
 		self.assertEqual(len(state._pendingExchanges), 0)
+		# and receive account can now be spent
+		self.Apply_AssertSucceeds(state, 'Pay', sourceAccount=receive, amount=1, maxBlock=200)
 		self.assertEqual(state.totalAccountedFor(), state._totalCreated)
 
 
