@@ -313,8 +313,8 @@ class State(object):
 			raise OutputsSpecDoesntMatch()
 		assert type(amount) is int
 		assert amount >= 0
-		if amount == 0:
-			return False, 'zero amount not permitted'
+		if amount < self._minimumBalance:
+			return False, 'amount is below minimum balance'
 		if maxBlock < self._currentBlockIndex:
 			return False, 'max block for transaction has been exceeded'
 		if not sourceAccount in self._balances:

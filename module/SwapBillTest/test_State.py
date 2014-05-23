@@ -85,27 +85,30 @@ class Test(unittest.TestCase):
 		self.assertEqual(state._balances, {('tx1',1):10, ('tx2',1):20})
 
 	def test_forwarding(self):
-		state = State.State(100, 'mochhash', minimumBalance=1)
+		state = State.State(100, 'mochhash', minimumBalance=10)
 		self.state = state
 		burn = self.Burn(100000000)
 		self.assertEqual(state._balances, {burn:100000000})
-		details = {'sourceAccount':burn, 'amount':1, 'maxBlock':200}
+		details = {'sourceAccount':burn, 'amount':10, 'maxBlock':200}
 		self.assertRaises(OutputsSpecDoesntMatch, state.checkTransaction, 'ForwardToFutureNetworkVersion', (), details)
 		self.assertRaises(OutputsSpecDoesntMatch, state.checkTransaction, 'ForwardToFutureNetworkVersion', ('madeUpOutput'), details)
 		self.assertRaises(OutputsSpecDoesntMatch, state.checkTransaction, 'ForwardToFutureNetworkVersion', ('change', 'madeUpOutput'), details)
 		outputs = self.Apply_AssertSucceeds(state, 'ForwardToFutureNetworkVersion', **details)
 		change = outputs['change']
-		self.assertEqual(state._balances, {change:99999999})
+		self.assertEqual(state._balances, {change:99999990})
 		self.assertEqual(state.totalAccountedFor(), state._totalCreated)
-		self.assertEqual(state._totalForwarded, 1)
-		details = {'sourceAccount':change, 'amount':1, 'maxBlock':200}
+		self.assertEqual(state._totalForwarded, 10)
+		details = {'sourceAccount':change, 'amount':10, 'maxBlock':200}
 		details['amount'] = 100000000
 		reason = self.Apply_AssertFails(state, 'ForwardToFutureNetworkVersion', **details)
 		self.assertEqual(reason, 'insufficient balance in source account (transaction ignored)')
 		details['amount'] = 0
 		reason = self.Apply_AssertFails(state, 'ForwardToFutureNetworkVersion', **details)
-		self.assertEqual(reason, 'zero amount not permitted')
-		details['amount'] = 1
+		self.assertEqual(reason, 'amount is below minimum balance')
+		details['amount'] = 9
+		reason = self.Apply_AssertFails(state, 'ForwardToFutureNetworkVersion', **details)
+		self.assertEqual(reason, 'amount is below minimum balance')
+		details['amount'] = 10
 		details['maxBlock'] = 99
 		reason = self.Apply_AssertFails(state, 'ForwardToFutureNetworkVersion', **details)
 		self.assertEqual(reason, 'max block for transaction has been exceeded')
@@ -114,9 +117,9 @@ class Test(unittest.TestCase):
 		details['sourceAccount'] = 'madeUpSourceAccount'
 		reason = self.Apply_AssertFails(state, 'ForwardToFutureNetworkVersion', **details)
 		self.assertEqual(reason, 'source account does not exist' )
-		self.assertEqual(state._balances, {change:99999999})
+		self.assertEqual(state._balances, {change:99999990})
 		self.assertEqual(state.totalAccountedFor(), state._totalCreated)
-		self.assertEqual(state._totalForwarded, 1)
+		self.assertEqual(state._totalForwarded, 10)
 
 	def test_burn_and_pay(self):
 		state = State.State(100, 'mochhash', minimumBalance=10)
