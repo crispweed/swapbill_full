@@ -138,6 +138,10 @@ class Test(unittest.TestCase):
 		self.assertEqual(reason, 'amount is below minimum balance')
 		reason = self.Apply_AssertFails(state, 'Pay', sourceAccount=('tx3',1), amount=9, maxBlock=200)
 		self.assertEqual(reason, 'amount is below minimum balance')
+		# change amount below minimum balance
+		reason = self.Apply_AssertFails(state, 'Pay', sourceAccount=('tx2',1), amount=11, maxBlock=200)
+		self.assertEqual(reason, 'payment transaction includes change, with change amount below minimum balance')
+
 		self.assertEqual(state._balances, {('tx1',1):10, ('tx2',1):20, ('tx3',1):30})
 
 		self.Apply_AssertSucceeds(state, 'Pay', sourceAccount=('tx3',1), amount=20, maxBlock=200)

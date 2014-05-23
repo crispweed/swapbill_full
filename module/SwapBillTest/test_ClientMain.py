@@ -123,6 +123,15 @@ class Test(unittest.TestCase):
 		payTargetAddress = host.formatAddressForEndUser(host.getNewSwapBillAddress())
 		host._setOwner(host.defaultOwner)
 		self.assertRaisesRegexp(TransactionNotSuccessfulAgainstCurrentState, 'amount is below minimum balance', RunClient, host, ['pay', '--quantity', 1*e(7)-1, '--toAddress', payTargetAddress])
+		self.assertRaisesRegexp(TransactionNotSuccessfulAgainstCurrentState, 'payment transaction includes change, with change amount below minimum balance', RunClient, host, ['pay', '--quantity', 1*e(7)+1, '--toAddress', payTargetAddress])
+		# but can split exactly
+		RunClient(host, ['pay', '--quantity', 1*e(7), '--toAddress', payTargetAddress])
+		output, result = RunClient(host, ['get_balance'])
+		self.assertDictEqual(result, {'total': 1*e(7), 'in active account': 1*e(7)})
+		# or transfer full output amount
+		RunClient(host, ['pay', '--quantity', 1*e(7), '--toAddress', payTargetAddress])
+		output, result = RunClient(host, ['get_balance'])
+		self.assertDictEqual(result, {'total': 0, 'in active account': 0})
 
 	def test_ltc_sell_missing_unspent_regression(self):
 		host = InitHost()
