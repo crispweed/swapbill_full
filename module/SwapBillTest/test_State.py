@@ -44,8 +44,8 @@ class Test(unittest.TestCase):
 		### note that applyTransaction now calls check and asserts success internally
 		### but this then also asserts that there is no warning
 		canApply, reason = state.checkTransaction(transactionType, outputs, details)
-		self.assertEqual(canApply, True)
 		self.assertEqual(reason, '')
+		self.assertEqual(canApply, True)
 		txID = self.TXID()
 		state.applyTransaction(transactionType, txID=txID, outputs=outputs, transactionDetails=details)
 		txOutputs = {}
@@ -446,6 +446,20 @@ class Test(unittest.TestCase):
 		self.Apply_AssertSucceeds(state, 'LTCExchangeCompletion', **details)
 		self.assertEqual(state.totalAccountedFor(), state._totalCreated)
 
+	def test_ltc_buy_change_added_to_refund(self):
+		state = State.State(100, 'starthash', minimumBalance=1*e(8))
+		self.state = state
+		burn = self.Burn(22*e(7))
+		change, refund = self.BuyOffer(state, burn, 'madeUpReceiveAddress', swapBillOffered=3*e(7), exchangeRate=0x80000000)
+		self.assertEqual(state._balances, {refund:19*e(7)})
+	def test_ltc_sell_change_added_to_receiving(self):
+		state = State.State(100, 'starthash', minimumBalance=1*e(8))
+		self.state = state
+		burn = self.Burn(22*e(7))
+		change, receive = self.SellOffer(state, burn, swapBillDesired=3*16*e(7), exchangeRate=0x80000000)
+		# deposit is 3*16*e(7) // 16
+		self.assertEqual(state._balances, {receive:19*e(7)})
+
 	def test_small_sell_remainder_refunded(self):
 		state = State.State(100, 'starthash', minimumBalance=1)
 		self.state = state
@@ -507,6 +521,9 @@ class Test(unittest.TestCase):
 		    'maxBlock':100, 'maxBlockOffset':0
 		}
 		reason = self.Apply_AssertFails(state, 'LTCSellOffer', **details)
+		self.assertEqual(reason, "source account is linked to an outstanding trade offer or pending exchange and can't be spent until the trade is completed or expires")
+		details = {'sourceAccount':refundA, 'amount':10, 'maxBlock':200}
+		reason = self.Apply_AssertFails(state, 'ForwardToFutureNetworkVersion', **details)
 		self.assertEqual(reason, "source account is linked to an outstanding trade offer or pending exchange and can't be spent until the trade is completed or expires")
 		# (end of bunch of tests for stuff not being able to use refund account)
 		self.assertEqual(state._balances, {changeB:9375000-1, receiveB:1, changeA:3, refundA:100000+1})
