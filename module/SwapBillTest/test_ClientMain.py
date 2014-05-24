@@ -106,6 +106,17 @@ class Test(unittest.TestCase):
 		info = GetStateInfo(host)
 		self.assertEqual(info['balances'], {'02:1': 2*e(7), '04:2': 1*e(7), '04:1': 25*e(6)})
 
+	def test_start_block_not_reached(self):
+		host = InitHost()
+		ownerDir = path.join(dataDirectory, host._getOwner())
+		if not path.exists(ownerDir):
+			os.mkdir(ownerDir)
+		args = ['--datadir', ownerDir, 'get_balance']
+		out = io.StringIO()
+		startBlock = 5
+		assert host.getBlockHashAtIndexOrNone(startBlock) is None
+		self.assertRaisesRegexp(ExceptionReportedToUser, 'Block chain has not reached the swapbill start block [(]5[)][.]', ClientMain.Main, startBlockIndex=startBlock, startBlockHash='madeUpBlockHash', useTestNet=True, commandLineArgs=args, host=host, out=out)		
+
 	def test_minimum_balance(self):
 		host = InitHost()
 		host._addUnspent(500000000)
