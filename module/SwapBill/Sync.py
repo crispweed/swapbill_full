@@ -82,7 +82,7 @@ def SyncAndReturnStateAndOwnedAccounts(cacheDirectory, startBlockIndex, startBlo
 		blockIndex = startBlockIndex
 		blockHash = host.getBlockHashAtIndexOrNone(blockIndex)
 		if blockHash is None:
-			raise ExceptionReportedToUser('Block chain has not reached the swapbill start block.')
+			raise ExceptionReportedToUser('Block chain has not reached the swapbill start block (' + str(startBlockIndex) + ').')
 		if blockHash != startBlockHash:
 			raise ExceptionReportedToUser('Block hash for swapbill start block does not match.')
 		state = State.State(blockIndex, blockHash)
