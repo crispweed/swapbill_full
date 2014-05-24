@@ -49,6 +49,9 @@ def _processTransactions(host, state, ownedAccounts, transactions, applyToState,
 			# ** TODO we don't know if this affects me based on current approach for checking this
 			# since exchange completion doesn't consume any swapbill, and pays out to an address already set up by the trade offer
 			# sort this out!
+			# **** and, in fact, this affects buy and sell offers also, by the looks of things
+			# **** and it seems like we need a way to track sell offers generally
+			# **** -> assign indices to buy and sell offers straight away, instead of just for pending exchange index later on? 
 			transactionAffectsMe = True
 		if transactionAffectsMe:
 			outputPubKeyHashes = []
