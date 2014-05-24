@@ -108,9 +108,15 @@ class Host(object):
 
 # block chain tracking, transaction stream and decoding
 
-	def getBlockHash(self, blockIndex):
-		return self._rpcHost.call('getblockhash', blockIndex)
-
+	def getBlockHashAtIndexOrNone(self, blockIndex):
+		try:
+			return self._rpcHost.call('getblockhash', blockIndex)
+		except RPC.RPCFailureWithMessage as e:
+			if str(e) == 'Block number out of range.':
+				return None
+		except RPC.RPCFailureException:
+			pass
+		raise ExceptionReportedToUser('Unexpected RPC error in call to getblockhash.')
 	def _getBlock_Cached(self, blockHash):
 		if self._cachedBlockHash != blockHash:
 			self._cachedBlock = self._rpcHost.call('getblock', blockHash)

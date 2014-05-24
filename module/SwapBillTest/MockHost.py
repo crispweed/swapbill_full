@@ -83,8 +83,9 @@ class MockHost(object):
 	def _addTransaction(self, txid, unsignedTransactionHex):
 		self._memPool.append((txid, unsignedTransactionHex))
 
-	def getBlockHash(self, blockIndex):
-		assert blockIndex < self._nextBlock
+	def getBlockHashAtIndexOrNone(self, blockIndex):
+		if blockIndex >= self._nextBlock:
+			return None
 		return str(blockIndex)
 	def getNextBlockHash(self, blockHash):
 		nextBlock = int(blockHash) + 1

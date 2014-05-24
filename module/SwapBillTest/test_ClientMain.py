@@ -70,7 +70,8 @@ def RunClient(host, args):
 		os.mkdir(ownerDir)
 	fullArgs = ['--datadir', ownerDir] + convertedArgs
 	out = io.StringIO()
-	result = ClientMain.Main(startBlockIndex=0, startBlockHash=host.getBlockHash(0), useTestNet=True, commandLineArgs=fullArgs, host=host, out=out)
+	assert host.getBlockHashAtIndexOrNone(0) is not None
+	result = ClientMain.Main(startBlockIndex=0, startBlockHash=host.getBlockHashAtIndexOrNone(0), useTestNet=True, commandLineArgs=fullArgs, host=host, out=out)
 	return out.getvalue(), result
 
 def GetStateInfo(host, includePending=False):

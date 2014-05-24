@@ -3,7 +3,9 @@ import time, requests, json
 
 class RPCFailureException(Exception):
 	pass
-class MethodNotFoundException(Exception):
+class MethodNotFoundException(RPCFailureException):
+	pass
+class RPCFailureWithMessage(RPCFailureException):
 	pass
 
 class Host(object):
@@ -31,6 +33,8 @@ class Host(object):
 			raise RPCFailureException('status code: ' + str(response.status_code) + ', reason: ' + response.reason)
 		responseJSON = response.json()
 		if 'error' in responseJSON and responseJSON['error'] != None:
+			if 'message' in responseJSON['error']:
+				raise RPCFailureWithMessage(responseJSON['error']['message'])
 			raise RPCFailureException('error json: ' + str(responseJSON['error']))
 		if response.status_code == 500:
 			raise RPCFailureException('status code: ' + str(response.status_code) + ', reason: ' + response.reason)

@@ -4,6 +4,7 @@ from os import path
 from collections import deque
 from SwapBill import State, DecodeTransaction, TransactionEncoding, PickledCache
 from SwapBill import FormatTransactionForUserDisplay
+from SwapBill.ExceptionReportedToUser import ExceptionReportedToUser
 
 stateVersion = 0.8
 ownedAccountsVersion = 0.1
@@ -13,10 +14,12 @@ def _processTransactions(host, state, ownedAccounts, transactions, applyToState,
 		hostTX, scriptPubKeys = DecodeTransaction.Decode(hostTXHex)
 		if hostTX == None:
 			continue
+		transactionAffectsMe = False
 		for i in range(hostTX.numberOfInputs()):
 			spentAccount = (hostTX.inputTXID(i), hostTX.inputVOut(i))
 			if spentAccount in ownedAccounts:
 				ownedAccounts.pop(spentAccount)
+				transactionAffectsMe = True
 		try:
 			transactionType, outputs, transactionDetails = TransactionEncoding.ToStateTransaction(hostTX)
 		except TransactionEncoding.NotValidSwapBillTransaction:
@@ -24,27 +27,34 @@ def _processTransactions(host, state, ownedAccounts, transactions, applyToState,
 		except TransactionEncoding.UnsupportedTransaction:
 			continue
 		if not state.checkTransaction(transactionType, outputs, transactionDetails)[0]:
-			outputPubKeyHashes = []
-			for i in range(len(outputs)):
-				outputPubKeyHashes.append(hostTX.outputPubKeyHash(i + 1))
-			print('Transaction fails:'+ FormatTransactionForUserDisplay.Format(host, transactionType, outputs, outputPubKeyHashes, transactionDetails), file=out)
+			if transactionAffectsMe:
+				outputPubKeyHashes = []
+				for i in range(len(outputs)):
+					outputPubKeyHashes.append(hostTX.outputPubKeyHash(i + 1))
+				print('Transaction fails:'+ FormatTransactionForUserDisplay.Format(host, transactionType, outputs, outputPubKeyHashes, transactionDetails), file=out)
 			continue
-		if applyToState:
+		if not applyToState:
+			continue
+		state.applyTransaction(transactionType, txID, outputs, transactionDetails)
+		for i in range(len(outputs)):
+			newOwnedAccount = (txID, i + 1)
+			if newOwnedAccount in state._balances:
+				privateKey = host.privateKeyForPubKeyHash(hostTX.outputPubKeyHash(i + 1))
+				if privateKey is not None:
+					#print("added owned account for:", transactionType, outputs[i], txID[-3:], i + 1)
+					assert not newOwnedAccount in ownedAccounts
+					ownedAccounts[newOwnedAccount] = (hostTX.outputAmount(i + 1), privateKey, scriptPubKeys[i + 1])
+					transactionAffectsMe = True
+		if transactionType == 'LTCExchangeCompletion':
+			# ** TODO we don't know if this affects me based on current approach for checking this
+			# since exchange completion doesn't consume any swapbill, and pays out to an address already set up by the trade offer
+			# sort this out!
+			transactionAffectsMe = True
+		if transactionAffectsMe:
 			outputPubKeyHashes = []
 			for i in range(len(outputs)):
 				outputPubKeyHashes.append(hostTX.outputPubKeyHash(i + 1))
-			state.applyTransaction(transactionType, txID, outputs, transactionDetails)
 			print('applied ' + FormatTransactionForUserDisplay.Format(host, transactionType, outputs, outputPubKeyHashes, transactionDetails), file=out)
-		if applyToState:
-			for i in range(len(outputs)):
-				newOwnedAccount = (txID, i + 1)
-				if newOwnedAccount in state._balances:
-					privateKey = host.privateKeyForPubKeyHash(outputPubKeyHashes[i])
-					if privateKey is not None:
-						#print("added owned account for:", transactionType, outputs[i], txID[-3:], i + 1)
-						assert not newOwnedAccount in ownedAccounts
-						ownedAccounts[newOwnedAccount] = (hostTX.outputAmount(i + 1), privateKey, scriptPubKeys[i + 1])
-
 
 def _processBlock(host, state, ownedAccounts, blockHash, out):
 	transactions = host.getBlockTransactions(blockHash)
@@ -60,7 +70,7 @@ def SyncAndReturnStateAndOwnedAccounts(cacheDirectory, startBlockIndex, startBlo
 		loaded = False
 	else:
 		loaded = True
-	if loaded and host.getBlockHash(blockIndex) != blockHash:
+	if loaded and host.getBlockHashAtIndexOrNone(blockIndex) != blockHash:
 		print('The block corresponding with cached state has been orphaned, full index generation required.', file=out)
 		loaded = False
 	if loaded and not state.startBlockMatches(startBlockHash):
@@ -70,8 +80,11 @@ def SyncAndReturnStateAndOwnedAccounts(cacheDirectory, startBlockIndex, startBlo
 		print('Loaded cached state data successfully', file=out)
 	else:
 		blockIndex = startBlockIndex
-		blockHash = startBlockHash
-		assert host.getBlockHash(blockIndex) == blockHash
+		blockHash = host.getBlockHashAtIndexOrNone(blockIndex)
+		if blockHash is None:
+			raise ExceptionReportedToUser('Block chain has not reached the swapbill start block.')
+		if blockHash != startBlockHash:
+			raise ExceptionReportedToUser('Block hash for swapbill start block does not match.')
 		state = State.State(blockIndex, blockHash)
 		ownedAccounts = {}
 
