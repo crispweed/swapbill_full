@@ -1,4 +1,5 @@
 import struct, binascii
+from SwapBill import HostTransaction
 
 class NotSwapBillTransaction(Exception):
 	pass
@@ -209,51 +210,45 @@ def ExtractOutputPubKeyHash(txBytes, outputIndex):
 	assert len(txBytes) > pos + 20
 	return txBytes[pos:pos + 20]
 
-## TODO change this to decode to in memory transaction
 def Decode(txBytes):
 	assert type(txBytes) is type(b'')
 	assert not UnexpectedFormat_Fast(txBytes, b'')
 
-	result = {}
+	result = HostTransaction.InMemoryTransaction()
 
 	pos = 4
 	pos, numberOfInputs = _decodeVarInt(txBytes, pos)
 
 	inputs = []
 	for i in range(numberOfInputs):
-		thisInput = {}
 		txIDBytes = txBytes[pos:pos + 32]
 		pos += 32
-		thisInput['txid'] = binascii.hexlify(txIDBytes[::-1]).decode('ascii')
-		thisInput['vout'] = struct.unpack("<L", txBytes[pos:pos + 4])[0]
+		txID = binascii.hexlify(txIDBytes[::-1]).decode('ascii')
+		vOut = struct.unpack("<L", txBytes[pos:pos + 4])[0]
+		result.addInput(txID, vOut)
 		pos += 4
 		pos, scriptLen = _decodeVarInt(txBytes, pos)
 		pos += scriptLen
 		pos += 4 # sequence
-		inputs.append(thisInput)
-	result['vin'] = inputs
 
 	pos, numberOfOutputs = _decodeVarInt(txBytes, pos)
 
-	outputs = []
+	scriptPubKeys = []
 	for i in range(numberOfOutputs):
-		thisOutput = {}
-		thisOutput['value'] = struct.unpack("<Q", txBytes[pos:pos + 8])[0]
+		outputAmount = struct.unpack("<Q", txBytes[pos:pos + 8])[0]
 		pos += 8
 		pos, scriptLen = _decodeVarInt(txBytes, pos)
-		scriptSigBytes = txBytes[pos:pos + scriptLen]
+		scriptPubKeyBytes = txBytes[pos:pos + scriptLen]
 		pos += scriptLen
-		thisOutput['scriptPubKey'] = binascii.hexlify(scriptSigBytes).decode('ascii')
+		scriptPubKeys.append(binascii.hexlify(scriptPubKeyBytes).decode('ascii')) # TODO keep this as binary data?
 		expectedScriptStart = OP_DUP
 		expectedScriptStart += OP_HASH160
 		expectedScriptStart += _opPush(20)
-		pubKeyHash = scriptSigBytes[len(expectedScriptStart):len(expectedScriptStart)+20]
+		pubKeyHash = scriptPubKeyBytes[len(expectedScriptStart):len(expectedScriptStart)+20]
 		assert len(pubKeyHash) == 20
-		thisOutput['pubKeyHash'] = binascii.hexlify(pubKeyHash).decode('ascii')
-		outputs.append(thisOutput)
-	result['vout'] = outputs
+		result.addOutput(pubKeyHash, outputAmount)
 
-	return result
+	return result, scriptPubKeys
 
 def FromHex(hexStr):
 	return binascii.unhexlify(hexStr.encode('ascii'))

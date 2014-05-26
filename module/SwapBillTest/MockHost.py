@@ -172,11 +172,11 @@ class MockHost(object):
 
 	def signAndSend(self, unsignedTransactionHex, privateKeys=[]):
 		unsignedTransactionBytes = RawTransaction.FromHex(unsignedTransactionHex)
-		decoded = RawTransaction.Decode(unsignedTransactionBytes)
+		decoded, scriptPubKeys = RawTransaction.Decode(unsignedTransactionBytes)
 		sumOfInputs = 0
 		requiredPrivateKeys = []
-		for entry in decoded['vin']:
-			amount, privateKeyRequired = self._consumeUnspent(entry['txid'], entry['vout'])
+		for i in range(decoded.numberOfInputs()):
+			amount, privateKeyRequired = self._consumeUnspent(decoded.inputTXID(i), decoded.inputVOut(i))
 			sumOfInputs += amount
 			if privateKeyRequired is not None:
 				requiredPrivateKeys.append(privateKeyRequired)
@@ -185,17 +185,16 @@ class MockHost(object):
 		self._nextTXID += 1
 		txid = MakeTXID(self._nextTXID)
 		outputAmounts = []
-		for vout in range(len(decoded['vout'])):
-			entry = decoded['vout'][vout]
+		for vout in range(decoded.numberOfOutputs()):
 			toAdd = {'txid':txid, 'vout':vout}
-			scriptPubKey = entry['scriptPubKey']
-			pubKeyHash = binascii.unhexlify(entry['pubKeyHash'].encode('ascii'))
+			scriptPubKey = scriptPubKeys[vout]
+			pubKeyHash = decoded.outputPubKeyHash(vout)
 			assert pubKeyHash == RawTransaction.PubKeyHashForScriptPubKey(scriptPubKey)
 			toAdd['scriptPubKey'] = scriptPubKey
 			toAdd['address'] = pubKeyHash
-			toAdd['amount'] = entry['value']
+			toAdd['amount'] = decoded.outputAmount(vout)
 			self._unspent.append(toAdd)
-			outputAmounts.append(entry['value'])
+			outputAmounts.append(decoded.outputAmount(vout))
 		transactionFee = sumOfInputs - sum(outputAmounts)
 		byteSize = len(unsignedTransactionHex) / 2
 		feeRequired = TransactionFee.CalculateRequired_FromSizeAndOutputs(byteSize, outputAmounts)

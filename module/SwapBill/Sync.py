@@ -2,7 +2,7 @@ from __future__ import print_function
 import sys
 from os import path
 from collections import deque
-from SwapBill import State, DecodeTransaction, TransactionEncoding, PickledCache, OwnedAccounts
+from SwapBill import State, RawTransaction, TransactionEncoding, PickledCache, OwnedAccounts, ControlAddressPrefix
 from SwapBill.ExceptionReportedToUser import ExceptionReportedToUser
 
 stateVersion = 0.8
@@ -10,8 +10,9 @@ ownedAccountsVersion = 0.2
 
 def _processTransactions(host, state, ownedAccounts, transactions, applyToState, reportPrefix, out):
 	for txID, hostTXHex in transactions:
-		hostTX, scriptPubKeys = DecodeTransaction.Decode(hostTXHex)
-		if hostTX == None:
+		hostTXBytes = RawTransaction.FromHex(hostTXHex)
+		hostTX, scriptPubKeys = RawTransaction.Decode(hostTXBytes)
+		if RawTransaction.UnexpectedFormat_Fast(hostTXBytes, ControlAddressPrefix.prefix):
 			continue
 		report = ownedAccounts.updateForSpent(hostTX, state)
 		try:

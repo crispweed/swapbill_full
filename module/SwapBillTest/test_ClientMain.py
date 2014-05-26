@@ -122,6 +122,31 @@ class Test(unittest.TestCase):
 		self.assertEqual(info['syncOutput'].count('in memory: Pay'), 0)
 		self.assertEqual(info['syncOutput'], 'Failed to load from cache, full index generation required (no cache file found)\nState update starting from block 0\nCommitted state updated to start of block 0\nIn memory state updated to end of block 3\n')
 
+	def test_bad_control_address_prefix(self):
+		host = InitHost()
+		host._addUnspent(100000000)
+		RunClient(host, ['burn', '--amount', 2*e(7)])
+		RunClient(host, ['burn', '--amount', 3*e(7)])
+		host._setOwner('recipient')
+		payTargetAddress = host.formatAddressForEndUser(host.getNewSwapBillAddress())
+		host._setOwner(host.defaultOwner)
+		RunClient(host, ['pay', '--amount', 1*e(7), '--toAddress', payTargetAddress])
+		host.holdNewTransactions = True
+		RunClient(host, ['burn', '--amount', 4*e(7)])
+		RunClient(host, ['pay', '--amount', 2*e(7), '--toAddress', payTargetAddress])
+		corruptedMemPool = []
+		for txID, txHex in host._memPool:
+
+			assert txHex.count('535750') == 1
+			corruptedTXHex = txHex.replace('535750', '545750')
+			corruptedMemPool.append((txID, corruptedTXHex))
+		host._memPool = corruptedMemPool
+		host.holdNewTransactions = False
+		info = GetStateInfo(host)
+		# 'corrupted' transactions have bad control address, and should just be ignored
+		self.assertEqual(info['syncOutput'], 'Loaded cached state data successfully\nState update starting from block 0\nCommitted state updated to start of block 0\nin memory: Burn\n - 20000000 swapbill output added\nin memory: Burn\n - 30000000 swapbill output added\nIn memory state updated to end of block 3\n')
+		# add tests for other badly formed transactions?
+
 	def test_start_block_not_reached(self):
 		host = InitHost()
 		ownerDir = path.join(dataDirectory, host._getOwner())
