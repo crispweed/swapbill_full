@@ -79,7 +79,7 @@ def Main(startBlockIndex, startBlockHash, useTestNet, commandLineArgs=sys.argv[1
 
 	if host is None:
 		host = Host.Host(useTestNet=useTestNet, dataDirectory=args.datadir, configFile=args.configfile)
-		print("current litecoind block count = {}".format(host._rpcHost.call('getblockcount')), file=out)
+		#print("current litecoind block count = {}".format(host._rpcHost.call('getblockcount')), file=out)
 
 	includePending = hasattr(args, 'includepending') and args.includepending
 
@@ -104,7 +104,6 @@ def Main(startBlockIndex, startBlockHash, useTestNet, commandLineArgs=sys.argv[1
 		return info
 
 	state, ownedAccounts = SyncAndReturnStateAndOwnedAccounts(args.datadir, startBlockIndex, startBlockHash, host, includePending=includePending, forceRescan=args.forceRescan, out=out)
-	print("state updated to end of block {}".format(state._currentBlockIndex - 1), file=out)
 
 	transactionBuildLayer = TransactionBuildLayer.TransactionBuildLayer(host, ownedAccounts)
 

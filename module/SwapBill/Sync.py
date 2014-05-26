@@ -9,43 +9,40 @@ from SwapBill.ExceptionReportedToUser import ExceptionReportedToUser
 stateVersion = 0.8
 ownedAccountsVersion = 0.2
 
-def _processTransactions(host, state, ownedAccounts, transactions, applyToState, out):
+def _processTransactions(host, state, ownedAccounts, transactions, applyToState, reportPrefix, out):
 	for txID, hostTXHex in transactions:
 		hostTX, scriptPubKeys = DecodeTransaction.Decode(hostTXHex)
 		if hostTX == None:
 			continue
-		outputsSpent = ownedAccounts.updateForSpent(hostTX)
+		report = ownedAccounts.updateForSpent(hostTX, state)
 		try:
 			transactionType, outputs, transactionDetails = TransactionEncoding.ToStateTransaction(hostTX)
-		except TransactionEncoding.NotValidSwapBillTransaction:
+			appliedSuccessfully = True
+		except (TransactionEncoding.NotValidSwapBillTransaction, TransactionEncoding.UnsupportedTransaction):
+			appliedSuccessfully = False
+			transactionType = 'InvalidTransaction'
+		if appliedSuccessfully and not state.checkTransaction(transactionType, outputs, transactionDetails)[0]:
+			appliedSuccessfully = False
+		if not appliedSuccessfully:
+			if report != '':
+				print(reportPrefix + ': ' + transactionType + ' failed to decode or apply', file=out)
+				print(report, end="", file=out)
 			continue
-		except TransactionEncoding.UnsupportedTransaction:
-			continue
-		if not state.checkTransaction(transactionType, outputs, transactionDetails)[0]:
-			if transactionAffectsMe:
-				outputPubKeyHashes = []
-				for i in range(len(outputs)):
-					outputPubKeyHashes.append(hostTX.outputPubKeyHash(i + 1))
-				print('Transaction fails:'+ FormatTransactionForUserDisplay.Format(host, transactionType, outputs, outputPubKeyHashes, transactionDetails), file=out)
-			continue
-		if not applyToState:
-			continue
-		changedSomewhereElse = ownedAccounts.checkForTradeOfferChanges(state)
-		assert not changedSomewhereElse
-		state.applyTransaction(transactionType, txID, outputs, transactionDetails)
-		tradeOffersChanged = ownedAccounts.checkForTradeOfferChanges(state)
-		newOwnedOutputs = ownedAccounts.updateForNewOutputs(host, state, txID, hostTX, outputs, scriptPubKeys)
-		if outputsSpent or tradeOffersChanged or newOwnedOutputs:
-			outputPubKeyHashes = []
-			for i in range(len(outputs)):
-				outputPubKeyHashes.append(hostTX.outputPubKeyHash(i + 1))
-			print('applied ' + FormatTransactionForUserDisplay.Format(host, transactionType, outputs, outputPubKeyHashes, transactionDetails), file=out)
+		if applyToState:
+			inBetweenReport = ownedAccounts.checkForTradeOfferChanges(state)
+			assert inBetweenReport == ''
+			state.applyTransaction(transactionType, txID, outputs, transactionDetails)
+			report += ownedAccounts.checkForTradeOfferChanges(state)
+			report += ownedAccounts.updateForNewOutputs(host, state, txID, hostTX, outputs, scriptPubKeys)
+		if report != '':
+			print(reportPrefix + ': ' + transactionType, file=out)
+			print(report, end="", file=out)
 
-def _processBlock(host, state, ownedAccounts, blockHash, out):
+def _processBlock(host, state, ownedAccounts, blockHash, reportPrefix, out):
 	transactions = host.getBlockTransactions(blockHash)
-	_processTransactions(host, state, ownedAccounts, transactions, True, out)
-	changedSomewhereElse = ownedAccounts.checkForTradeOfferChanges(state)
-	assert not changedSomewhereElse
+	_processTransactions(host, state, ownedAccounts, transactions, True, reportPrefix, out)
+	inBetweenReport = ownedAccounts.checkForTradeOfferChanges(state)
+	assert inBetweenReport == ''
 	state.advanceToNextBlock()
 	tradeOffersChanged = ownedAccounts.checkForTradeOfferChanges(state)
 	if tradeOffersChanged:
@@ -78,7 +75,7 @@ def SyncAndReturnStateAndOwnedAccounts(cacheDirectory, startBlockIndex, startBlo
 		state = State.State(blockIndex, blockHash)
 		ownedAccounts = OwnedAccounts.OwnedAccounts()
 
-	print('Starting from block', blockIndex, file=out)
+	print('State update starting from block', blockIndex, file=out)
 
 	toProcess = deque()
 	mostRecentHash = blockHash
@@ -89,7 +86,7 @@ def SyncAndReturnStateAndOwnedAccounts(cacheDirectory, startBlockIndex, startBlo
 		## hard coded value used here for number of blocks to lag behind with persistent state
 		if len(toProcess) == 20:
 			## advance cached state
-			_processBlock(host, state, ownedAccounts, blockHash, out=out)
+			_processBlock(host, state, ownedAccounts, blockHash, 'committed', out=out)
 			popped = toProcess.popleft()
 			blockIndex += 1
 			blockHash = popped
@@ -99,17 +96,19 @@ def SyncAndReturnStateAndOwnedAccounts(cacheDirectory, startBlockIndex, startBlo
 	PickledCache.Save((blockIndex, blockHash, state), stateVersion, cacheDirectory, 'State')
 	PickledCache.Save(ownedAccounts, ownedAccountsVersion, cacheDirectory, 'OwnedAccounts')
 
+	print("Committed state updated to end of block {}".format(state._currentBlockIndex - 1), file=out)
+
 	while len(toProcess) > 0:
 		## advance in memory state
-		_processBlock(host, state, ownedAccounts, blockHash, out=out)
+		_processBlock(host, state, ownedAccounts, blockHash, 'in memory', out=out)
 		popped = toProcess.popleft()
 		blockIndex += 1
 		blockHash = popped
-
-	_processBlock(host, state, ownedAccounts, blockHash, out=out)
+	_processBlock(host, state, ownedAccounts, blockHash, 'in memory', out=out)
 	blockIndex += 1
 
 	assert state._currentBlockIndex == blockIndex
+	print("In memory state updated to end of block {}".format(state._currentBlockIndex - 1), file=out)
 
 	# note that the best block chain may have changed during the above
 	# and so the following set of memory pool transactions may not correspond to the actual block chain endpoint we synchronised to
@@ -119,7 +118,7 @@ def SyncAndReturnStateAndOwnedAccounts(cacheDirectory, startBlockIndex, startBlo
 	# but we can potentially be more careful about this by checking best block chain after getting memory pool transactions
 	# and restarting the block chain traversal if this does not match up
 	memPoolTransactions = host.getMemPoolTransactions()
-	_processTransactions(host, state, ownedAccounts, memPoolTransactions, includePending, out)
+	_processTransactions(host, state, ownedAccounts, memPoolTransactions, includePending, 'in memory pool', out)
 
 	return state, ownedAccounts
 
