@@ -25,9 +25,8 @@ class SourceAddressUnseeded(ExceptionReportedToUser):
 	pass
 
 parser = argparse.ArgumentParser(prog='SwapBillClient', description='the reference implementation of the SwapBill protocol')
-#parser.add_argument('-V', '--version', action='version', version="SwapBillClient version %s" % config.clientVersion)
-parser.add_argument('--configfile', help='the location of the configuration file')
-parser.add_argument('--datadir', help='the location of the data directory', default='.')
+parser.add_argument('--configFile', help='the location of the configuration file')
+parser.add_argument('--dataDir', help='the location of the data directory', default='.')
 parser.add_argument('--forceRescan', help='force a full block chain rescan', action='store_true')
 subparsers = parser.add_subparsers(dest='action', help='the action to be taken')
 
@@ -74,11 +73,11 @@ sp.add_argument('-i', '--includepending', help='include transactions that have b
 def Main(startBlockIndex, startBlockHash, useTestNet, commandLineArgs=sys.argv[1:], host=None, out=sys.stdout):
 	args = parser.parse_args(commandLineArgs)
 
-	if not path.isdir(args.datadir):
-		raise ExceptionReportedToUser("The following path (specified for data directory parameter) is not a valid path to an existing directory: " + args.datadir)
+	if not path.isdir(args.dataDir):
+		raise ExceptionReportedToUser("The following path (specified for data directory parameter) is not a valid path to an existing directory: " + args.dataDir)
 
 	if host is None:
-		host = Host.Host(useTestNet=useTestNet, dataDirectory=args.datadir, configFile=args.configfile)
+		host = Host.Host(useTestNet=useTestNet, dataDirectory=args.dataDir, configFile=args.configFile)
 		#print("current litecoind block count = {}".format(host._rpcHost.call('getblockcount')), file=out)
 
 	includePending = hasattr(args, 'includepending') and args.includepending
@@ -86,7 +85,7 @@ def Main(startBlockIndex, startBlockHash, useTestNet, commandLineArgs=sys.argv[1
 	if args.action == 'get_state_info':
 		syncOut = io.StringIO()
 		startTime = time.clock()
-		state, ownedAccounts = SyncAndReturnStateAndOwnedAccounts(args.datadir, startBlockIndex, startBlockHash, host, includePending=includePending, forceRescan=args.forceRescan, out=syncOut)
+		state, ownedAccounts = SyncAndReturnStateAndOwnedAccounts(args.dataDir, startBlockIndex, startBlockHash, host, includePending=includePending, forceRescan=args.forceRescan, out=syncOut)
 		elapsedTime = time.clock() - startTime
 		formattedBalances = {}
 		for account in state._balances:
@@ -103,7 +102,7 @@ def Main(startBlockIndex, startBlockHash, useTestNet, commandLineArgs=sys.argv[1
 		}
 		return info
 
-	state, ownedAccounts = SyncAndReturnStateAndOwnedAccounts(args.datadir, startBlockIndex, startBlockHash, host, includePending=includePending, forceRescan=args.forceRescan, out=out)
+	state, ownedAccounts = SyncAndReturnStateAndOwnedAccounts(args.dataDir, startBlockIndex, startBlockHash, host, includePending=includePending, forceRescan=args.forceRescan, out=out)
 
 	transactionBuildLayer = TransactionBuildLayer.TransactionBuildLayer(host, ownedAccounts)
 

@@ -68,7 +68,7 @@ def RunClient(host, args):
 	ownerDir = path.join(dataDirectory, host._getOwner())
 	if not path.exists(ownerDir):
 		os.mkdir(ownerDir)
-	fullArgs = ['--datadir', ownerDir] + convertedArgs
+	fullArgs = ['--dataDir', ownerDir] + convertedArgs
 	out = io.StringIO()
 	assert host.getBlockHashAtIndexOrNone(0) is not None
 	result = ClientMain.Main(startBlockIndex=0, startBlockHash=host.getBlockHashAtIndexOrNone(0), useTestNet=True, commandLineArgs=fullArgs, host=host, out=out)
@@ -127,7 +127,7 @@ class Test(unittest.TestCase):
 		ownerDir = path.join(dataDirectory, host._getOwner())
 		if not path.exists(ownerDir):
 			os.mkdir(ownerDir)
-		args = ['--datadir', ownerDir, 'get_balance']
+		args = ['--dataDir', ownerDir, 'get_balance']
 		out = io.StringIO()
 		startBlock = 5
 		assert host.getBlockHashAtIndexOrNone(startBlock) is None
@@ -403,7 +403,7 @@ class Test(unittest.TestCase):
 	def test_bad_invocations(self):
 		host = InitHost()
 		self.assertRaisesRegexp(ExceptionReportedToUser, 'No pending exchange with the specified ID', RunClient, host, ['complete_ltc_sell', '--pending_exchange_id', '123'])
-		self.assertRaisesRegexp(ExceptionReportedToUser, 'The following path [(]specified for data directory parameter[)] is not a valid path to an existing directory', RunClient, host, ['--datadir=dontMakeADirectoryCalledThis', 'get_balance'])
+		self.assertRaisesRegexp(ExceptionReportedToUser, 'The following path [(]specified for data directory parameter[)] is not a valid path to an existing directory', RunClient, host, ['--dataDir=dontMakeADirectoryCalledThis', 'get_balance'])
 
 	def test_burn_and_pay(self):
 		host = InitHost()
