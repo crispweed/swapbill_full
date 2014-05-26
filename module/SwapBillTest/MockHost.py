@@ -136,15 +136,13 @@ class MockHost(object):
 		except UnicodeDecodeError:
 			# control address
 			return False
-		#return asText.startswith(addressPrefix + self._id + '_')
 		return asText.startswith(addressPrefix + self._id + '_host_')
 
-	def _consumeUnspent(self, txID, vOut, scriptPubKey):
+	def _consumeUnspent(self, txID, vOut):
 		unspentAfter = []
 		found = None
 		for entry in self._unspent:
 			if entry['txid'] == txID and entry['vout'] == vOut:
-				assert entry['scriptPubKey'] == scriptPubKey
 				assert found is None
 				found = entry
 			else:
@@ -178,7 +176,7 @@ class MockHost(object):
 		sumOfInputs = 0
 		requiredPrivateKeys = []
 		for entry in decoded['vin']:
-			amount, privateKeyRequired = self._consumeUnspent(entry['txid'], entry['vout'], entry['scriptPubKey'])
+			amount, privateKeyRequired = self._consumeUnspent(entry['txid'], entry['vout'])
 			sumOfInputs += amount
 			if privateKeyRequired is not None:
 				requiredPrivateKeys.append(privateKeyRequired)
@@ -203,11 +201,6 @@ class MockHost(object):
 		feeRequired = TransactionFee.CalculateRequired_FromSizeAndOutputs(byteSize, outputAmounts)
 		if transactionFee < feeRequired:
 			raise Host.InsufficientTransactionFees
-			#print('byteSize:', byteSize)
-			#print('outputAmounts:')
-			#print(outputAmounts)
-			#print('transactionFee:', transactionFee)
-			#print('feeRequired:', feeRequired)
 		assert transactionFee >= feeRequired
 		if transactionFee >= feeRequired + TransactionFee.dustLimit:
 			print('transactionFee:', transactionFee)

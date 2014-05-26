@@ -34,7 +34,7 @@ class Test(unittest.TestCase):
 		self.assertEqual(pubKeyHash, b"\xae\x89\x91\xa4\x19\x9a6Y1k-\x18Mh\x91\xb8'\xea`b")
 
 		decoded = RawTransaction.Decode(rawTX)
-		self.assertListEqual(decoded['vin'], [{'vout': 0, 'txid': 'b46c0b9cab086fd3ffbe69796e0c0416c14e4b5f416fe7ec349848b08ded7986', 'scriptPubKey': '2102066feb3b543146fec6afcb89a2e92e18e3fbbee43ff5c1175cb01897594ab8acac'}])
+		self.assertListEqual(decoded['vin'], [{'vout': 0, 'txid': 'b46c0b9cab086fd3ffbe69796e0c0416c14e4b5f416fe7ec349848b08ded7986'}])
 		self.assertListEqual(decoded['vout'], [{'pubKeyHash': '3823d67db1ca2067d141ae2ffce6cba88e286f22', 'value': 200000000, 'scriptPubKey': '76a9143823d67db1ca2067d141ae2ffce6cba88e286f2288ac'}, {'pubKeyHash': '4b6512d12809128d65329225b630b7f508d2c58b', 'value': 100000000, 'scriptPubKey': '76a9144b6512d12809128d65329225b630b7f508d2c58b88ac'}])
 		self.assertEqual(len(decoded), 2)
 

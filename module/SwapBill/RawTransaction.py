@@ -225,14 +225,10 @@ def Decode(txBytes):
 		txIDBytes = txBytes[pos:pos + 32]
 		pos += 32
 		thisInput['txid'] = binascii.hexlify(txIDBytes[::-1]).decode('ascii')
-		#thisInput['txID'] = txIDBytes[::-1]
 		thisInput['vout'] = struct.unpack("<L", txBytes[pos:pos + 4])[0]
 		pos += 4
 		pos, scriptLen = _decodeVarInt(txBytes, pos)
-		scriptPubKeyBytes = txBytes[pos:pos + scriptLen]
 		pos += scriptLen
-		thisInput['scriptPubKey'] = binascii.hexlify(scriptPubKeyBytes).decode('ascii')
-		#thisInput['scriptPubKey'] = scriptPubKeyBytes
 		pos += 4 # sequence
 		inputs.append(thisInput)
 	result['vin'] = inputs
@@ -253,7 +249,6 @@ def Decode(txBytes):
 		expectedScriptStart += _opPush(20)
 		pubKeyHash = scriptSigBytes[len(expectedScriptStart):len(expectedScriptStart)+20]
 		assert len(pubKeyHash) == 20
-		#thisOutput['pubKeyHash'] = pubKeyHash
 		thisOutput['pubKeyHash'] = binascii.hexlify(pubKeyHash).decode('ascii')
 		outputs.append(thisOutput)
 	result['vout'] = outputs
