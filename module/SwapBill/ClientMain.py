@@ -98,7 +98,7 @@ def Main(startBlockIndex, startBlockHash, useTestNet, commandLineArgs=sys.argv[1
 		    'numberOfLTCBuyOffers':state._LTCBuys.size(),
 		    'numberOfLTCSellOffers':state._LTCSells.size(),
 		    'numberOfPendingExchanges':len(state._pendingExchanges),
-		    'numberOfOwnedAccounts':len(ownedAccounts)
+		    'numberOfSpendableOutputs':len(ownedAccounts.spendableAccounts)
 		}
 		return info
 
@@ -135,7 +135,7 @@ def Main(startBlockIndex, startBlockHash, useTestNet, commandLineArgs=sys.argv[1
 		for i in range(baseTX.numberOfInputs()):
 			txID = baseTX.inputTXID(i)
 			vOut = baseTX.inputVOut(i)
-			baseInputsAmount += ownedAccounts[(txID, vOut)][0]
+			baseInputsAmount += ownedAccounts.spendableAccounts[(txID, vOut)][0]
 		txID = SetFeeAndSend(baseTX, baseInputsAmount, backingUnspent)
 		return {'transaction id':txID}
 
@@ -230,13 +230,21 @@ def Main(startBlockIndex, startBlockHash, useTestNet, commandLineArgs=sys.argv[1
 		total = 0
 		spendable = 0
 		activeAccountAmount = 0
-		for account in ownedAccounts:
+		for account in ownedAccounts.spendableAccounts:
 			assert account in state._balances
 			amount = state._balances[account]
 			total += amount
 			spendable += state.getSpendableAmount(account)
 			if amount > activeAccountAmount:
 				activeAccountAmount = amount
+		for account in ownedAccounts.sellOffers:
+			assert account in state._balances
+			amount = state._balances[account]
+			total += amount
+		for account in ownedAccounts.buyOffers:
+			assert account in state._balances
+			amount = state._balances[account]
+			total += amount
 		return {'spendable':spendable, 'total':total, 'active':activeAccountAmount}
 
 	elif args.action == 'get_buy_offers':
@@ -244,7 +252,7 @@ def Main(startBlockIndex, startBlockHash, useTestNet, commandLineArgs=sys.argv[1
 		offers = state._LTCBuys.getSortedExchangeRateAndDetails()
 		for exchangeRate, buyDetails in offers:
 			#print('testing owned status for:', buyDetails.refundAccount[0][-3:], buyDetails.refundAccount[1])
-			mine = buyDetails.refundAccount in ownedAccounts
+			mine = buyDetails.refundAccount in ownedAccounts.buyOffers
 			exchangeAmount = buyDetails.swapBillAmount
 			rate_Double = float(exchangeRate) / 0x100000000
 			ltc = int(exchangeAmount * rate_Double)
@@ -255,7 +263,7 @@ def Main(startBlockIndex, startBlockHash, useTestNet, commandLineArgs=sys.argv[1
 		result = []
 		offers = state._LTCSells.getSortedExchangeRateAndDetails()
 		for exchangeRate, sellDetails in offers:
-			mine = sellDetails.receivingAccount in ownedAccounts
+			mine = sellDetails.receivingAccount in ownedAccounts.sellOffers
 			exchangeAmount = sellDetails.swapBillAmount
 			depositAmount = sellDetails.swapBillDeposit
 			rate_Double = float(exchangeRate) / 0x100000000
@@ -269,8 +277,8 @@ def Main(startBlockIndex, startBlockHash, useTestNet, commandLineArgs=sys.argv[1
 			d = {}
 			exchange = state._pendingExchanges[key]
 			#d['ltc receive address'] = host.formatAddressForEndUser(exchange.ltcReceiveAddress)
-			d['I am seller (and need to complete)'] = exchange.sellerReceivingAccount in ownedAccounts
-			d['I am buyer (and waiting for payment)'] = exchange.buyerAddress in ownedAccounts
+			d['I am seller (and need to complete)'] = exchange.sellerReceivingAccount in ownedAccounts.sellOffers
+			d['I am buyer (and waiting for payment)'] = exchange.buyerAddress in ownedAccounts.buyOffers
 			d['deposit paid by seller'] = exchange.swapBillDeposit
 			d['swap bill paid by buyer'] = exchange.swapBillAmount
 			d['outstanding ltc payment amount'] = exchange.ltc

@@ -28,24 +28,24 @@ class TransactionBuildLayer(object):
 	def getActiveAccount(self, state):
 		best = None
 		bestAmount = 0
-		for account in self._ownedAccounts:
-			amount = state.getSpendableAmount(account)
+		for account in self._ownedAccounts.spendableAccounts:
+			assert state.getSpendableAmount(account) > 0
+			amount = state._balances[account]
 			if amount > bestAmount:
 				best = account
 				bestAmount = amount
 		if bestAmount == 0:
 			raise ExceptionReportedToUser('No active swapbill balance currently available (you may need to wait for a transaction in progress to complete).')
-		self._scriptPubKeyLookup[best] = self._ownedAccounts[best][2]
-		self._privateKeys.append(self._ownedAccounts[best][1])
+		self._scriptPubKeyLookup[best] = self._ownedAccounts.spendableAccounts[best][2]
+		self._privateKeys.append(self._ownedAccounts.spendableAccounts[best][1])
 		return best
 
 	def getAllOwnedAndSpendable(self, state):
 		result = []
-		for account in self._ownedAccounts:
-			if state.getSpendableAmount(account) == 0:
-				continue
-			self._scriptPubKeyLookup[account] = self._ownedAccounts[account][2]
-			self._privateKeys.append(self._ownedAccounts[account][1])
+		for account in self._ownedAccounts.spendableAccounts:
+			assert state.getSpendableAmount(account) > 0
+			self._scriptPubKeyLookup[account] = self._ownedAccounts.spendableAccounts[account][2]
+			self._privateKeys.append(self._ownedAccounts.spendableAccounts[account][1])
 			result.append(account)
 		return result
 

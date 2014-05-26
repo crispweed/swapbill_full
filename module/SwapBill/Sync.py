@@ -2,24 +2,19 @@ from __future__ import print_function
 import sys
 from os import path
 from collections import deque
-from SwapBill import State, DecodeTransaction, TransactionEncoding, PickledCache
+from SwapBill import State, DecodeTransaction, TransactionEncoding, PickledCache, OwnedAccounts
 from SwapBill import FormatTransactionForUserDisplay
 from SwapBill.ExceptionReportedToUser import ExceptionReportedToUser
 
 stateVersion = 0.8
-ownedAccountsVersion = 0.1
+ownedAccountsVersion = 0.2
 
 def _processTransactions(host, state, ownedAccounts, transactions, applyToState, out):
 	for txID, hostTXHex in transactions:
 		hostTX, scriptPubKeys = DecodeTransaction.Decode(hostTXHex)
 		if hostTX == None:
 			continue
-		transactionAffectsMe = False
-		for i in range(hostTX.numberOfInputs()):
-			spentAccount = (hostTX.inputTXID(i), hostTX.inputVOut(i))
-			if spentAccount in ownedAccounts:
-				ownedAccounts.pop(spentAccount)
-				transactionAffectsMe = True
+		outputsSpent = ownedAccounts.updateForSpent(hostTX)
 		try:
 			transactionType, outputs, transactionDetails = TransactionEncoding.ToStateTransaction(hostTX)
 		except TransactionEncoding.NotValidSwapBillTransaction:
@@ -36,24 +31,9 @@ def _processTransactions(host, state, ownedAccounts, transactions, applyToState,
 		if not applyToState:
 			continue
 		state.applyTransaction(transactionType, txID, outputs, transactionDetails)
-		for i in range(len(outputs)):
-			newOwnedAccount = (txID, i + 1)
-			if newOwnedAccount in state._balances:
-				privateKey = host.privateKeyForPubKeyHash(hostTX.outputPubKeyHash(i + 1))
-				if privateKey is not None:
-					#print("added owned account for:", transactionType, outputs[i], txID[-3:], i + 1)
-					assert not newOwnedAccount in ownedAccounts
-					ownedAccounts[newOwnedAccount] = (hostTX.outputAmount(i + 1), privateKey, scriptPubKeys[i + 1])
-					transactionAffectsMe = True
-		if transactionType == 'LTCExchangeCompletion':
-			# ** TODO we don't know if this affects me based on current approach for checking this
-			# since exchange completion doesn't consume any swapbill, and pays out to an address already set up by the trade offer
-			# sort this out!
-			# **** and, in fact, this affects buy and sell offers also, by the looks of things
-			# **** and it seems like we need a way to track sell offers generally
-			# **** -> assign indices to buy and sell offers straight away, instead of just for pending exchange index later on? 
-			transactionAffectsMe = True
-		if transactionAffectsMe:
+		tradeOffersChanged = ownedAccounts.checkForTradeOfferChanges(state)
+		newOwnedOutputs = ownedAccounts.updateForNewOutputs(host, state, txID, hostTX, outputs, scriptPubKeys)
+		if outputsSpent or tradeOffersChanged or newOwnedOutputs:
 			outputPubKeyHashes = []
 			for i in range(len(outputs)):
 				outputPubKeyHashes.append(hostTX.outputPubKeyHash(i + 1))
@@ -89,7 +69,7 @@ def SyncAndReturnStateAndOwnedAccounts(cacheDirectory, startBlockIndex, startBlo
 		if blockHash != startBlockHash:
 			raise ExceptionReportedToUser('Block hash for swapbill start block does not match.')
 		state = State.State(blockIndex, blockHash)
-		ownedAccounts = {}
+		ownedAccounts = OwnedAccounts.OwnedAccounts()
 
 	print('Starting from block', blockIndex, file=out)
 
