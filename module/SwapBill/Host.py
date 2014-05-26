@@ -53,6 +53,8 @@ class Host(object):
 		except RPC.MethodNotFoundException:
 			self._hasExtendTransactionsInBlockQuery = False
 
+		self._submittedTransactionsFileName = path.join(dataDirectory, 'submittedTransactions.txt')
+
 # unspents, addresses, transaction encode and send
 
 	def getUnspent(self):
@@ -104,6 +106,11 @@ class Host(object):
 			txID = self._rpcHost.call('sendrawtransaction', signedHex)
 		except RPC.RPCFailureException as e:
 			raise ExceptionReportedToUser('RPC error sending signed transaction: ' + str(e))
+		with open(self._submittedTransactionsFileName, mode='a') as f:
+			f.write(txID)
+			f.write('\n')
+			f.write(signedHex)
+			f.write('\n')
 		return txID
 
 # block chain tracking, transaction stream and decoding
