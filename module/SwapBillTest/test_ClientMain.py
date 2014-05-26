@@ -105,6 +105,18 @@ class Test(unittest.TestCase):
 		self.assertTrue(info['syncOutput'].startswith('Loaded cached state data successfully\nStarting from block 0\n'))
 		info = GetStateInfo(host)
 		self.assertEqual(info['balances'], {'02:1': 2*e(7), '04:2': 1*e(7), '04:1': 25*e(6)})
+		self.assertEqual(info['syncOutput'].count('applied Burn'), 2)
+		self.assertEqual(info['syncOutput'].count('applied Pay'), 1)
+		host._setOwner('recipient')
+		info = GetStateInfo(host)
+		self.assertEqual(info['balances'], {'02:1': 2*e(7), '04:2': 1*e(7), '04:1': 25*e(6)})
+		self.assertEqual(info['syncOutput'].count('applied Burn'), 0)
+		self.assertEqual(info['syncOutput'].count('applied Pay'), 1)
+		host._setOwner('someoneElse')
+		info = GetStateInfo(host)
+		self.assertEqual(info['balances'], {'02:1': 2*e(7), '04:2': 1*e(7), '04:1': 25*e(6)})
+		self.assertEqual(info['syncOutput'].count('applied Burn'), 0)
+		self.assertEqual(info['syncOutput'].count('applied Pay'), 0)
 
 	def test_start_block_not_reached(self):
 		host = InitHost()
