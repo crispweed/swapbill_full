@@ -96,7 +96,7 @@ def SyncAndReturnStateAndOwnedAccounts(cacheDirectory, startBlockIndex, startBlo
 	PickledCache.Save((blockIndex, blockHash, state), stateVersion, cacheDirectory, 'State')
 	PickledCache.Save(ownedAccounts, ownedAccountsVersion, cacheDirectory, 'OwnedAccounts')
 
-	print("Committed state updated to end of block {}".format(state._currentBlockIndex - 1), file=out)
+	print("Committed state updated to start of block {}".format(state._currentBlockIndex), file=out)
 
 	while len(toProcess) > 0:
 		## advance in memory state

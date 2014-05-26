@@ -90,7 +90,7 @@ class Test(unittest.TestCase):
 		info = GetStateInfo(host, includePending)
 		self.assertSetEqual(set(info['balances'].values()), set(expected))
 
-	def test_basic(self):
+	def test_burn_pay_and_sync_output(self):
 		host = InitHost()
 		self.assertRaises(InsufficientFunds, RunClient, host, ['burn', '--quantity', 2*e(7)])
 		host._addUnspent(100000000)
@@ -110,14 +110,17 @@ class Test(unittest.TestCase):
 		self.assertEqual(info['balances'], {'02:1': 2*e(7), '04:2': 1*e(7), '04:1': 25*e(6)})
 		self.assertEqual(info['syncOutput'].count('in memory: Burn'), 2)
 		self.assertEqual(info['syncOutput'].count('in memory: Pay'), 1)
+		self.assertEqual(info['syncOutput'], 'Loaded cached state data successfully\nState update starting from block 0\nCommitted state updated to start of block 0\nin memory: Burn\n - 20000000 swapbill output added\nin memory: Burn\n - 35000000 swapbill output added\nin memory: Pay\n - 35000000 swapbill output consumed\n - 25000000 swapbill output added\nIn memory state updated to end of block 3\n')
 		host._setOwner('recipient')
 		info = GetStateInfo(host)
 		self.assertEqual(info['syncOutput'].count('in memory: Burn'), 0)
 		self.assertEqual(info['syncOutput'].count('in memory: Pay'), 1)
+		self.assertEqual(info['syncOutput'], 'Failed to load from cache, full index generation required (no cache file found)\nState update starting from block 0\nCommitted state updated to start of block 0\nin memory: Pay\n - 10000000 swapbill output added\nIn memory state updated to end of block 3\n')
 		host._setOwner('someoneElse')
 		info = GetStateInfo(host)
 		self.assertEqual(info['syncOutput'].count('in memory: Burn'), 0)
 		self.assertEqual(info['syncOutput'].count('in memory: Pay'), 0)
+		self.assertEqual(info['syncOutput'], 'Failed to load from cache, full index generation required (no cache file found)\nState update starting from block 0\nCommitted state updated to start of block 0\nIn memory state updated to end of block 3\n')
 
 	def test_start_block_not_reached(self):
 		host = InitHost()
