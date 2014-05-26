@@ -83,31 +83,20 @@ def PubKeyHashForScriptPubKey(scriptPubKey):
 
 def Create(tx, scriptPubKeyLookup):
 	data = struct.pack("<L", 1) # version, 4 byte little endian
-
-	# Number of inputs.
-	## TODO: force to  < 0xfd for SB transactions?
 	data += _encodeVarInt(int(tx.numberOfInputs()))
-
-	# List of Inputs.
 	for i in range(tx.numberOfInputs()):
 		txid = tx.inputTXID(i)
 		vout = tx.inputVOut(i)
 		scriptPubKey = scriptPubKeyLookup[(txid, vout)]
-		#assert type(txid) == str
-		#assert type(scriptPubKey) == str
 		txIDBytes = binascii.unhexlify(txid.encode('ascii'))[::-1]
 		assert len(txIDBytes) == 32
 		data += txIDBytes
 		data += struct.pack("<L", vout)
 		script = binascii.unhexlify(scriptPubKey.encode('ascii'))
-		## TODO: force script length to < 0xfd for SB transactions?
 		data += _encodeVarInt(int(len(script)))
 		data += script
-		data += b'\xff' * 4                                    # Sequence
-
-	# Number of outputs.
+		data += b'\xff' * 4 # sequence
 	data += _encodeVarInt(tx.numberOfOutputs())
-
 	for i in range(tx.numberOfOutputs()):
 		pubKeyHash = tx.outputPubKeyHash(i)
 		value = tx.outputAmount(i)
@@ -121,12 +110,10 @@ def Create(tx, scriptPubKeyLookup):
 		script += OP_CHECKSIG
 		data += _encodeVarInt(int(len(script)))
 		data += script
-
-	data += struct.pack("<L", 0)                # LockTime
+	data += struct.pack("<L", 0) # lock time
 	return data
 
 def UnexpectedFormat_Fast(txBytes, controlAddressPrefix):
-	## TODO: optimise this by putting the control address at the end of the transaction!
 	assert type(txBytes) is type(b'')
 	assert type(controlAddressPrefix) is type(b'')
 	assert len(controlAddressPrefix) <= 20
@@ -170,45 +157,6 @@ def UnexpectedFormat_Fast(txBytes, controlAddressPrefix):
 	if pos + 4 != len(txBytes):
 		return True
 	return False
-
-def ExtractOutputPubKeyHash(txBytes, outputIndex):
-	assert type(txBytes) is type(b'')
-	assert outputIndex >= 0
-
-	if UnexpectedFormat_Fast(txBytes, b''):
-		raise NotSwapBillTransaction()
-
-	pos = 4
-
-	pos, numberOfInputs = _decodeVarInt(txBytes, pos)
-
-	for i in range(numberOfInputs):
-		pos += 32
-		pos += 4
-		pos, scriptLen = _decodeVarInt(txBytes, pos)
-		#print(i, scriptLen)
-		pos += scriptLen
-		pos += 4
-		assert pos < len(txBytes)
-
-	pos, numberOfOutputs = _decodeVarInt(txBytes, pos)
-
-	if outputIndex >= numberOfOutputs:
-		raise NotEnoughOutputs()
-
-	for i in range(outputIndex):
-		pos += 8
-		pos, scriptLen = _decodeVarInt(txBytes, pos)
-		pos += scriptLen
-
-	pos += 8
-	pos, scriptLen = _decodeVarInt(txBytes, pos)
-	expectedScriptStart = OP_DUP
-	expectedScriptStart += OP_HASH160
-	expectedScriptStart += _opPush(20)
-	pos += len(expectedScriptStart)
-	assert len(txBytes) > pos + 20
-	return txBytes[pos:pos + 20]
 
 def Decode(txBytes):
 	assert type(txBytes) is type(b'')
