@@ -78,7 +78,6 @@ def Main(startBlockIndex, startBlockHash, useTestNet, commandLineArgs=sys.argv[1
 
 	if host is None:
 		host = Host.Host(useTestNet=useTestNet, dataDirectory=args.dataDir, configFile=args.configFile)
-		#print("current litecoind block count = {}".format(host._rpcHost.call('getblockcount')), file=out)
 
 	includePending = hasattr(args, 'includepending') and args.includepending
 
@@ -205,8 +204,6 @@ def Main(startBlockIndex, startBlockHash, useTestNet, commandLineArgs=sys.argv[1
 		    'destinationAddress':exchange.ltcReceiveAddress,
 		    'destinationAmount':exchange.ltc
 		}
-		#print('complete_ltc_sell details:')
-		#print(details)
 		transactionBuildLayer.startTransactionConstruction()
 		return CheckAndSend(transactionType, (), (), details)
 
@@ -250,7 +247,6 @@ def Main(startBlockIndex, startBlockHash, useTestNet, commandLineArgs=sys.argv[1
 		result = []
 		offers = state._LTCBuys.getSortedExchangeRateAndDetails()
 		for exchangeRate, buyDetails in offers:
-			#print('testing owned status for:', buyDetails.refundAccount[0][-3:], buyDetails.refundAccount[1])
 			mine = buyDetails.refundAccount in ownedAccounts.buyOffers
 			exchangeAmount = buyDetails.swapBillAmount
 			rate_Double = float(exchangeRate) / 0x100000000
@@ -275,7 +271,6 @@ def Main(startBlockIndex, startBlockHash, useTestNet, commandLineArgs=sys.argv[1
 		for key in state._pendingExchanges:
 			d = {}
 			exchange = state._pendingExchanges[key]
-			#d['ltc receive address'] = host.formatAddressForEndUser(exchange.ltcReceiveAddress)
 			d['I am seller (and need to complete)'] = exchange.sellerReceivingAccount in ownedAccounts.sellOffers
 			d['I am buyer (and waiting for payment)'] = exchange.buyerAddress in ownedAccounts.buyOffers
 			d['deposit paid by seller'] = exchange.swapBillDeposit

@@ -3,7 +3,6 @@ import sys
 from os import path
 from collections import deque
 from SwapBill import State, DecodeTransaction, TransactionEncoding, PickledCache, OwnedAccounts
-from SwapBill import FormatTransactionForUserDisplay
 from SwapBill.ExceptionReportedToUser import ExceptionReportedToUser
 
 stateVersion = 0.8

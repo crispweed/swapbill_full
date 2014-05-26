@@ -35,7 +35,6 @@ def AddPaymentFeesAndChange(baseTX, baseInputAmount, dustLimit, transactionFee, 
 
 	if baseInputAmount + outputsTotal > totalRequired:
 		overSupply = baseInputAmount + outputsTotal - totalRequired
-		#print('overSupply:', overSupply)
 		if overSupply >= dustLimit:
 			filledOutTX.addOutput(changePubKeyHash, overSupply)
 
