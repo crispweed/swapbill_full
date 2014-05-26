@@ -40,12 +40,12 @@ sp.add_argument('--toAddress', required=True, help='pay to this address')
 sp.add_argument('--blocksUntilExpiry', type=int, default=8, help='if the transaction takes longer than this to go through then the transaction expires (in which case no payment is made and the full amount is returned as change)')
 
 sp = subparsers.add_parser('post_ltc_buy', help='make an offer to buy litecoin with swapbill')
-sp.add_argument('--quantity', required=True, help='amount of swapbill offered')
+sp.add_argument('--swapBillOffered', required=True, help='amount of swapbill offered')
 sp.add_argument('--exchangeRate', required=True, help='the exchange rate (positive integer, SWP/LTC * 0x100000000, must be less than 0x100000000)')
 sp.add_argument('--blocksUntilExpiry', type=int, default=200, help='after this block the offer expires (and swapbill remaining in any unmatched part of the offer is returned)')
 
 sp = subparsers.add_parser('post_ltc_sell', help='make an offer to sell litecoin for swapbill')
-sp.add_argument('--quantity', required=True, help='amount of swapbill to buy (deposit of 1/16 of this amount will be paid in to the offer)')
+sp.add_argument('--swapBillDesired', required=True, help='amount of swapbill to buy (deposit of 1/16 of this amount will be paid in to the offer)')
 sp.add_argument('--exchangeRate', required=True, help='the exchange rate SWP/LTC (must be greater than 0 and less than 1)')
 sp.add_argument('--blocksUntilExpiry', type=int, default=200, help='after this block the offer expires (and swapbill remaining in any unmatched part of the offer is returned)')
 
@@ -176,7 +176,7 @@ def Main(startBlockIndex, startBlockHash, useTestNet, commandLineArgs=sys.argv[1
 		transactionBuildLayer.startTransactionConstruction()
 		details = {
 		    'sourceAccount':transactionBuildLayer.getActiveAccount(state),
-		    'swapBillOffered':int(args.quantity),
+		    'swapBillOffered':int(args.swapBillOffered),
 		    'exchangeRate':int(float(args.exchangeRate) * 0x100000000),
 		    'receivingAddress':host.getNewNonSwapBillAddress(),
 		    'maxBlock':state._currentBlockIndex + args.blocksUntilExpiry
@@ -190,7 +190,7 @@ def Main(startBlockIndex, startBlockHash, useTestNet, commandLineArgs=sys.argv[1
 		transactionBuildLayer.startTransactionConstruction()
 		details = {
 		    'sourceAccount':transactionBuildLayer.getActiveAccount(state),
-		    'swapBillDesired':int(args.quantity),
+		    'swapBillDesired':int(args.swapBillDesired),
 		    'exchangeRate':int(float(args.exchangeRate) * 0x100000000),
 		    'maxBlock':state._currentBlockIndex + args.blocksUntilExpiry
 		}
