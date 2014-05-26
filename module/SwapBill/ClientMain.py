@@ -49,7 +49,7 @@ sp.add_argument('--exchangeRate', required=True, help='the exchange rate SWP/LTC
 sp.add_argument('--blocksUntilExpiry', type=int, default=200, help='after this block the offer expires (and swapbill remaining in any unmatched part of the offer is returned)')
 
 sp = subparsers.add_parser('complete_ltc_sell', help='complete an ltc exchange by fulfilling a pending exchange payment')
-sp.add_argument('--pending_exchange_id', required=True, help='the id of the pending exchange payment to fulfill')
+sp.add_argument('--pendingExchangeID', required=True, help='the id of the pending exchange payment to fulfill')
 
 subparsers.add_parser('collect', help='combine all current owned swapbill outputs into active account')
 
@@ -196,7 +196,7 @@ def Main(startBlockIndex, startBlockHash, useTestNet, commandLineArgs=sys.argv[1
 
 	elif args.action == 'complete_ltc_sell':
 		transactionType = 'LTCExchangeCompletion'
-		pendingExchangeID = int(args.pending_exchange_id)
+		pendingExchangeID = int(args.pendingExchangeID)
 		if not pendingExchangeID in state._pendingExchanges:
 			raise ExceptionReportedToUser('No pending exchange with the specified ID.')
 		exchange = state._pendingExchanges[pendingExchangeID]

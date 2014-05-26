@@ -163,7 +163,7 @@ class Test(unittest.TestCase):
 		info = GetStateInfo(host)
 		RunClient(host, ['post_ltc_buy', '--swapBillOffered', '30000000', '--exchangeRate', '0.5'])
 		info = GetStateInfo(host)
-		RunClient(host, ['complete_ltc_sell', '--pending_exchange_id', '0'])
+		RunClient(host, ['complete_ltc_sell', '--pendingExchangeID', '0'])
 		info = GetStateInfo(host)
 		self.assertEqual(info['balances'], {'04:1': 48125000, '04:2': 1*e(7), '03:2': 41875000})
 
@@ -402,7 +402,7 @@ class Test(unittest.TestCase):
 
 	def test_bad_invocations(self):
 		host = InitHost()
-		self.assertRaisesRegexp(ExceptionReportedToUser, 'No pending exchange with the specified ID', RunClient, host, ['complete_ltc_sell', '--pending_exchange_id', '123'])
+		self.assertRaisesRegexp(ExceptionReportedToUser, 'No pending exchange with the specified ID', RunClient, host, ['complete_ltc_sell', '--pendingExchangeID', '123'])
 		self.assertRaisesRegexp(ExceptionReportedToUser, 'The following path [(]specified for data directory parameter[)] is not a valid path to an existing directory', RunClient, host, ['--dataDir=dontMakeADirectoryCalledThis', 'get_balance'])
 
 	def test_burn_and_pay(self):
@@ -700,7 +700,7 @@ class Test(unittest.TestCase):
 		self.assertDictEqual(ownerBalances, {'alice': 1*e(7), 'bob': 3*e(7)+625000, 'clive': 6*e(7)-625000, 'dave': 7*e(7)-1250000})
 		#dave is more on the ball, and makes his completion payment
 		host._setOwner('dave')
-		RunClient(host, ['complete_ltc_sell', '--pending_exchange_id', '1'])
+		RunClient(host, ['complete_ltc_sell', '--pendingExchangeID', '1'])
 		info = GetStateInfo(host)
 		#dave gets credited bob's exchange funds, and is also refunded his exchange deposit
 		ownerBalances = GetOwnerBalances(host, ownerList, info['balances'])
