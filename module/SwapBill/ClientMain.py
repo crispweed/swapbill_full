@@ -28,6 +28,7 @@ parser = argparse.ArgumentParser(prog='SwapBillClient', description='the referen
 #parser.add_argument('-V', '--version', action='version', version="SwapBillClient version %s" % config.clientVersion)
 parser.add_argument('--configfile', help='the location of the configuration file')
 parser.add_argument('--datadir', help='the location of the data directory', default='.')
+parser.add_argument('--forceRescan', help='force a full block chain rescan', action='store_true')
 subparsers = parser.add_subparsers(dest='action', help='the action to be taken')
 
 sp = subparsers.add_parser('burn', help='destroy litecoin to create swapbill')
@@ -85,7 +86,7 @@ def Main(startBlockIndex, startBlockHash, useTestNet, commandLineArgs=sys.argv[1
 	if args.action == 'get_state_info':
 		syncOut = io.StringIO()
 		startTime = time.clock()
-		state, ownedAccounts = SyncAndReturnStateAndOwnedAccounts(args.datadir, startBlockIndex, startBlockHash, host, includePending=includePending, out=syncOut)
+		state, ownedAccounts = SyncAndReturnStateAndOwnedAccounts(args.datadir, startBlockIndex, startBlockHash, host, includePending=includePending, forceRescan=args.forceRescan, out=syncOut)
 		elapsedTime = time.clock() - startTime
 		formattedBalances = {}
 		for account in state._balances:
@@ -102,7 +103,7 @@ def Main(startBlockIndex, startBlockHash, useTestNet, commandLineArgs=sys.argv[1
 		}
 		return info
 
-	state, ownedAccounts = SyncAndReturnStateAndOwnedAccounts(args.datadir, startBlockIndex, startBlockHash, host, includePending=includePending, out=out)
+	state, ownedAccounts = SyncAndReturnStateAndOwnedAccounts(args.datadir, startBlockIndex, startBlockHash, host, includePending=includePending, forceRescan=args.forceRescan, out=out)
 	print("state updated to end of block {}".format(state._currentBlockIndex - 1), file=out)
 
 	transactionBuildLayer = TransactionBuildLayer.TransactionBuildLayer(host, ownedAccounts)

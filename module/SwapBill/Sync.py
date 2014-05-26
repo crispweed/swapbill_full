@@ -30,6 +30,8 @@ def _processTransactions(host, state, ownedAccounts, transactions, applyToState,
 			continue
 		if not applyToState:
 			continue
+		changedSomewhereElse = ownedAccounts.checkForTradeOfferChanges(state)
+		assert not changedSomewhereElse
 		state.applyTransaction(transactionType, txID, outputs, transactionDetails)
 		tradeOffersChanged = ownedAccounts.checkForTradeOfferChanges(state)
 		newOwnedOutputs = ownedAccounts.updateForNewOutputs(host, state, txID, hostTX, outputs, scriptPubKeys)
@@ -42,17 +44,22 @@ def _processTransactions(host, state, ownedAccounts, transactions, applyToState,
 def _processBlock(host, state, ownedAccounts, blockHash, out):
 	transactions = host.getBlockTransactions(blockHash)
 	_processTransactions(host, state, ownedAccounts, transactions, True, out)
+	changedSomewhereElse = ownedAccounts.checkForTradeOfferChanges(state)
+	assert not changedSomewhereElse
 	state.advanceToNextBlock()
+	tradeOffersChanged = ownedAccounts.checkForTradeOfferChanges(state)
+	if tradeOffersChanged:
+		print('trade offer or pending exchange expired', file=out)
 
-def SyncAndReturnStateAndOwnedAccounts(cacheDirectory, startBlockIndex, startBlockHash, host, includePending, out):
-	try:
-		(blockIndex, blockHash, state) = PickledCache.Load(cacheDirectory, 'State', stateVersion)
-		ownedAccounts = PickledCache.Load(cacheDirectory, 'OwnedAccounts', ownedAccountsVersion)
-	except PickledCache.LoadFailedException as e:
-		print('Failed to load from cache, full index generation required (' + str(e) + ')', file=out)
-		loaded = False
-	else:
-		loaded = True
+def SyncAndReturnStateAndOwnedAccounts(cacheDirectory, startBlockIndex, startBlockHash, host, includePending, forceRescan, out):
+	loaded = False
+	if not forceRescan:
+		try:
+			(blockIndex, blockHash, state) = PickledCache.Load(cacheDirectory, 'State', stateVersion)
+			ownedAccounts = PickledCache.Load(cacheDirectory, 'OwnedAccounts', ownedAccountsVersion)
+			loaded = True
+		except PickledCache.LoadFailedException as e:
+			print('Failed to load from cache, full index generation required (' + str(e) + ')', file=out)
 	if loaded and host.getBlockHashAtIndexOrNone(blockIndex) != blockHash:
 		print('The block corresponding with cached state has been orphaned, full index generation required.', file=out)
 		loaded = False

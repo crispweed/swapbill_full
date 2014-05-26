@@ -74,8 +74,11 @@ def RunClient(host, args):
 	result = ClientMain.Main(startBlockIndex=0, startBlockHash=host.getBlockHashAtIndexOrNone(0), useTestNet=True, commandLineArgs=fullArgs, host=host, out=out)
 	return out.getvalue(), result
 
-def GetStateInfo(host, includePending=False):
-	args = ['get_state_info']
+def GetStateInfo(host, includePending=False, forceRescan=False):
+	args = []
+	if forceRescan:
+		args.append('--forceRescan')
+	args.append('get_state_info')
 	if includePending:
 		args.append('-i')
 	output, info = RunClient(host, args)
@@ -109,12 +112,10 @@ class Test(unittest.TestCase):
 		self.assertEqual(info['syncOutput'].count('applied Pay'), 1)
 		host._setOwner('recipient')
 		info = GetStateInfo(host)
-		self.assertEqual(info['balances'], {'02:1': 2*e(7), '04:2': 1*e(7), '04:1': 25*e(6)})
 		self.assertEqual(info['syncOutput'].count('applied Burn'), 0)
 		self.assertEqual(info['syncOutput'].count('applied Pay'), 1)
 		host._setOwner('someoneElse')
 		info = GetStateInfo(host)
-		self.assertEqual(info['balances'], {'02:1': 2*e(7), '04:2': 1*e(7), '04:1': 25*e(6)})
 		self.assertEqual(info['syncOutput'].count('applied Burn'), 0)
 		self.assertEqual(info['syncOutput'].count('applied Pay'), 0)
 
@@ -707,3 +708,37 @@ class Test(unittest.TestCase):
 		self.assertEqual(info['numberOfLTCSellOffers'], 1)
 		self.assertEqual(info['numberOfPendingExchanges'], 0)
 
+		host._setOwner('alice')
+		info = GetStateInfo(host, includePending=False, forceRescan=True)
+		self.assertEqual(info['syncOutput'].count('applied Burn'), 1)
+		self.assertEqual(info['syncOutput'].count('applied LTCBuyOffer'), 1)
+		self.assertEqual(info['syncOutput'].count('applied LTCSellOffer'), 0)
+		self.assertEqual(info['syncOutput'].count('applied LTCExchangeCompletion'), 0)
+		self.assertEqual(info['syncOutput'].count('applied Pay'), 0)
+		self.assertEqual(info['syncOutput'].count('applied Collect'), 0)
+		self.assertEqual(info['syncOutput'].count('trade offer or pending exchange expired'), 0)
+		host._setOwner('bob')
+		info = GetStateInfo(host, includePending=False, forceRescan=True)
+		self.assertEqual(info['syncOutput'].count('applied Burn'), 2)
+		self.assertEqual(info['syncOutput'].count('applied LTCBuyOffer'), 2)
+		self.assertEqual(info['syncOutput'].count('applied LTCSellOffer'), 2)
+		self.assertEqual(info['syncOutput'].count('applied LTCExchangeCompletion'), 1)
+		self.assertEqual(info['syncOutput'].count('applied Pay'), 0)
+		self.assertEqual(info['syncOutput'].count('applied Collect'), 1)
+		self.assertEqual(info['syncOutput'].count('trade offer or pending exchange expired'), 1)
+		host._setOwner('clive')
+		info = GetStateInfo(host, includePending=False, forceRescan=True)
+		self.assertEqual(info['syncOutput'].count('applied Burn'), 1)
+		self.assertEqual(info['syncOutput'].count('applied LTCSellOffer'), 1)
+		self.assertEqual(info['syncOutput'].count('applied LTCExchangeCompletion'), 0)
+		self.assertEqual(info['syncOutput'].count('applied Pay'), 0)
+		self.assertEqual(info['syncOutput'].count('applied Collect'), 0)
+		self.assertEqual(info['syncOutput'].count('trade offer or pending exchange expired'), 1)
+		host._setOwner('dave')
+		info = GetStateInfo(host, includePending=False, forceRescan=True)
+		self.assertEqual(info['syncOutput'].count('applied Burn'), 1)
+		self.assertEqual(info['syncOutput'].count('applied LTCSellOffer'), 1)
+		self.assertEqual(info['syncOutput'].count('applied LTCExchangeCompletion'), 1)
+		self.assertEqual(info['syncOutput'].count('applied Pay'), 0)
+		self.assertEqual(info['syncOutput'].count('applied Collect'), 0)
+		self.assertEqual(info['syncOutput'].count('trade offer or pending exchange expired'), 0)
