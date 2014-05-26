@@ -32,10 +32,10 @@ parser.add_argument('--forceRescan', help='force a full block chain rescan', act
 subparsers = parser.add_subparsers(dest='action', help='the action to be taken')
 
 sp = subparsers.add_parser('burn', help='destroy litecoin to create swapbill')
-sp.add_argument('--quantity', required=True, help='quantity of LTC to be destroyed (in LTC satoshis)')
+sp.add_argument('--amount', required=True, help='amount of LTC to be destroyed, in satoshis')
 
 sp = subparsers.add_parser('pay', help='make a swapbill payment')
-sp.add_argument('--quantity', required=True, help='quantity of swapbill to be paid (in swapbill satoshis)')
+sp.add_argument('--amount', required=True, help='amount of swapbill to be paid, in satoshis')
 sp.add_argument('--toAddress', required=True, help='pay to this address')
 sp.add_argument('--blocksUntilExpiry', type=int, default=8, help='if the transaction takes longer than this to go through then the transaction expires (in which case no payment is made and the full amount is returned as change)')
 
@@ -147,12 +147,12 @@ def Main(startBlockIndex, startBlockHash, useTestNet, commandLineArgs=sys.argv[1
 		return pubKeyHash
 
 	if args.action == 'burn':
-		if int(args.quantity) < TransactionFee.dustLimit:
+		if int(args.amount) < TransactionFee.dustLimit:
 			raise ExceptionReportedToUser('Burn amount is below dust limit.')
 		transactionType = 'Burn'
 		outputs = ('destination',)
 		outputPubKeyHashes = (host.getNewSwapBillAddress(),)
-		details = {'amount':int(args.quantity)}
+		details = {'amount':int(args.amount)}
 		transactionBuildLayer.startTransactionConstruction()
 		return CheckAndSend(transactionType, outputs, outputPubKeyHashes, details)
 
@@ -163,7 +163,7 @@ def Main(startBlockIndex, startBlockHash, useTestNet, commandLineArgs=sys.argv[1
 		transactionBuildLayer.startTransactionConstruction()
 		details = {
 		    'sourceAccount':transactionBuildLayer.getActiveAccount(state),
-		    'amount':int(args.quantity),
+		    'amount':int(args.amount),
 		    'maxBlock':state._currentBlockIndex + args.blocksUntilExpiry
 		}
 		return CheckAndSend(transactionType, outputs, outputPubKeyHashes, details)
