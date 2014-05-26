@@ -51,8 +51,8 @@ class State(object):
 			self._tradeOfferChangeCounts[sellDetails.receivingAccount] += 1
 			self._addToAccount(sellDetails.receivingAccount, sellDetails.swapBillDeposit)
 			self._removeAccountRef(sellDetails.receivingAccount)
-		## TODO currently iterates through all pending exchanges each block added
-		## (sort out scaling issues with this!)
+		## ** currently iterates through all pending exchanges each block added
+		## are there scaling issues with this?
 		toDelete = []
 		for key in self._pendingExchanges:
 			exchange = self._pendingExchanges[key]
@@ -147,8 +147,6 @@ class State(object):
 	def _apply_Burn(self, txID, amount):
 		self._totalCreated += amount
 		self._addAccount((txID, 1), amount)
-
-	## TODO - split transaction details into inputs and outputs?
 
 	def _check_Pay(self, outputs, sourceAccount, amount, maxBlock):
 		if outputs != ('change', 'destination'):
