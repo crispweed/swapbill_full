@@ -233,7 +233,7 @@ class State(object):
 		self._matchLTC()
 
 	def _check_LTCSellOffer(self, outputs, sourceAccount, swapBillDesired, exchangeRate, maxBlock):
-		if outputs != ('change', 'receiving'):
+		if outputs != ('change', 'ltcSell'):
 			raise OutputsSpecDoesntMatch()
 		assert type(swapBillDesired) is int
 		assert swapBillDesired >= 0

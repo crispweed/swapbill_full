@@ -19,7 +19,7 @@ _mappingByTypeCode = (
     ('LTCSellOffer',
      1,
      (('swapBillDesired', 6, 'maxBlock', 4, 'exchangeRate', 4, None, 2), None),
-     ('change', 'receiving'),
+     ('change', 'ltcSell'),
      ()
 	),
     ('LTCExchangeCompletion', 0, (('pendingExchangeIndex', 6, None, 10), None), (), (('destinationAddress', 'destinationAmount'),)),

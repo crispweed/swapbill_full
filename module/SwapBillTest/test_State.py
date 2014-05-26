@@ -9,7 +9,7 @@ class Test(unittest.TestCase):
 	    'Burn':('destination',),
 	    'Pay':('change','destination'),
 	    'LTCBuyOffer':('change','refund'),
-	    'LTCSellOffer':('change','receiving'),
+	    'LTCSellOffer':('change','ltcSell'),
 	    'LTCExchangeCompletion':(),
 	    'Collect':('destination',),
 	    'ForwardToFutureNetworkVersion':('change',)
@@ -322,8 +322,8 @@ class Test(unittest.TestCase):
 
 		self.assertRaises(OutputsSpecDoesntMatch, state.checkTransaction, 'LTCSellOffer', (), details)
 		self.assertRaises(OutputsSpecDoesntMatch, state.checkTransaction, 'LTCSellOffer', ('madeUpOutput'), details)
-		self.assertRaises(OutputsSpecDoesntMatch, state.checkTransaction, 'LTCSellOffer', ('receiving', 'change'), details)
-		self.assertRaises(OutputsSpecDoesntMatch, state.checkTransaction, 'LTCSellOffer', ('change', 'receiving', 'extraOutput'), details)
+		self.assertRaises(OutputsSpecDoesntMatch, state.checkTransaction, 'LTCSellOffer', ('ltcSell', 'change'), details)
+		self.assertRaises(OutputsSpecDoesntMatch, state.checkTransaction, 'LTCSellOffer', ('change', 'ltcSell', 'extraOutput'), details)
 
 		# nonexistant source account
 		details['sourceAccount'] = 'madeUpAccount'
@@ -333,13 +333,13 @@ class Test(unittest.TestCase):
 
 		# bad max block
 		details['maxBlock'] = 99
-		canApply, reason = state.checkTransaction('LTCSellOffer', ('change','receiving'), details)
+		canApply, reason = state.checkTransaction('LTCSellOffer', ('change','ltcSell'), details)
 		self.assertEqual(canApply, True)
 		self.assertEqual(reason, 'max block for transaction has been exceeded')
 		self.assertEqual(state._balances, {changeA:70000000-1, burnB:200000000, burnC:200000000, refundA:1})
 		self.assertEqual(state._LTCSells.size(), 0)
 		expiredSellOfferChange = (self.TXID(), 1)
-		state.applyTransaction('LTCSellOffer', expiredSellOfferChange[0], ('change','receiving'), details)
+		state.applyTransaction('LTCSellOffer', expiredSellOfferChange[0], ('change','ltcSell'), details)
 		self.assertEqual(state._balances, {changeA:70000000-1, expiredSellOfferChange:200000000, burnC:200000000, refundA:1})
 		self.assertEqual(state._LTCSells.size(), 0)
 		details['maxBlock'] = 100
@@ -369,7 +369,7 @@ class Test(unittest.TestCase):
 		details['swapBillDesired'] = 40000000
 		outputs = self.Apply_AssertSucceeds(state, 'LTCSellOffer', **details)
 		changeB = outputs['change']
-		receivingB = outputs['receiving']
+		receivingB = outputs['ltcSell']
 		self.assertEqual(state._balances, {changeA:70000000-1, changeB:197500000-1, burnC:200000000, refundA:1, receivingB:1})
 		self.assertEqual(state._LTCBuys.size(), 0)
 		self.assertEqual(state._LTCSells.size(), 1)
@@ -437,7 +437,7 @@ class Test(unittest.TestCase):
 		details = {'sourceAccount':source, 'swapBillDesired':swapBillDesired, 'exchangeRate':exchangeRate, 'maxBlock':maxBlock}
 		outputs = self.Apply_AssertSucceeds(state, 'LTCSellOffer', **details)
 		self.assertEqual(state.totalAccountedFor(), state._totalCreated)
-		return outputs['change'], outputs['receiving']
+		return outputs['change'], outputs['ltcSell']
 	def BuyOffer(self, state, source, receiveAddress, swapBillOffered, exchangeRate, maxBlock=200):
 		details = {'sourceAccount':source, 'receivingAddress':receiveAddress, 'swapBillOffered':swapBillOffered, 'exchangeRate':exchangeRate, 'maxBlock':maxBlock}
 		outputs = self.Apply_AssertSucceeds(state, 'LTCBuyOffer', **details)

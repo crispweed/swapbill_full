@@ -184,7 +184,7 @@ def Main(startBlockIndex, startBlockHash, useTestNet, commandLineArgs=sys.argv[1
 
 	elif args.action == 'post_ltc_sell':
 		transactionType = 'LTCSellOffer'
-		outputs = ('change', 'receiving')
+		outputs = ('change', 'ltcSell')
 		outputPubKeyHashes = (host.getNewSwapBillAddress(), host.getNewSwapBillAddress())
 		transactionBuildLayer.startTransactionConstruction()
 		details = {
