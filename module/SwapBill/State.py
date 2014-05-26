@@ -355,27 +355,4 @@ class State(object):
 		methodName = '_apply_' + transactionType
 		method = getattr(self, methodName)
 		method(txID, **transactionDetails)
-		assert self.totalAccountedFor() == self._totalCreated
-
-	def totalAccountedFor(self):
-		result = 0
-		#print()
-		for key in self._balances:
-			result += self._balances[key]
-		#print('balances:  ', result)
-		for exchangeRate, details in self._LTCBuys.getSortedExchangeRateAndDetails():
-			result += details.swapBillAmount
-		#print('+buys:     ', result)
-		for exchangeRate, details in self._LTCSells.getSortedExchangeRateAndDetails():
-			result += details.swapBillDeposit
-		#print('+sells:    ', result)
-		for key in self._pendingExchanges:
-			exchange = self._pendingExchanges[key]
-			#print(exchange.__dict__)
-			result += exchange.swapBillAmount
-			result += exchange.swapBillDeposit
-		#print('+exchanges:', result)
-		result += self._totalForwarded
-		return result
-
 
