@@ -13,7 +13,7 @@ _mappingByTypeCode = (
     ('LTCBuyOffer',
      1,
      (('swapBillOffered', 6, 'maxBlock', 4, 'exchangeRate', 4, None, 2), None),
-     ('change', 'refund'),
+     ('change', 'ltcBuy'),
      (('receivingAddress', None),)
 	),
     ('LTCSellOffer',

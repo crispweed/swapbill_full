@@ -186,7 +186,7 @@ class State(object):
 			self._addAccount((txID, 1), amount)
 
 	def _check_LTCBuyOffer(self, outputs, sourceAccount, swapBillOffered, exchangeRate, receivingAddress, maxBlock):
-		if outputs != ('change', 'refund'):
+		if outputs != ('change', 'ltcBuy'):
 			raise OutputsSpecDoesntMatch()
 		assert type(swapBillOffered) is int
 		assert swapBillOffered >= 0

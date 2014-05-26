@@ -73,10 +73,10 @@ class Test(unittest.TestCase):
 		self.assertDictEqual(tx.__dict__, {'_inputs': [('sourceTXID', 4)], '_outputs': [(b'SWP\x01\x14\x00\x00\x00\x00\x00d\x00\x00\x00\x00\x00\x00\x00\x00\x00', 0), ('changePKH', 0), ('destinationPKH', 0)]})
 		self.checkIgnoredBytes(tx, 6)
 		tx = FromStateTransaction(
-		    'LTCBuyOffer', ('change','refund'), ('changePKH','refundPKH'),
+		    'LTCBuyOffer', ('change','ltcBuy'), ('changePKH','ltcBuyPKH'),
 		    {'sourceAccount':('sourceTXID',5), 'receivingAddress':'ltcSellPKH', 'swapBillOffered':22, 'maxBlock':0, 'exchangeRate':123}
 		)
-		self.assertDictEqual(tx.__dict__, {'_outputs': [(b'SWP\x02\x16\x00\x00\x00\x00\x00\x00\x00\x00\x00{\x00\x00\x00\x00\x00', 0), ('changePKH', 0), ('refundPKH', 0), ('ltcSellPKH', 0)], '_inputs': [('sourceTXID', 5)]} )
+		self.assertDictEqual(tx.__dict__, {'_outputs': [(b'SWP\x02\x16\x00\x00\x00\x00\x00\x00\x00\x00\x00{\x00\x00\x00\x00\x00', 0), ('changePKH', 0), ('ltcBuyPKH', 0), ('ltcSellPKH', 0)], '_inputs': [('sourceTXID', 5)]} )
 		self.checkIgnoredBytes(tx, 2)
 		tx = FromStateTransaction(
 		    'LTCSellOffer', ('change','ltcSell'), ('changePKH','ltcSellPKH'),
