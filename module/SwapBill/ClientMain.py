@@ -1,12 +1,17 @@
 from __future__ import print_function
+import sys, argparse, binascii, traceback, struct, time
+supportedVersions = ('2.7', '3.2', '3.3', '3.4')
+thisVersion = str(sys.version_info.major) + '.' + str(sys.version_info.minor)
+if not thisVersion in supportedVersions:
+	print('This version of python (' + thisVersion + ') is not supported. Supported versions are:', supportedVersions)
+	exit()
+PY3 = sys.version_info.major > 2
+if PY3:
+	import io
+else:
+	import StringIO as io
+from os import path
 try:
-	import sys, argparse, binascii, traceback, struct, time
-	PY3 = sys.version_info.major > 2
-	if PY3:
-		import io
-	else:
-		import StringIO as io
-	from os import path
 	from SwapBill import RawTransaction, Address, TransactionFee
 	from SwapBill import TransactionEncoding, BuildHostedTransaction, Sync, Host, TransactionBuildLayer
 	from SwapBill import FormatTransactionForUserDisplay
@@ -18,7 +23,7 @@ except ImportError as e:
 	assert message.startswith(start)
 	module = message[len(start):]
 	print("Please install the '" + module + "' module.")
-	print("e.g. (on linux) 'sudo pip install " + module + "'")
+	print("e.g. (on linux, for this python version) 'sudo pip-{major}.{minor} install {module}'".format(major=sys.version_info.major, minor=sys.version_info.minor, module=module))
 	exit()
 
 class BadAddressArgument(ExceptionReportedToUser):
