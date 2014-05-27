@@ -1,5 +1,5 @@
 from __future__ import print_function
-import sys, argparse, binascii, traceback, struct, time
+import sys, argparse, binascii, traceback, struct, time, os
 supportedVersions = ('2.7', '3.2', '3.3', '3.4')
 thisVersion = str(sys.version_info.major) + '.' + str(sys.version_info.minor)
 if not thisVersion in supportedVersions:
@@ -90,15 +90,22 @@ def Main(startBlockIndex, startBlockHash, useTestNet, commandLineArgs=sys.argv[1
 	if not path.isdir(args.dataDir):
 		raise ExceptionReportedToUser("The following path (specified for data directory parameter) is not a valid path to an existing directory: " + args.dataDir)
 
+	dataDir = path.join(args.dataDir, 'swapBillData')
+	if not path.exists(dataDir):
+		try:
+			os.mkdir(dataDir)
+		except Exception as e:
+			raise ExceptionReportedToUser("Failed to create directory " + dataDir + ":", e)
+
 	if host is None:
-		host = Host.Host(useTestNet=useTestNet, dataDirectory=args.dataDir, configFile=args.configFile)
+		host = Host.Host(useTestNet=useTestNet, dataDirectory=dataDir, configFile=args.configFile)
 
 	includePending = hasattr(args, 'includepending') and args.includepending
 
 	if args.action == 'get_state_info':
 		syncOut = io.StringIO()
 		startTime = time.clock()
-		state, ownedAccounts = SyncAndReturnStateAndOwnedAccounts(args.dataDir, startBlockIndex, startBlockHash, host, includePending=includePending, forceRescan=args.forceRescan, out=syncOut)
+		state, ownedAccounts = SyncAndReturnStateAndOwnedAccounts(dataDir, startBlockIndex, startBlockHash, host, includePending=includePending, forceRescan=args.forceRescan, out=syncOut)
 		elapsedTime = time.clock() - startTime
 		formattedBalances = {}
 		for account in state._balances:
@@ -115,7 +122,7 @@ def Main(startBlockIndex, startBlockHash, useTestNet, commandLineArgs=sys.argv[1
 		}
 		return info
 
-	state, ownedAccounts = SyncAndReturnStateAndOwnedAccounts(args.dataDir, startBlockIndex, startBlockHash, host, includePending=includePending, forceRescan=args.forceRescan, out=out)
+	state, ownedAccounts = SyncAndReturnStateAndOwnedAccounts(dataDir, startBlockIndex, startBlockHash, host, includePending=includePending, forceRescan=args.forceRescan, out=out)
 
 	transactionBuildLayer = TransactionBuildLayer.TransactionBuildLayer(host, ownedAccounts)
 

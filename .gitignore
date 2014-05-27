@@ -1,6 +1,5 @@
 dataDirectoryForTests/
+swapBillData/
 __pycache__
 htmlcov
 .coverage
-wallet.txt
-*.cache
