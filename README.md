@@ -143,9 +143,89 @@ such as [here](http://testnet.litecointools.com/) or [here](http://kuttler.eu/bi
 but it also seems fairly easy at the moment to get testnet litecoin directly by mining.
 For this you can simply use the ```setgenerate true``` RPC command to turn on mining in litecoind.
 
-Once you have spendable litecoin you can go ahead and this to create some swapbill with the client's 'burn' action.
+Once you have spendable litecoin you can go ahead and use this to create some swapbill with the client's 'burn' action.
 
 ```
 ~/git/swapbill $ python Client.py burn --amount 10000000
+Loaded cached state data successfully
+State update starting from block 283276
+Committed state updated to start of block 283346
+In memory state updated to end of block 283366
+attempting to send Burn, destination output address=myLej8rPxBF2ZE5ST2YVDpnA7Dwjh8fbRA, amount=10000000
+Operation successful
+transaction id : 01e436f2d26827dd9bd35b01e08a7aa4676b118284113b23ce3f0e5eac645cb6
 ```
+
+The amount here is in satoshis, so this just destroyed 0.1 litecoin.
+But in exchange we're credited with a corresponding amount of swapbill.
+
+It's worth noting at this point that the SwapBill protocol includes a constraint on the minimum amount of swapbill associated with any
+given SwapBill 'account', or output.
+This constraint is currently set to exactly 10000000 satoshis, and so that is the minimum amount we're allowed to burn.
+(If you try to burn less, the client should refuse to submit the transaction and display a suitable error message.)
+
+By default, queries such as get_balance only report the amount actually confirmed (with at least one confirmation) by the host blockchain,
+and so if we try querying this straight away, we won't see any swapbill credited for this burn:
+
+```
+~/git/swapbill $ python Client.py get_balance
+Loaded cached state data successfully
+State update starting from block 283346
+Committed state updated to start of block 283346
+In memory state updated to end of block 283366
+Operation successful
+active : 0
+spendable : 0
+total : 0
+```
+
+But we can use the -i option to force the query to include pending transactions (from the litecoind memory pool), and then we get:
+
+```
+~/git/swapbill $ python Client.py get_balance -i
+Loaded cached state data successfully
+State update starting from block 283346
+Committed state updated to start of block 283346
+In memory state updated to end of block 283366
+in memory pool: Burn
+ - 10000000 swapbill output added
+Operation successful
+active : 10000000
+spendable : 10000000
+total : 10000000
+```
+
+And then, if we wait a bit to allow the transaction to go through, we can see this as a confirmed transaction:
+
+```
+~/git/swapbill $ python Client.py get_balance
+Loaded cached state data successfully
+State update starting from block 283346
+Committed state updated to start of block 283349
+in memory: Burn
+ - 10000000 swapbill output added
+In memory state updated to end of block 283369
+Operation successful
+active : 10000000
+spendable : 10000000
+total : 10000000
+```
+
+## Aside: committed and in memory transactions
+
+In the above output we can see different block counts for 'committed' and 'in memory' state, and it's worth taking a moment to explain this.
+
+What's going on here is that the client commits state to disk in order to avoid spending time resynchronising on each invocation,
+but with this committed state actually lagging a fixed number of blocks (currently 20) behind the actual current block chain end.
+
+This mechanism enables the client to handle small blockchain reorganisations robustly, without overcomplicating the client code.
+If there are blockchain reorganisations of more than 20 blocks this will trigger a full resynch,
+but blockchain reorganisations of less than 20 blocks can be processed naturally starting from the committed state.
+
+For transaction reporting during synchronisation:
+* Transactions that are included in the persistent state cached to disk get prefixed by 'committed'.
+* Transactions that are confirmed in the blockchain but not yet cached to disk get prefixed by 'in memory'. (When you run the client again, you'll normally see these transactions repeated, unless there was a blockchain reorganisation invalidating the transaction.)
+* Transactions that are not yet confirmed in the blockchain, but present in the litecoind memory pool get get prefixed with 'in memory pool'.
+
+## Multiple outputs, and 'Collect'
 
