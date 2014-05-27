@@ -161,12 +161,9 @@ def UnexpectedFormat_Fast(txBytes, controlAddressPrefix):
 def Decode(txBytes):
 	assert type(txBytes) is type(b'')
 	assert not UnexpectedFormat_Fast(txBytes, b'')
-
 	result = HostTransaction.InMemoryTransaction()
-
 	pos = 4
 	pos, numberOfInputs = _decodeVarInt(txBytes, pos)
-
 	inputs = []
 	for i in range(numberOfInputs):
 		txIDBytes = txBytes[pos:pos + 32]
@@ -178,9 +175,7 @@ def Decode(txBytes):
 		pos, scriptLen = _decodeVarInt(txBytes, pos)
 		pos += scriptLen
 		pos += 4 # sequence
-
 	pos, numberOfOutputs = _decodeVarInt(txBytes, pos)
-
 	scriptPubKeys = []
 	for i in range(numberOfOutputs):
 		outputAmount = struct.unpack("<Q", txBytes[pos:pos + 8])[0]
@@ -195,7 +190,6 @@ def Decode(txBytes):
 		pubKeyHash = scriptPubKeyBytes[len(expectedScriptStart):len(expectedScriptStart)+20]
 		assert len(pubKeyHash) == 20
 		result.addOutput(pubKeyHash, outputAmount)
-
 	return result, scriptPubKeys
 
 def FromHex(hexStr):
