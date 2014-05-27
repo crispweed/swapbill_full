@@ -21,6 +21,6 @@ for entry in os.listdir(publicRoot):
 	assert path.isfile(pathedEntry)
 	os.remove(pathedEntry)
 
-shutil.copy2(path.join(privateRoot, 'Client.py'), path.join(publicRoot, 'Client.py'))
-
+for entry in ('Client.py', 'README.md'):
+	shutil.copy2(path.join(privateRoot, entry), path.join(publicRoot, entry))
 shutil.copytree(path.join(privateRoot, 'module', 'SwapBill'), path.join(publicRoot, 'module', 'SwapBill'))
