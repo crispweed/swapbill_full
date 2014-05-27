@@ -1,16 +1,25 @@
 from __future__ import print_function
-import sys, argparse, binascii, traceback, struct, time
-PY3 = sys.version_info.major > 2
-if PY3:
-	import io
-else:
-	import StringIO as io
-from os import path
-from SwapBill import RawTransaction, Address, TransactionFee
-from SwapBill import TransactionEncoding, BuildHostedTransaction, Sync, Host, TransactionBuildLayer
-from SwapBill import FormatTransactionForUserDisplay
-from SwapBill.Sync import SyncAndReturnStateAndOwnedAccounts
-from SwapBill.ExceptionReportedToUser import ExceptionReportedToUser
+try:
+	import sys, argparse, binascii, traceback, struct, time
+	PY3 = sys.version_info.major > 2
+	if PY3:
+		import io
+	else:
+		import StringIO as io
+	from os import path
+	from SwapBill import RawTransaction, Address, TransactionFee
+	from SwapBill import TransactionEncoding, BuildHostedTransaction, Sync, Host, TransactionBuildLayer
+	from SwapBill import FormatTransactionForUserDisplay
+	from SwapBill.Sync import SyncAndReturnStateAndOwnedAccounts
+	from SwapBill.ExceptionReportedToUser import ExceptionReportedToUser
+except ImportError as e:
+	message = str(e)
+	start = 'No module named '
+	assert message.startswith(start)
+	module = message[len(start):]
+	print("Please install the '" + module + "' module.")
+	print("e.g. (on linux) 'sudo pip install " + module + "'")
+	exit()
 
 class BadAddressArgument(ExceptionReportedToUser):
 	def __init__(self, address):
