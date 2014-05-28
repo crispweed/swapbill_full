@@ -45,6 +45,22 @@ You can test the RPC server by making RPC queries from the command line, e.g.:
 
 (This RPC interface is very handy for interaction with the reference client generally, and for general troubleshooting.)
 
+# A note about the txindex option
+
+The txindex tells litecoind to include a full transaction index, which is required if you want to look up any arbitrary transaction in the blockchain history
+by transaction ID.
+
+Because of the way the SwapBill protocol works, with swapbill amounts associated directly with unspent outputs in the underlying blockchain,
+the SwapBill client doesn't actually need to look up arbitrary transactions in the blockchain history.
+We just need to scan the transactions in each new block as they arrive.
+
+Unfortunately, the RPC interface to the litecoin reference client doesn't provide a way to query the set of transactions in a given block, and
+the txindex option is then required, essentially, as a workaround for this specific query functionality.
+
+(It's possible, and quite straightforward, to patch the litecoin reference client to add an RPC method for querying the set of transactions in a given block,
+without the txindex option needing to be set. The SwapBill client actually tests for the possibility to call a custom 'getrawtransactionsinblock' RPC method,
+and if this is available then no arbitrary transaction queries is required, and the txindex option can be left unset.)
+
 # Running the client
 
 There's no installation process for the client, currently, and instead this just runs directly
@@ -430,9 +446,8 @@ A couple of other details to note with regards to trading:
 * there is also a minimum litecoin equivalent constraint applied to trade offers - currently the litecoin equivalent for each trade offer type (calculate based on swapbill amount and exchange rate) must be at least 1000000 litecoin satoshis
 * trade offers may be partially matched, and litecoin sell offers can then potentially require more than completion transaction
 
-The trading mechanism provided by SwapBill is necessarily fairly complex, and can use a lot more documentation than is included here,
-but for now we'll content ourselves
-with a couple of worked through examples to show how this works in practice.
+The trading mechanism provided by SwapBill is necessarily fairly complex, and a specification of the *exact* operation of this mechanism is beyond the scope of this document,
+but we'll show a couple of concrete examples of trading through the client to show *how to use* this mechanism.
 
 ## Trading swapbill for host currency
 
