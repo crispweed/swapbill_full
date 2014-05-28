@@ -51,15 +51,15 @@ The txindex tells litecoind to include a full transaction index, which is requir
 by transaction ID.
 
 Because of the way the SwapBill protocol works, with swapbill amounts associated directly with unspent outputs in the underlying blockchain,
-the SwapBill client doesn't actually need to look up arbitrary transactions in the blockchain history.
-We just need to scan the transactions in each new block as they arrive.
+the SwapBill client just need to scan the transactions in each new block as it arrives,
+and *doesn't* need to look up arbitrary transactions from further back in the blockchain history.
 
-Unfortunately, the RPC interface to the litecoin reference client doesn't provide a way to query the set of transactions in a given block, and
-the txindex option is then required, essentially, as a workaround for this specific query functionality.
+Unfortunately, the RPC interface to the litecoin reference client doesn't provide a way to query the transactions by block, and
+the txindex option is then required, essentially, as a workaround to implement this specific query functionality.
 
-(It's possible, and quite straightforward, to patch the litecoin reference client to add an RPC method for querying the set of transactions in a given block,
-without the txindex option needing to be set. The SwapBill client actually tests for the possibility to call a custom 'getrawtransactionsinblock' RPC method,
-and if this is available then no arbitrary transaction queries is required, and the txindex option can be left unset.)
+It's possible, and quite straightforward, to patch the reference client source code to add an RPC method for querying the set of transactions in a given block,
+without the txindex option needing to be set. The SwapBill client actually tests for the existance of a custom 'getrawtransactionsinblock' RPC method,
+and uses this if available. With this custom query no arbitrary transaction queries is required, and the txindex option can be left unset.
 
 # Running the client
 
@@ -231,10 +231,9 @@ total : 10000000
 Note that it can sometimes take a while for new blocks to be mined on the litecoin testnet,
 depending on whether anyone is actually mining this blockchain (!), and it can then take a while for swapbill transactions to be confirmed.
 
-Burn transactions are necessary to create swapbill initially, and can also be used if there is no swapbill available,
-but in most cases (where there is swapbill available for exchange),
-you should actually prefer to obtain swapbill through the SwapBill trading mechanism,
-as you'll get a better exchange rate for your host currency this way.
+Burn transactions are necessary to create swapbill initially,
+but you'll get a better exchange rate for your host currency if you *exchange*
+host currency for swapbill (see below), and so exchanges for the host currency should be preferred over burns wherever possible.
 
 ## Aside: committed and in memory transactions
 
@@ -414,11 +413,6 @@ but you can't make a payment of:
 The swapbill protocol includes support for decentralised exchange between swapbill and the host currency, based on buy and sell
 offer information posted on the block chain and protocol rules for matching these buy and sell offers.
 
-Although more complicated than submitting a burn transaction,
-this is usually the best way to obtain swapbill (as long as there is swapbill available for exchange)
-because you will get more swapbill for the same amount of litecoin,
-and this exchange mechanism this should be preferred to swapbill creation through burn transactions.
-
 Three additional client actions (and associated transaction types) are provided for this exchange mechanism:
 * post_ltc_buy
 * post_ltc_sell
@@ -447,7 +441,19 @@ A couple of other details to note with regards to trading:
 * trade offers may be partially matched, and litecoin sell offers can then potentially require more than completion transaction
 
 The trading mechanism provided by SwapBill is necessarily fairly complex, and a specification of the *exact* operation of this mechanism is beyond the scope of this document,
-but we'll show a couple of concrete examples of trading through the client to show *how to use* this mechanism.
+but we'll show a concrete example of trading worked through in the client to show *how to use* the mechanism.
 
-## Trading swapbill for host currency
+## Trading example
+
+The buyer has 100000000 swapbill, and wants to exchange this all for litecoin.
+
+```
+~/git/swapbill $ python Client.py --dataDir buyer get_balance
+...
+Operation successful
+active : 100000000
+spendable : 100000000
+total : 100000000
+```
+
 
