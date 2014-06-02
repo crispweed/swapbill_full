@@ -29,6 +29,7 @@ def _processTransactions(host, state, ownedAccounts, transactions, applyToState,
 				print(report, end="", file=out)
 			continue
 		if applyToState:
+			#print(reportPrefix + ': ' + txID)
 			inBetweenReport = ownedAccounts.checkForTradeOfferChanges(state)
 			assert inBetweenReport == ''
 			state.applyTransaction(transactionType, txID, outputs, transactionDetails)
