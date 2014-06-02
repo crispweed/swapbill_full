@@ -1,6 +1,15 @@
 from __future__ import print_function
 import unittest
 from SwapBill import LTCTrading
+from SwapBill.Amounts import e
+
+class MockDetails(object):
+	pass
+
+def Over256(value):
+	assert value > 0
+	assert value < 256
+	return 0x1000000 * value
 
 class Test(unittest.TestCase):
 	def test(self):
@@ -20,3 +29,20 @@ class Test(unittest.TestCase):
 		self.assertTrue(LTCTrading.SatisfiesMinimumExchange(0x80000000,  20 * milliSatoshi))
 		self.assertFalse(LTCTrading.SatisfiesMinimumExchange(0x70000000,  20 * milliSatoshi))
 
+
+	def test_match(self):
+		#def Match2(buyRate, buyDetails, sellRate, sellDetails):
+		buyDetails = MockDetails()
+		buyDetails.swapBillOffered = 1*e(8)
+		buyDetails.receivingAccount = "buyReceive"
+		buyDetails.refundAccount = "buyRefund"
+		sellDetails = MockDetails()
+		sellDetails.ltcOffered = 1*e(8)
+		sellDetails.swapBillDeposit = 1*e(6)
+		sellDetails.receivingAccount = "sellReceive"
+		buyRate = Over256(128)
+		sellRate = Over256(128)
+		exchange, outstandingBuy, outstandingSell = LTCTrading.Match2(buyRate, buyDetails, sellRate, sellDetails)
+		#if outstandingBuy is not None: print('buy:', outstandingBuy.__dict__)
+		#if outstandingSell is not None: print('sell:', outstandingSell.__dict__)
+		#print('exchange:', exchange.__dict__)
