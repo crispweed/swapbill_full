@@ -12,9 +12,9 @@ def LTCWithExchangeRate(exchangeRate, swapBillAmount):
 def SatisfiesMinimumExchange(rate, amount):
 	return LTCWithExchangeRate(rate, amount) >= minimumExchangeLTC
 
-def Match(buyRate, buyExpiry, buyDetails, sellRate, sellExpiry, sellDetails):
-	assert SatisfiesMinimumExchange(buyRate, buyDetails.swapBillAmount) ## should not have been added to buys
-	assert SatisfiesMinimumExchange(sellRate, sellDetails.swapBillAmount) ## should not have been added to sells
+def Match(buyRate, buyDetails, sellRate, sellDetails):
+	assert SatisfiesMinimumExchange(buyRate, buyDetails.swapBillAmount) ## otherwise should not have been added to buys
+	assert SatisfiesMinimumExchange(sellRate, sellDetails.swapBillAmount) ## otherwise should not have been added to sells
 	appliedRate = (buyRate + sellRate) // 2
 	exchange = Exchange()
 	exchange.ltcReceiveAddress = buyDetails.receivingAccount
@@ -39,5 +39,3 @@ def Match(buyRate, buyExpiry, buyDetails, sellRate, sellExpiry, sellDetails):
 	exchange.ltc = LTCWithExchangeRate(appliedRate, exchange.swapBillAmount)
 	assert exchange.ltc >= minimumExchangeLTC ## should be guaranteed by buy and sell both satisfying this minimum requirement
 	return exchange, outstandingBuy, outstandingSell
-
-

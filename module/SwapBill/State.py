@@ -110,7 +110,7 @@ class State(object):
 			assert self._balanceRefCounts[buyDetails.refundAccount] > 0
 			self._tradeOfferChangeCounts[sellDetails.receivingAccount] += 1
 			self._tradeOfferChangeCounts[buyDetails.refundAccount] += 1
-			exchange, buyDetails, sellDetails = LTCTrading.Match(buyRate, buyExpiry, buyDetails, sellRate, sellExpiry, sellDetails)
+			exchange, buyDetails, sellDetails = LTCTrading.Match(buyRate, buyDetails, sellRate, sellDetails)
 			exchange.expiry = self._currentBlockIndex + 50
 			key = self._nextExchangeIndex
 			self._nextExchangeIndex += 1
