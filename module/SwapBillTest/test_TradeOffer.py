@@ -99,20 +99,3 @@ class Test(unittest.TestCase):
 		buy = TradeOffer.BuyOffer(2*e(7), 0x80000000)
 		sell = TradeOffer.SellOffer(100, 1*e(7)-1, 0x80000000)
 		self.assertRaises(RemainderIsBelowMinimumExchange, TradeOffer.MatchOffers, buy=buy, sell=sell)
-
-
-		##def Match2(buyRate, buyDetails, sellRate, sellDetails):
-		#buyDetails = MockDetails()
-		#buyDetails.swapBillOffered = 1*e(8)
-		#buyDetails.receivingAccount = "buyReceive"
-		#buyDetails.refundAccount = "buyRefund"
-		#sellDetails = MockDetails()
-		#sellDetails.ltcOffered = 1*e(8)
-		#sellDetails.swapBillDeposit = 1*e(6)
-		#sellDetails.receivingAccount = "sellReceive"
-		#buyRate = Over256(128)
-		#sellRate = Over256(128)
-		#exchange, outstandingBuy, outstandingSell = LTCTrading.Match2(buyRate, buyDetails, sellRate, sellDetails)
-		#if outstandingBuy is not None: print('buy:', outstandingBuy.__dict__)
-		#if outstandingSell is not None: print('sell:', outstandingSell.__dict__)
-		#print('exchange:', exchange.__dict__)
