@@ -47,21 +47,19 @@ def _ltcWithExchangeRate(exchangeRate, swapBillAmount):
 
 def DepositRequiredForLTCSell(exchangeRate, ltcOffered):
 	swapBillAmount = ltcOffered * 0x100000000 // exchangeRate
-	return swapBillAmount // _depositDevisor
+	deposit = swapBillAmount // _depositDevisor
+	if deposit * _depositDevisor != swapBillAmount:
+		deposit += 1
+	return deposit
 
 def OffersMeetOrOverlap(buy, sell):
 	return buy.rate <= sell.rate
 
 def MatchOffers(buy, sell):
-	#print('MatchOffers')
 	assert OffersMeetOrOverlap(buy, sell)
-	#print('buyRate: %x' % buy.rate)
-	#print('sellRate: %x' % sell.rate)
 	appliedRate = (buy.rate + sell.rate) // 2
-	#print('appliedRate: %x' % appliedRate)
 
 	ltcToBeExchanged = _ltcWithExchangeRate(appliedRate, buy._swapBillOffered)
-	#print('ltcToBeExchanged:', ltcToBeExchanged)
 	assert ltcToBeExchanged >= _minimumExchangeLTC ## should be guaranteed by buy and sell both satisfying this minimum requirement
 
 	exchange = Exchange()
@@ -71,10 +69,8 @@ def MatchOffers(buy, sell):
 	if ltcToBeExchanged <= sell._ltcOffered:
 		# ltc buy offer is consumed completely
 		exchange.swapBillAmount = buy._swapBillOffered
-		#print('exchange.swapBillAmount:', exchange.swapBillAmount)
 		exchange.ltc = ltcToBeExchanged
 		exchange.swapBillDeposit = sell._swapBillDeposit * ltcToBeExchanged // sell._ltcOffered
-		#print('exchange.swapBillDeposit:', exchange.swapBillDeposit)
 		if ltcToBeExchanged < sell._ltcOffered:
 			sell._subtractExchanged(ltcToBeExchanged, exchange.swapBillDeposit)
 			outstandingSell = sell
