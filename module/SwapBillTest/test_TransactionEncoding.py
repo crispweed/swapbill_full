@@ -80,7 +80,7 @@ class Test(unittest.TestCase):
 		self.checkIgnoredBytes(tx, 2)
 		tx = FromStateTransaction(
 		    'LTCSellOffer', ('change','ltcSell'), ('changePKH','ltcSellPKH'),
-		    {'sourceAccount':('sourceTXID',3), 'swapBillDesired':22, 'maxBlock':0, 'exchangeRate':123}
+		    {'sourceAccount':('sourceTXID',3), 'ltcOffered':22, 'maxBlock':0, 'exchangeRate':123}
 		)
 		self.assertDictEqual(tx.__dict__, {'_inputs': [('sourceTXID', 3)], '_outputs': [(b'SWP\x03\x16\x00\x00\x00\x00\x00\x00\x00\x00\x00{\x00\x00\x00\x00\x00', 0), ('changePKH', 0), ('ltcSellPKH', 0)]} )
 		self.checkIgnoredBytes(tx, 2)

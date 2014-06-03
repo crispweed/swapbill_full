@@ -99,3 +99,24 @@ class Test(unittest.TestCase):
 		buy = TradeOffer.BuyOffer(2*e(7), 0x80000000)
 		sell = TradeOffer.SellOffer(100, 1*e(7)-1, 0x80000000)
 		self.assertRaises(RemainderIsBelowMinimumExchange, TradeOffer.MatchOffers, buy=buy, sell=sell)
+
+	def test_non_simple_overlap(self):
+		buyRate = 0x40000000
+		buy = TradeOffer.BuyOffer(1*e(7), buyRate)
+		sellRate = 0x45000000
+		ltcOffered = 2*e(7) * sellRate // 0x100000000
+		deposit = 2*e(7) // 16
+		sell = TradeOffer.SellOffer(deposit, ltcOffered, sellRate)
+		appliedRate = (buyRate + sellRate) // 2
+		ltcInExchange = 1*e(7) * appliedRate // 0x100000000
+		assert ltcInExchange < ltcOffered // 2
+		self.assertEqual(ltcInExchange, 2597656)
+		n = ltcInExchange
+		d = ltcOffered
+		exchangeFractionAsFloat = float(n)/d
+		assert exchangeFractionAsFloat < 0.482 and exchangeFractionAsFloat > 0.481
+		depositInExchange = deposit * n // d
+		exchange, outstandingBuy, outstandingSell = TradeOffer.MatchOffers(buy=buy, sell=sell)
+		self.assertIsNone(outstandingBuy)
+		self.assertDictEqual(outstandingSell.__dict__, {'rate': sellRate, '_swapBillDeposit': deposit-depositInExchange, '_ltcOffered': ltcOffered-ltcInExchange})
+		self.assertDictEqual(exchange.__dict__, {'swapBillAmount': 1*e(7), 'ltc': ltcInExchange, 'swapBillDeposit': depositInExchange})

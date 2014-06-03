@@ -56,13 +56,15 @@ sp.add_argument('--blocksUntilExpiry', type=int, default=8, help='if the transac
 
 sp = subparsers.add_parser('post_ltc_buy', help='make an offer to buy litecoin with swapbill')
 sp.add_argument('--swapBillOffered', required=True, help='amount of swapbill offered')
-sp.add_argument('--exchangeRate', required=True, help='the exchange rate (positive integer, SWP/LTC * 0x100000000, must be less than 0x100000000)')
 sp.add_argument('--blocksUntilExpiry', type=int, default=8, help='after this block the offer expires (and swapbill remaining in any unmatched part of the offer is returned)')
+sp.add_argument('--exchangeRate', help='the exchange rate SWP/LTC, in floating point representation (must be greater than 0 and less than 1)')
+sp.add_argument('--exchangeRate_AsInteger', help='the exchange rate SWP/LTC, in integer representation (must be greater than 0 and less than 4294967296)')
 
 sp = subparsers.add_parser('post_ltc_sell', help='make an offer to sell litecoin for swapbill')
-sp.add_argument('--swapBillDesired', required=True, help='amount of swapbill to buy (deposit of 1/16 of this amount will be paid in to the offer)')
-sp.add_argument('--exchangeRate', required=True, help='the exchange rate SWP/LTC (must be greater than 0 and less than 1)')
+sp.add_argument('--ltcOffered', required=True, help='amount of ltc offered')
 sp.add_argument('--blocksUntilExpiry', type=int, default=2, help='after this block the offer expires (and swapbill remaining in any unmatched part of the offer is returned)')
+sp.add_argument('--exchangeRate', help='the exchange rate SWP/LTC, in floating point representation (must be greater than 0 and less than 1)')
+sp.add_argument('--exchangeRate_AsInteger', help='the exchange rate SWP/LTC, in integer representation (must be greater than 0 and less than 4294967296)')
 
 sp = subparsers.add_parser('complete_ltc_sell', help='complete an ltc exchange by fulfilling a pending exchange payment')
 sp.add_argument('--pendingExchangeID', required=True, help='the id of the pending exchange payment to fulfill')
@@ -85,6 +87,15 @@ sp.add_argument('-i', '--includepending', help='include transactions that have b
 
 sp = subparsers.add_parser('get_state_info', help='get some general state information')
 sp.add_argument('-i', '--includepending', help='include transactions that have been submitted but not yet confirmed (based on host memory pool)', action='store_true')
+
+def ExchangeRateFromArgs(args):
+	if args.exchangeRate is not None:
+		if args.exchangeRate_AsInteger is not None:
+			raise ExceptionReportedToUser("Either exchangeRate or exchangeRate_AsInteger should be specified, not both.")
+		return int(float(args.exchangeRate) * 0x100000000)
+	if args.exchangeRate_AsInteger is None:
+		raise ExceptionReportedToUser("One of exchangeRate or exchangeRate_AsInteger must be specified.")
+	return int(args.exchangeRate_AsInteger)
 
 def Main(startBlockIndex, startBlockHash, useTestNet, commandLineArgs=sys.argv[1:], host=None, out=sys.stdout):
 	args = parser.parse_args(commandLineArgs)
@@ -197,7 +208,7 @@ def Main(startBlockIndex, startBlockHash, useTestNet, commandLineArgs=sys.argv[1
 		details = {
 		    'sourceAccount':transactionBuildLayer.getActiveAccount(state),
 		    'swapBillOffered':int(args.swapBillOffered),
-		    'exchangeRate':int(float(args.exchangeRate) * 0x100000000),
+		    'exchangeRate':ExchangeRateFromArgs(args),
 		    'receivingAddress':host.getNewNonSwapBillAddress(),
 		    'maxBlock':state._currentBlockIndex + args.blocksUntilExpiry
 		}
@@ -210,8 +221,8 @@ def Main(startBlockIndex, startBlockHash, useTestNet, commandLineArgs=sys.argv[1
 		transactionBuildLayer.startTransactionConstruction()
 		details = {
 		    'sourceAccount':transactionBuildLayer.getActiveAccount(state),
-		    'swapBillDesired':int(args.swapBillDesired),
-		    'exchangeRate':int(float(args.exchangeRate) * 0x100000000),
+		    'ltcOffered':int(args.ltcOffered),
+		    'exchangeRate':ExchangeRateFromArgs(args),
 		    'maxBlock':state._currentBlockIndex + args.blocksUntilExpiry
 		}
 		return CheckAndSend(transactionType, outputs, outputPubKeyHashes, details)
@@ -268,7 +279,7 @@ def Main(startBlockIndex, startBlockHash, useTestNet, commandLineArgs=sys.argv[1
 
 	elif args.action == 'get_buy_offers':
 		result = []
-		for offer in state._LTCSells.getSortedOffers():
+		for offer in state._LTCBuys.getSortedOffers():
 			mine = offer.refundAccount in ownedAccounts.buyOffers
 			exchangeAmount = offer._swapBillOffered
 			rate_Double = float(offer.rate) / 0x100000000
@@ -281,10 +292,10 @@ def Main(startBlockIndex, startBlockHash, useTestNet, commandLineArgs=sys.argv[1
 		for offer in state._LTCSells.getSortedOffers():
 			mine = offer.receivingAccount in ownedAccounts.sellOffers
 			ltc = offer._ltcOffered
-			depositAmount = sellDetails.swapBillDeposit
+			depositAmount = offer._swapBillDeposit
 			rate_Double = float(offer.rate) / 0x100000000
 			swapBillEquivalent = int(ltc / rate_Double)
-			result.append(('exchange rate', rate_Double, {'ltc offered':exchangeAmount, 'deposit paid':depositAmount, 'swapbill equivalent':swapBillEquivalent, 'mine':mine}))
+			result.append(('exchange rate', rate_Double, {'ltc offered':ltc, 'deposit paid':depositAmount, 'swapbill equivalent':swapBillEquivalent, 'mine':mine}))
 		return result
 
 	elif args.action == 'get_pending_exchanges':
