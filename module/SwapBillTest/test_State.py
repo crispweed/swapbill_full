@@ -8,10 +8,10 @@ def totalAccountedFor(state):
 	result = 0
 	for key in state._balances:
 		result += state._balances[key]
-	for exchangeRate, details in state._LTCBuys.getSortedExchangeRateAndDetails():
-		result += details.swapBillAmount
-	for exchangeRate, details in state._LTCSells.getSortedExchangeRateAndDetails():
-		result += details.swapBillDeposit
+	for offer in state._LTCBuys.getSortedOffers():
+		result += offer._swapBillOffered
+	for offer in state._LTCSells.getSortedOffers():
+		result += offer._swapBillDeposit
 	for key in state._pendingExchanges:
 		exchange = state._pendingExchanges[key]
 		result += exchange.swapBillAmount

@@ -2,60 +2,83 @@ from __future__ import print_function
 import unittest
 from SwapBill import TradeOfferHeap
 
+class MockOffer(object):
+	pass
+
 class Test(unittest.TestCase):
-	def _doTest(self, negateExchangeRates):
-		h = TradeOfferHeap.Heap(100, negateExchangeRates)
-		rateSign = -1 if negateExchangeRates else 1
+	def addOffer(self, rate, expiry, s):
+		offer = MockOffer()
+		if self.negateExchangeRates:
+			offer.rate = -rate
+		else:
+			offer.rate = rate
+		offer.expiry = expiry
+		offer.s = s
+		self.h.addOffer(offer)
+
+	def currentBestExchangeRate(self):
+		if self.negateExchangeRates:
+			return self.h.currentBestExchangeRate() * -1
+		return self.h.currentBestExchangeRate()
+
+	def doTests(self):
+		h = TradeOfferHeap.Heap(100, self.negateExchangeRates)
+		self.h = h
 		self.assertTrue(h.empty())
-		h.addOffer(1000 * rateSign, 103, 'offer1')
+		self.addOffer(1000, 103, 'offer1')
 		self.assertFalse(h.empty())
-		self.assertEqual(h.peekCurrentBest(), 'offer1')
-		self.assertEqual(h.currentBestExchangeRate(), 1000 * rateSign)
-		h.addOffer(999 * rateSign, 104, 'offer2')
+		self.assertEqual(h.peekCurrentBest().s, 'offer1')
+		self.assertEqual(self.currentBestExchangeRate(), 1000)
+		self.addOffer(999, 104, 'offer2')
 		self.assertEqual(h.size(), 2)
-		self.assertEqual(h.peekCurrentBest(), 'offer2')
-		self.assertEqual(h.currentBestExchangeRate(), 999 * rateSign)
-		#h.addOffer('c', 11, 1001 * rateSign, 105)
-		h.addOffer(1001 * rateSign, 105, 'offer3')
+		self.assertEqual(h.peekCurrentBest().s, 'offer2')
+		self.assertEqual(self.currentBestExchangeRate(), 999)
+		self.addOffer(1001, 105, 'offer3')
 		self.assertEqual(h.size(), 3)
-		self.assertEqual(h.peekCurrentBest(), 'offer2')
-		self.assertEqual(h.currentBestExchangeRate(), 999 * rateSign)
+		self.assertEqual(h.peekCurrentBest().s, 'offer2')
+		self.assertEqual(self.currentBestExchangeRate(), 999)
 		expired = h.advanceToBlock(101)
 		self.assertEqual(expired, [])
 		self.assertEqual(h.size(), 3)
-		self.assertEqual(h.peekCurrentBest(), 'offer2')
-		self.assertEqual(h.currentBestExchangeRate(), 999 * rateSign)
+		self.assertEqual(h.peekCurrentBest().s, 'offer2')
+		self.assertEqual(self.currentBestExchangeRate(), 999)
 		expired = h.advanceToBlock(104)
-		self.assertEqual(expired, ['offer1'])
+		self.assertEqual(len(expired), 1)
+		self.assertEqual(expired[0].s, 'offer1')
 		self.assertEqual(h.size(), 2)
-		self.assertEqual(h.peekCurrentBest(), 'offer2')
-		self.assertEqual(h.currentBestExchangeRate(), 999 * rateSign)
+		self.assertEqual(h.peekCurrentBest().s, 'offer2')
+		self.assertEqual(self.currentBestExchangeRate(), 999)
 		expired = h.advanceToBlock(105)
-		self.assertEqual(expired, ['offer2'])
+		self.assertEqual(len(expired), 1)
+		self.assertEqual(expired[0].s, 'offer2')
 		self.assertEqual(h.size(), 1)
-		self.assertEqual(h.peekCurrentBest(), 'offer3')
-		self.assertEqual(h.currentBestExchangeRate(), 1001 * rateSign)
+		self.assertEqual(h.peekCurrentBest().s, 'offer3')
+		self.assertEqual(self.currentBestExchangeRate(), 1001)
 		expired = h.advanceToBlock(111)
-		self.assertEqual(expired, ['offer3'])
+		self.assertEqual(len(expired), 1)
+		self.assertEqual(expired[0].s, 'offer3')
 		self.assertTrue(h.empty())
-		h.addOffer(1000 * rateSign, 120, 'offer4')
-		h.addOffer(999 * rateSign, 120, 'offer5')
-		h.addOffer(1001 * rateSign, 121, 'offer6')
-		h.addOffer(900 * rateSign, 120, 'offer7')
+		self.addOffer(1000, 120, 'offer4')
+		self.addOffer(999, 120, 'offer5')
+		self.addOffer(1001, 121, 'offer6')
+		self.addOffer(900, 120, 'offer7')
 		self.assertEqual(h.size(), 4)
-		self.assertEqual(h.peekCurrentBest(), 'offer7')
-		self.assertEqual(h.currentBestExchangeRate(), 900 * rateSign)
+		self.assertEqual(h.peekCurrentBest().s, 'offer7')
+		self.assertEqual(self.currentBestExchangeRate(), 900)
 		popped = h.popCurrentBest()
-		self.assertEqual(popped, 'offer7')
+		self.assertEqual(popped.s, 'offer7')
 		self.assertEqual(h.size(), 3)
-		self.assertEqual(h.peekCurrentBest(), 'offer5')
-		self.assertEqual(h.currentBestExchangeRate(), 999 * rateSign)
+		self.assertEqual(h.peekCurrentBest().s, 'offer5')
+		self.assertEqual(self.currentBestExchangeRate(), 999)
 		expired = h.advanceToBlock(121)
-		self.assertEqual(sorted(expired), ['offer4', 'offer5'])
+		self.assertEqual(len(expired), 2)
+		self.assertEqual(sorted([expired[0].s, expired[1].s]), ['offer4', 'offer5'])
 		self.assertEqual(h.size(), 1)
-		self.assertEqual(h.peekCurrentBest(), 'offer6')
-		self.assertEqual(h.currentBestExchangeRate(), 1001 * rateSign)
+		self.assertEqual(h.peekCurrentBest().s, 'offer6')
+		self.assertEqual(self.currentBestExchangeRate(), 1001)
 
 	def test(self):
-		self._doTest(False)
-		self._doTest(True)
+		self.negateExchangeRates = False
+		self.doTests()
+		self.negateExchangeRates = True
+		self.doTests()

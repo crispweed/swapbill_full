@@ -268,25 +268,23 @@ def Main(startBlockIndex, startBlockHash, useTestNet, commandLineArgs=sys.argv[1
 
 	elif args.action == 'get_buy_offers':
 		result = []
-		offers = state._LTCBuys.getSortedExchangeRateAndDetails()
-		for exchangeRate, buyDetails in offers:
-			mine = buyDetails.refundAccount in ownedAccounts.buyOffers
-			exchangeAmount = buyDetails.swapBillAmount
-			rate_Double = float(exchangeRate) / 0x100000000
+		for offer in state._LTCSells.getSortedOffers():
+			mine = offer.refundAccount in ownedAccounts.buyOffers
+			exchangeAmount = offer._swapBillOffered
+			rate_Double = float(offer.rate) / 0x100000000
 			ltc = int(exchangeAmount * rate_Double)
 			result.append(('exchange rate', rate_Double, {'swapbill offered':exchangeAmount, 'ltc equivalent':ltc, 'mine':mine}))
 		return result
 
 	elif args.action == 'get_sell_offers':
 		result = []
-		offers = state._LTCSells.getSortedExchangeRateAndDetails()
-		for exchangeRate, sellDetails in offers:
-			mine = sellDetails.receivingAccount in ownedAccounts.sellOffers
-			exchangeAmount = sellDetails.swapBillAmount
+		for offer in state._LTCSells.getSortedOffers():
+			mine = offer.receivingAccount in ownedAccounts.sellOffers
+			ltc = offer._ltcOffered
 			depositAmount = sellDetails.swapBillDeposit
-			rate_Double = float(exchangeRate) / 0x100000000
-			ltc = int(exchangeAmount * rate_Double)
-			result.append(('exchange rate', rate_Double, {'swapbill desired':exchangeAmount, 'deposit paid':depositAmount, 'ltc equivalent':ltc, 'mine':mine}))
+			rate_Double = float(offer.rate) / 0x100000000
+			swapBillEquivalent = int(ltc / rate_Double)
+			result.append(('exchange rate', rate_Double, {'ltc offered':exchangeAmount, 'deposit paid':depositAmount, 'swapbill equivalent':swapBillEquivalent, 'mine':mine}))
 		return result
 
 	elif args.action == 'get_pending_exchanges':
