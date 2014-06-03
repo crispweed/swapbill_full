@@ -1,6 +1,6 @@
 from __future__ import print_function
 import binascii
-from SwapBill import TradeOfferHeap, LTCTrading
+from SwapBill import TradeOfferHeap, TradeOffer
 from SwapBill.Amounts import e
 
 class InvalidTransactionParameters(Exception):
@@ -42,25 +42,22 @@ class State(object):
 
 	def advanceToNextBlock(self):
 		expired = self._LTCBuys.advanceToNextBlock()
-		for buyDetails in expired:
-			self._tradeOfferChangeCounts[buyDetails.refundAccount] += 1
-			self._addToAccount(buyDetails.refundAccount, buyDetails.swapBillAmount)
-			self._removeAccountRef(buyDetails.refundAccount)
+		for buyOffer in expired:
+			self._tradeOfferChangeCounts[buyOffer.refundAccount] += 1
+			self._addToAccount(buyOffer.refundAccount, buyOffer._swapBillOffered)
+			self._removeAccountRef(buyOffer.refundAccount)
 		expired = self._LTCSells.advanceToNextBlock()
-		for sellDetails in expired:
-			self._tradeOfferChangeCounts[sellDetails.receivingAccount] += 1
-			self._addToAccount(sellDetails.receivingAccount, sellDetails.swapBillDeposit)
-			self._removeAccountRef(sellDetails.receivingAccount)
-		## ** currently iterates through all pending exchanges each block added
-		## are there scaling issues with this?
+		for sellOffer in expired:
+			self._tradeOfferChangeCounts[sellOffer.receivingAccount] += 1
+			self._addToAccount(sellOffer.receivingAccount, sellOffer._swapBillDeposit)
+			self._removeAccountRef(sellOffer.receivingAccount)
+		# ** currently iterates through all pending exchanges each block added
+		# are there scaling issues with this?
 		toDelete = []
 		for key in self._pendingExchanges:
 			exchange = self._pendingExchanges[key]
 			if exchange.expiry == self._currentBlockIndex:
-				#print("pending exchange expired")
-				#print("buyerAddress:", exchange.buyerAddress)
-				#print("refundAmount:", exchange.swapBillAmount + exchange.swapBillDeposit)
-				## refund buyers funds locked up in the exchange, plus sellers deposit (as penalty for failing to make exchange)
+				# refund buyers funds locked up in the exchange, plus sellers deposit (as penalty for failing to make exchange)
 				self._addToAccount(exchange.buyerAddress, exchange.swapBillAmount + exchange.swapBillDeposit)
 				self._tradeOfferChangeCounts[exchange.buyerAddress] += 1
 				self._tradeOfferChangeCounts[exchange.sellerReceivingAccount] += 1
@@ -94,47 +91,25 @@ class State(object):
 		else:
 			self._balanceRefCounts[account] -= 1
 
-	def _matchLTC(self):
-		while True:
-			if self._LTCBuys.empty() or self._LTCSells.empty():
-				return
-			if self._LTCBuys.currentBestExchangeRate() > self._LTCSells.currentBestExchangeRate():
-				return
-			buyRate = self._LTCBuys.currentBestExchangeRate()
-			buyExpiry = self._LTCBuys.currentBestExpiry()
-			buyDetails = self._LTCBuys.popCurrentBest()
-			sellRate = self._LTCSells.currentBestExchangeRate()
-			sellExpiry = self._LTCSells.currentBestExpiry()
-			sellDetails = self._LTCSells.popCurrentBest()
-			assert self._balanceRefCounts[sellDetails.receivingAccount] > 0
-			assert self._balanceRefCounts[buyDetails.refundAccount] > 0
-			self._tradeOfferChangeCounts[sellDetails.receivingAccount] += 1
-			self._tradeOfferChangeCounts[buyDetails.refundAccount] += 1
-			exchange, buyDetails, sellDetails = LTCTrading.Match(buyRate, buyDetails, sellRate, sellDetails)
-			exchange.expiry = self._currentBlockIndex + 50
-			key = self._nextExchangeIndex
-			self._nextExchangeIndex += 1
-			# the account refs from buy and sell details effectively transfer into this exchange object
-			self._pendingExchanges[key] = exchange
-			if not buyDetails is None:
-				if LTCTrading.SatisfiesMinimumExchange(buyRate, buyDetails.swapBillAmount):
-					self._LTCBuys.addOffer(buyRate, buyExpiry, buyDetails)
-					self._balanceRefCounts[buyDetails.refundAccount] += 1
-					continue # may need to match against a second offer
-				else:
-					## small remaining buy offer is discarded
-					## refund swapbill amount left in this buy offer
-					self._addToAccount(buyDetails.refundAccount, buyDetails.swapBillAmount)
-			if not sellDetails is None:
-				if LTCTrading.SatisfiesMinimumExchange(sellRate, sellDetails.swapBillAmount):
-					self._LTCSells.addOffer(sellRate, sellExpiry, sellDetails)
-					self._balanceRefCounts[sellDetails.receivingAccount] += 1
-					continue
-				else:
-					## small remaining sell offer is discarded
-					## refund swapbill amount left in this buy offer
-					self._addToAccount(sellDetails.receivingAccount, sellDetails.swapBillDeposit)
-			return # break out of while loop
+	def _matchOffersAndAddExchange(self, buy, sell):
+		assert self._balanceRefCounts[buy.refundAccount] > 0
+		assert self._balanceRefCounts[sell.receivingAccount] > 0
+		exchange, buyRemainder, sellRemainder = TradeOffer.MatchOffers(buy=buy, sell=sell)
+		self._tradeOfferChangeCounts[sell.receivingAccount] += 1
+		self._tradeOfferChangeCounts[buy.refundAccount] += 1
+		exchange.expiry = self._currentBlockIndex + 50
+		exchange.ltcReceiveAddress = buy.receivingAccount
+		exchange.buyerAddress = buy.refundAccount
+		exchange.sellerReceivingAccount = sell.receivingAccount
+		key = self._nextExchangeIndex
+		self._nextExchangeIndex += 1
+		# note that the account refs from buy and sell details effectively transfer into this exchange object, by default
+		self._pendingExchanges[key] = exchange
+		if buyRemainder is not None:
+			self._balanceRefCounts[buyRemainder.refundAccount] += 1
+		if sellRemainder is not None:
+			self._balanceRefCounts[sellRemainder.receivingAccount] += 1
+		return buyRemainder, sellRemainder
 
 	def _check_Burn(self, outputs, amount):
 		if outputs != ('destination',):
@@ -209,7 +184,9 @@ class State(object):
 			return False, 'insufficient balance in source account (offer not posted)'
 		if sourceAccount in self._balanceRefCounts:
 			return False, "source account is linked to an outstanding trade offer or pending exchange and can't be spent until the trade is completed or expires"
-		if not LTCTrading.SatisfiesMinimumExchange(exchangeRate, swapBillOffered):
+		try:
+			buy = TradeOffer.BuyOffer(swapBillOffered=swapBillOffered, rate=exchangeRate)
+		except TradeOffer.OfferIsBelowMinimumExchange:
 			return False, 'does not satisfy minimum exchange amount (offer not posted)'
 		if maxBlock < self._currentBlockIndex:
 			return True, 'max block for transaction has been exceeded'
@@ -229,42 +206,63 @@ class State(object):
 			self._addAccount(changeAccount, available)
 		else:
 			self._addToAccount(refundAccount, available)
-		buyDetails = BuyDetails()
-		buyDetails.swapBillAmount = swapBillOffered
-		buyDetails.receivingAccount = receivingAddress
-		buyDetails.refundAccount = refundAccount
 		assert not refundAccount in self._balanceRefCounts
 		self._balanceRefCounts[refundAccount] = 1
 		self._tradeOfferChangeCounts[refundAccount] = 0
-		self._LTCBuys.addOffer(exchangeRate, maxBlock, buyDetails)
-		self._matchLTC()
+		buy = TradeOffer.BuyOffer(swapBillOffered=swapBillOffered, rate=exchangeRate)
+		buy.receivingAccount = receivingAddress
+		buy.refundAccount = refundAccount
+		buy.expiry = maxBlock
+		toReAdd = []
+		while True:
+			if self._LTCSells.empty() or not TradeOffer.OffersMeetOrOverlap(buy=buy, sell=self._LTCSells.peekCurrentBest()):
+				# no more matchable sell offers
+				self._LTCBuys.addOffer(buy)
+				break
+			sell = self._LTCSells.popCurrentBest()
+			try:
+				buyRemainder, sellRemainder = self._matchOffersAndAddExchange(buy=buy, sell=sell)
+			except TradeOffer.RemainderIsBelowMinimumExchange:
+				toReAdd.append(sell)
+				continue
+			if buyRemainder is not None:
+				buy = buyRemainder
+				continue # (remainder can match against another offer)
+			# new offer is fully matched
+			if sellRemainder is not None:
+				toReAdd.append(sellRemainder)
+			break
+		for entry in toReAdd:
+			self._LTCSells.addOffer(entry)
 
-	def _check_LTCSellOffer(self, outputs, sourceAccount, swapBillDesired, exchangeRate, maxBlock):
+	def _check_LTCSellOffer(self, outputs, sourceAccount, ltcOffered, exchangeRate, maxBlock):
 		if outputs != ('change', 'ltcSell'):
 			raise OutputsSpecDoesntMatch()
-		assert type(swapBillDesired) is int
-		assert swapBillDesired >= 0
+		assert type(ltcOffered) is int
+		assert ltcOffered >= 0
 		assert type(exchangeRate) is int
 		assert exchangeRate > 0
 		assert exchangeRate < 0x100000000
 		assert type(maxBlock) is int
 		assert maxBlock >= 0
-		if swapBillDesired == 0:
+		if ltcOffered == 0:
 			return False, 'zero amount not permitted'
 		if not sourceAccount in self._balances:
 			return False, 'source account does not exist'
-		swapBillDeposit = swapBillDesired // LTCTrading.depositDivisor
+		swapBillDeposit = TradeOffer.DepositRequiredForLTCSell(exchangeRate=exchangeRate, ltcOffered=ltcOffered)
 		if self._balances[sourceAccount] < swapBillDeposit + self._minimumBalance:
 			return False, 'insufficient balance in source account (offer not posted)'
 		if sourceAccount in self._balanceRefCounts:
 			return False, "source account is linked to an outstanding trade offer or pending exchange and can't be spent until the trade is completed or expires"
-		if not LTCTrading.SatisfiesMinimumExchange(exchangeRate, swapBillDesired):
+		try:
+			sell = TradeOffer.SellOffer(swapBillDeposit=swapBillDeposit, ltcOffered=ltcOffered, rate=exchangeRate)
+		except TradeOffer.OfferIsBelowMinimumExchange:
 			return False, 'does not satisfy minimum exchange amount (offer not posted)'
 		if maxBlock < self._currentBlockIndex:
 			return True, 'max block for transaction has been exceeded'
 		return True, ''
-	def _apply_LTCSellOffer(self, txID, sourceAccount, swapBillDesired, exchangeRate, maxBlock):
-		swapBillDeposit = swapBillDesired // LTCTrading.depositDivisor
+	def _apply_LTCSellOffer(self, txID, sourceAccount, ltcOffered, exchangeRate, maxBlock):
+		swapBillDeposit = TradeOffer.DepositRequiredForLTCSell(exchangeRate=exchangeRate, ltcOffered=ltcOffered)
 		available = self._consumeAccount(sourceAccount)
 		if maxBlock < self._currentBlockIndex:
 			self._addAccount((txID, 1), available)
@@ -279,15 +277,33 @@ class State(object):
 			self._addAccount(changeAccount, available)
 		else:
 			self._addToAccount(receivingAccount, available)
-		sellDetails = SellDetails()
-		sellDetails.swapBillAmount = swapBillDesired
-		sellDetails.swapBillDeposit = swapBillDeposit
-		sellDetails.receivingAccount = receivingAccount
 		assert not receivingAccount in self._balanceRefCounts
 		self._balanceRefCounts[receivingAccount] = 1
 		self._tradeOfferChangeCounts[receivingAccount] = 0
-		self._LTCSells.addOffer(exchangeRate, maxBlock, sellDetails)
-		self._matchLTC()
+		sell = TradeOffer.SellOffer(swapBillDeposit=swapBillDeposit, ltcOffered=ltcOffered, rate=exchangeRate)
+		sell.receivingAccount = receivingAccount
+		sell.expiry = maxBlock
+		toReAdd = []
+		while True:
+			if self._LTCBuys.empty() or not TradeOffer.OffersMeetOrOverlap(buy=self._LTCBuys.peekCurrentBest(), sell=sell):
+				# no more matchable buy offers
+				self._LTCSells.addOffer(sell)
+				break
+			buy = self._LTCBuys.popCurrentBest()
+			try:
+				buyRemainder, sellRemainder = self._matchOffersAndAddExchange(buy=buy, sell=sell)
+			except TradeOffer.RemainderIsBelowMinimumExchange:
+				toReAdd.append(buy)
+				continue
+			if sellRemainder is not None:
+				sell = sellRemainder
+				continue # (remainder can match against another offer)
+			# new offer is fully matched
+			if buyRemainder is not None:
+				toReAdd.append(buyRemainder)
+			break
+		for entry in toReAdd:
+			self._LTCBuys.addOffer(entry)
 
 	def _check_LTCExchangeCompletion(self, outputs, pendingExchangeIndex, destinationAddress, destinationAmount):
 		if outputs != ():

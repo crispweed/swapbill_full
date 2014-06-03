@@ -40,9 +40,14 @@ class Exchange(object):
 	pass
 
 _minimumExchangeLTC = 1000000
+_depositDevisor = 16
 
 def _ltcWithExchangeRate(exchangeRate, swapBillAmount):
 	return swapBillAmount * exchangeRate // 0x100000000
+
+def DepositRequiredForLTCSell(exchangeRate, ltcOffered):
+	swapBillAmount = ltcOffered * 0x100000000 // exchangeRate
+	return swapBillAmount // _depositDevisor
 
 def OffersMeetOrOverlap(buy, sell):
 	return buy.rate <= sell.rate
