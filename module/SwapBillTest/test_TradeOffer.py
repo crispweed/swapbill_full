@@ -95,7 +95,7 @@ class Test(unittest.TestCase):
 	def test_match_remainder_too_small(self):
 		buy = TradeOffer.BuyOffer(2*e(7)-1, 0x80000000)
 		sell = TradeOffer.SellOffer(100, 1*e(7), 0x80000000)
-		#self.assertRaises(RemainderIsBelowMinimumExchange, TradeOffer.MatchOffers, buy=buy, sell=sell)
+		self.assertRaises(RemainderIsBelowMinimumExchange, TradeOffer.MatchOffers, buy=buy, sell=sell)
 		buy = TradeOffer.BuyOffer(2*e(7), 0x80000000)
 		sell = TradeOffer.SellOffer(100, 1*e(7)-1, 0x80000000)
 		self.assertRaises(RemainderIsBelowMinimumExchange, TradeOffer.MatchOffers, buy=buy, sell=sell)
