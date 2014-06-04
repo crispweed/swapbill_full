@@ -161,13 +161,13 @@ class Test(unittest.TestCase):
     def test_minimum_balance(self):
         host = InitHost()
         host._addUnspent(500000000)
-        self.assertRaisesRegexp(TransactionNotSuccessfulAgainstCurrentState, 'burn amount is below minimum balance', RunClient, host, ['burn', '--amount', 1*e(7)-1])
+        self.assertRaisesRegexp(TransactionNotSuccessfulAgainstCurrentState, 'burn output is below minimum balance', RunClient, host, ['burn', '--amount', 1*e(7)-1])
         RunClient(host, ['burn', '--amount', 2*e(7)])
         host._setOwner('recipient')
         payTargetAddress = host.formatAddressForEndUser(host.getNewSwapBillAddress())
         host._setOwner(host.defaultOwner)
         self.assertRaisesRegexp(TransactionNotSuccessfulAgainstCurrentState, 'amount is below minimum balance', RunClient, host, ['pay', '--amount', 1*e(7)-1, '--toAddress', payTargetAddress])
-        self.assertRaisesRegexp(TransactionNotSuccessfulAgainstCurrentState, 'transaction includes change output, with change amount below minimum balance', RunClient, host, ['pay', '--amount', 1*e(7)+1, '--toAddress', payTargetAddress])
+        self.assertRaisesRegexp(TransactionNotSuccessfulAgainstCurrentState, 'transaction would generate change output with change amount below minimum balance', RunClient, host, ['pay', '--amount', 1*e(7)+1, '--toAddress', payTargetAddress])
         # but can split exactly
         RunClient(host, ['pay', '--amount', 1*e(7), '--toAddress', payTargetAddress])
         output, result = RunClient(host, ['get_balance'])
@@ -680,7 +680,7 @@ class Test(unittest.TestCase):
         # we now need enough to fund the offer, + minimum balance in refund account
         activeAccountBalances = GetOwnerActiveAccountBalances(host, ownerList, info['balances'])
         self.assertDictEqual(activeAccountBalances , {'bob': 1*e(7), 'clive': 5*e(7)-625000, 'dave': 7*e(7)})
-        self.assertRaisesRegexp(TransactionNotSuccessfulAgainstCurrentState, 'insufficient balance in source account', RunClient, host, ['post_ltc_buy', '--swapBillOffered', 1*e(7), '--exchangeRate', '0.25'])
+        self.assertRaisesRegexp(TransactionNotSuccessfulAgainstCurrentState, 'insufficient swapbill input', RunClient, host, ['post_ltc_buy', '--swapBillOffered', 1*e(7), '--exchangeRate', '0.25'])
         # can't collect, because one output is locked for trade
         self.assertRaisesRegexp(ExceptionReportedToUser, 'There are currently less than two spendable swapbill outputs', RunClient, host, ['collect'])
         # so burn some more

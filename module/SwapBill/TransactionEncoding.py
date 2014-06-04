@@ -7,44 +7,52 @@ class UnsupportedTransaction(Exception):
 class NotValidSwapBillTransaction(Exception):
 	pass
 
-_mappingByTypeCode = (
-    ('Burn', 0, ((0, 16), 'amount'), ('destination',), ()),
-    ('Pay', 1, (('amount', 6, 'maxBlock', 4, None, 6), None), ('change','destination'), ()),
+_fundedMappingByTypeCode = (
+    ('Burn', ((0, 16), 'amount'), ('destination',), ()),
+    ('Pay', (('amount', 6, 'maxBlock', 4, None, 6), None), ('change','destination'), ()),
     ('LTCBuyOffer',
-     1,
      (('swapBillOffered', 6, 'maxBlock', 4, 'exchangeRate', 4, None, 2), None),
      ('change', 'ltcBuy'),
      (('receivingAddress', None),)
 	),
     ('LTCSellOffer',
-     1,
      (('ltcOffered', 6, 'maxBlock', 4, 'exchangeRate', 4, None, 2), None),
      ('change', 'ltcSell'),
      ()
 	),
-    ('LTCExchangeCompletion', 0, (('pendingExchangeIndex', 6, None, 10), None), (), (('destinationAddress', 'destinationAmount'),)),
-    ('Collect', None, (('_numberOfSources', 2, None, 14), None), ('destination',), ()),
     #('BackLTCSells',
-     #1,
      #(('backingAmount', 6, 'maxBlock', 4, None, 6), None),
      #('change', 'refund'),
-     #(('receivingAddress', None),)
-     #()
+     #(('receivingAddress', None),),
 	#),
 	)
 
-_forwardCompatibilityMapping = ('ForwardToFutureNetworkVersion', 1, (('amount', 6, 'maxBlock', 4, None, 6), None), ('change',), ())
+_forwardCompatibilityMapping = ('ForwardToFutureNetworkVersion', (('amount', 6, 'maxBlock', 4, None, 6), None), ('change',), ())
+
+_unfundedMappingByTypeCode = (
+    ('LTCExchangeCompletion',
+     (('pendingExchangeIndex', 6, None, 10), None),
+     (),
+     (('destinationAddress', 'destinationAmount'),)
+    ),
+	)
 
 def _mappingFromTypeString(transactionType):
-	for i in range(len(_mappingByTypeCode)):
-		if transactionType == _mappingByTypeCode[i][0]:
-			return i, _mappingByTypeCode[i]
+	for i in range(len(_fundedMappingByTypeCode)):
+		if transactionType == _fundedMappingByTypeCode[i][0]:
+			return i, _fundedMappingByTypeCode[i]
+	for i in range(len(_unfundedMappingByTypeCode)):
+		if transactionType == _unfundedMappingByTypeCode[i][0]:
+			return 128 + i, _unfundedMappingByTypeCode[i]
 	raise Exception('Unknown transaction type string', transactionType)
 def _mappingFromTypeCode(typeCode):
-	if typeCode < len(_mappingByTypeCode):
-		return _mappingByTypeCode[typeCode]
+	if typeCode < len(_fundedMappingByTypeCode):
+		return _fundedMappingByTypeCode[typeCode]
 	if typeCode < 128:
 		return _forwardCompatibilityMapping
+	typeCode -= 128
+	if typeCode < len(_unfundedMappingByTypeCode):
+		return _unfundedMappingByTypeCode[typeCode]
 	raise UnsupportedTransaction()
 
 def _decodeInt(data):
@@ -71,9 +79,9 @@ def ToStateTransaction(tx):
 	assert len(ControlAddressPrefix.prefix) == 3
 	typeCode = _decodeInt(controlAddressData[3:4])
 	mapping = _mappingFromTypeCode(typeCode)
+	funded = (len(mapping[2]) > 0)
 	transactionType = mapping[0]
 	details = {}
-	meta = {'_numberOfSources':mapping[1]}
 	controlAddressMapping, amountMapping = mapping[2]
 	pos = 4
 	for i in range(len(controlAddressMapping) // 2):
@@ -85,23 +93,16 @@ def ToStateTransaction(tx):
 				raise NotValidSwapBillTransaction
 		elif valueMapping is not None:
 			value = _decodeInt(data)
-			if valueMapping.startswith('_'):
-				meta[valueMapping] = value
-			else:
-				details[valueMapping] = value
+			details[valueMapping] = value
 		pos += numberOfBytes
 	assert pos == 20
 	if amountMapping is not None:
 		details[amountMapping] = tx.outputAmount(0)
-	numberOfSources = meta['_numberOfSources']
-	if numberOfSources > tx.numberOfInputs():
-		raise NotValidSwapBillTransaction('not enough inputs, or bad meta data for number of inputs')
-	if numberOfSources == 1:
-		details['sourceAccount'] = (tx.inputTXID(0), tx.inputVOut(0))
-	elif numberOfSources != 0:
-		details['sourceAccounts'] = []
-		for i in range(numberOfSources):
-			details['sourceAccounts'].append((tx.inputTXID(i), tx.inputVOut(i)))
+	sourceAccounts = None
+	if funded:
+		sourceAccounts = []
+		for i in range(tx.numberOfInputs()):
+			sourceAccounts.append((tx.inputTXID(i), tx.inputVOut(i)))
 	outputs = mapping[3]
 	destinations = mapping[4]
 	for i in range(len(destinations)):
@@ -111,22 +112,18 @@ def ToStateTransaction(tx):
 			details[addressMapping] = tx.outputPubKeyHash(1 + len(outputs) + i)
 		if amountMapping is not None:
 			details[amountMapping] = tx.outputAmount(1 + len(outputs) + i)
-	return transactionType, outputs, details
+	return transactionType, sourceAccounts, outputs, details
 
-def FromStateTransaction(transactionType, outputs, outputPubKeyHashes, originalDetails):
+def FromStateTransaction(transactionType, sourceAccounts, outputs, outputPubKeyHashes, originalDetails):
 	assert len(outputs) == len(outputPubKeyHashes)
 	typeCode, mapping = _mappingFromTypeString(transactionType)
 	tx = HostTransaction.InMemoryTransaction()
 	details = originalDetails.copy()
-	if 'sourceAccount' in details:
-		txID, vout = details['sourceAccount']
-		tx.addInput(txID, vout)
-	elif 'sourceAccounts' in details:
-		for txID, vout in details['sourceAccounts']:
+	funded = (len(mapping[2]) > 0)
+	assert funded == (sourceAccounts is not None)
+	if sourceAccounts is not None:
+		for txID, vout in sourceAccounts:
 			tx.addInput(txID, vout)
-	details['_numberOfSources'] = tx.numberOfInputs()
-	if mapping[1] is not None:
-		assert mapping[1] == details['_numberOfSources']
 	details[None] = 0
 	details[0] = 0
 	controlAddressMapping, amountMapping = mapping[2]
