@@ -82,7 +82,7 @@ def ToStateTransaction(tx):
 	funded = (len(mapping[2]) > 0)
 	transactionType = mapping[0]
 	details = {}
-	controlAddressMapping, amountMapping = mapping[2]
+	controlAddressMapping, amountMapping = mapping[1]
 	pos = 4
 	for i in range(len(controlAddressMapping) // 2):
 		valueMapping = controlAddressMapping[i * 2]
@@ -103,8 +103,8 @@ def ToStateTransaction(tx):
 		sourceAccounts = []
 		for i in range(tx.numberOfInputs()):
 			sourceAccounts.append((tx.inputTXID(i), tx.inputVOut(i)))
-	outputs = mapping[3]
-	destinations = mapping[4]
+	outputs = mapping[2]
+	destinations = mapping[3]
 	for i in range(len(destinations)):
 		addressMapping, amountMapping = destinations[i]
 		assert addressMapping is not None
@@ -126,7 +126,7 @@ def FromStateTransaction(transactionType, sourceAccounts, outputs, outputPubKeyH
 			tx.addInput(txID, vout)
 	details[None] = 0
 	details[0] = 0
-	controlAddressMapping, amountMapping = mapping[2]
+	controlAddressMapping, amountMapping = mapping[1]
 	controlAddressData = ControlAddressPrefix.prefix + _encodeInt(typeCode, 1)
 	for i in range(len(controlAddressMapping) // 2):
 		valueMapping = controlAddressMapping[i * 2]
@@ -134,16 +134,17 @@ def FromStateTransaction(transactionType, sourceAccounts, outputs, outputPubKeyH
 		controlAddressData += _encodeInt(details[valueMapping], numberOfBytes)
 	assert len(controlAddressData) == 20
 	tx.addOutput(controlAddressData, details[amountMapping])
-	expectedOutputs = mapping[3]
+	expectedOutputs = mapping[2]
 	assert expectedOutputs == outputs
 	for pubKeyHash in outputPubKeyHashes:
 		tx.addOutput(pubKeyHash, 0)
-	destinations = mapping[4]
+	destinations = mapping[3]
 	for addressMapping, amountMapping in destinations:
 		assert addressMapping is not None
 		tx.addOutput(details[addressMapping], details[amountMapping])
-	transactionType_Check, outputs_Check, details_Check = ToStateTransaction(tx)
+	transactionType_Check, sourceAccounts_Check, outputs_Check, details_Check = ToStateTransaction(tx)
 	assert transactionType_Check == transactionType
+	assert sourceAccounts_Check == sourceAccounts
 	assert outputs_Check == outputs
 	assert details_Check == originalDetails
 	return tx
