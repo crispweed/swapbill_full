@@ -265,13 +265,13 @@ class State(object):
 			return True, 'max block for transaction has been exceeded'
 		return True, ''
 	def _apply_LTCSellOffer(self, txID, sourceAccount, ltcOffered, exchangeRate, maxBlock):
-		swapBillDeposit = TradeOffer.DepositRequiredForLTCSell(exchangeRate=exchangeRate, ltcOffered=ltcOffered)
 		available = self._consumeAccount(sourceAccount)
 		if maxBlock < self._currentBlockIndex:
 			self._addAccount((txID, 1), available)
 			return
 		changeAccount = (txID, 1)
 		receivingAccount = (txID, 2)
+		swapBillDeposit = TradeOffer.DepositRequiredForLTCSell(exchangeRate=exchangeRate, ltcOffered=ltcOffered)
 		assert available >= swapBillDeposit + self._minimumBalance
 		available -= swapBillDeposit
 		self._addAccount(receivingAccount, self._minimumBalance)
@@ -344,8 +344,6 @@ class State(object):
 			#return False, 'amount is below minimum balance'
 		#if backingAmount < transactionMax * 100:
 			#return False, 'not enough transactions covered'
-		#if maxBlock < self._currentBlockIndex:
-			#return False, 'max block for transaction has been exceeded'
 		#if not sourceAccount in self._balances:
 			#return False, 'source account does not exist'
 		#if self._balances[sourceAccount] < backingAmount:
@@ -354,9 +352,14 @@ class State(object):
 			#return False, 'transaction includes change output, with change amount below minimum balance'
 		#if sourceAccount in self._balanceRefCounts:
 			#return False, "source account is not currently spendable (e.g. this may be locked until a trade completes)"
+		#if maxBlock < self._currentBlockIndex:
+			#return True, 'max block for transaction has been exceeded'
 		#return True, ''
 	#def _apply_BackLTCSells(self, txID, sourceAccount, backingAmount, transactionMax, receivingAddress, maxBlock):
 		#available = self._consumeAccount(sourceAccount)
+		#if maxBlock < self._currentBlockIndex:
+			#self._addAccount((txID, 1), available)
+			#return
 		#self._totalForwarded += amount
 		#if available > amount:
 			#self._addAccount((txID, 1), available - amount)
