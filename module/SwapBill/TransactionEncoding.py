@@ -142,9 +142,4 @@ def FromStateTransaction(transactionType, sourceAccounts, outputs, outputPubKeyH
 	for addressMapping, amountMapping in destinations:
 		assert addressMapping is not None
 		tx.addOutput(details[addressMapping], details[amountMapping])
-	transactionType_Check, sourceAccounts_Check, outputs_Check, details_Check = ToStateTransaction(tx)
-	assert transactionType_Check == transactionType
-	assert sourceAccounts_Check == sourceAccounts
-	assert outputs_Check == outputs
-	assert details_Check == originalDetails
 	return tx

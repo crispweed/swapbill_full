@@ -1,7 +1,18 @@
 from __future__ import print_function
 import unittest, binascii
 from SwapBill import TransactionEncoding
-from SwapBill.TransactionEncoding import FromStateTransaction, ToStateTransaction
+
+def FromStateTransactionWrapper(originalFunction):
+	def Wrapper(transactionType, sourceAccounts, outputs, outputPubKeyHashes, originalDetails):
+		tx = originalFunction(transactionType, sourceAccounts, outputs, outputPubKeyHashes, originalDetails)
+		transactionType_Check, sourceAccounts_Check, outputs_Check, details_Check = TransactionEncoding.ToStateTransaction(tx)
+		assert transactionType_Check == transactionType
+		assert sourceAccounts_Check == sourceAccounts
+		assert outputs_Check == outputs
+		assert details_Check == originalDetails
+		return tx
+	return Wrapper
+TransactionEncoding.FromStateTransaction = FromStateTransactionWrapper(TransactionEncoding.FromStateTransaction)
 
 class Test(unittest.TestCase):
 
@@ -49,39 +60,39 @@ class Test(unittest.TestCase):
 
 	def test_bad_state_transactions(self):
 		# outputs don't match spec
-		self.assertRaises(AssertionError, FromStateTransaction, 'Burn', [], (), (), {'amount':10})
+		self.assertRaises(AssertionError, TransactionEncoding.FromStateTransaction, 'Burn', [], (), (), {'amount':10})
 		# outputs don't match spec
-		self.assertRaises(AssertionError, FromStateTransaction, 'Burn', [], ('dostination',), ('_pkh',), {'amount':10})
+		self.assertRaises(AssertionError, TransactionEncoding.FromStateTransaction, 'Burn', [], ('dostination',), ('_pkh',), {'amount':10})
 		# Burn is a funded type, so must have sourceAccounts list set
-		self.assertRaises(AssertionError, FromStateTransaction, 'Burn', None, ('destination',), ('_pkh',), {'amount':10})
+		self.assertRaises(AssertionError, TransactionEncoding.FromStateTransaction, 'Burn', None, ('destination',), ('_pkh',), {'amount':10})
 		# bad type string
-		self.assertRaisesRegexp(Exception, "('Unknown transaction type string', 'Burneeyo')", FromStateTransaction, 'Burneeyo', [], ('destination',), ('_pkh',), {'amount':10})
+		self.assertRaisesRegexp(Exception, "('Unknown transaction type string', 'Burneeyo')", TransactionEncoding.FromStateTransaction, 'Burneeyo', [], ('destination',), ('_pkh',), {'amount':10})
 		# lengths of keys and outputs spec don't match
-		self.assertRaises(AssertionError, FromStateTransaction, 'Pay', [('sourceTXID',4)], ('change','destination'), ('changePKH'), {'amount':20, 'maxBlock':100})
+		self.assertRaises(AssertionError, TransactionEncoding.FromStateTransaction, 'Pay', [('sourceTXID',4)], ('change','destination'), ('changePKH'), {'amount':20, 'maxBlock':100})
 		# LTCExchangeCompletion is unfunded, so must not have sourceAccounts list set
-		self.assertRaises(AssertionError, FromStateTransaction, 'LTCExchangeCompletion', [], (), (), {'pendingExchangeIndex':10, 'destinationAddress':'madeUpAddress', 'destinationAmount':10})
+		self.assertRaises(AssertionError, TransactionEncoding.FromStateTransaction, 'LTCExchangeCompletion', [], (), (), {'pendingExchangeIndex':10, 'destinationAddress':'madeUpAddress', 'destinationAmount':10})
 		# control group!
-		FromStateTransaction('Burn', [], ('destination',), ('_pkh',), {'amount':10})
-		FromStateTransaction('Pay', [('sourceTXID',4)], ('change','destination'), ('changePKH', 'destinationPKH'), {'amount':20, 'maxBlock':100})
-		FromStateTransaction('LTCExchangeCompletion', None, (), (), {'pendingExchangeIndex':10, 'destinationAddress':'madeUpAddress', 'destinationAmount':10})
+		TransactionEncoding.FromStateTransaction('Burn', [], ('destination',), ('_pkh',), {'amount':10})
+		TransactionEncoding.FromStateTransaction('Pay', [('sourceTXID',4)], ('change','destination'), ('changePKH', 'destinationPKH'), {'amount':20, 'maxBlock':100})
+		TransactionEncoding.FromStateTransaction('LTCExchangeCompletion', None, (), (), {'pendingExchangeIndex':10, 'destinationAddress':'madeUpAddress', 'destinationAmount':10})
 
 	def test_bad_burn_address(self):
-		tx = FromStateTransaction('Burn', [], ('destination',), ('_pkh',), {'amount':10})
+		tx = TransactionEncoding.FromStateTransaction('Burn', [], ('destination',), ('_pkh',), {'amount':10})
 		self.assertEqual(tx._outputs[0], (b'SWP\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00', 10))
 		tx._outputs[0] = (b'SWP\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x01', 10)
-		self.assertRaises(TransactionEncoding.NotValidSwapBillTransaction, ToStateTransaction, tx)
+		self.assertRaises(TransactionEncoding.NotValidSwapBillTransaction, TransactionEncoding.ToStateTransaction, tx)
 		tx._outputs[0] = (b'SWP\x00\x80\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00', 10)
-		self.assertRaises(TransactionEncoding.NotValidSwapBillTransaction, ToStateTransaction, tx)
+		self.assertRaises(TransactionEncoding.NotValidSwapBillTransaction, TransactionEncoding.ToStateTransaction, tx)
 		tx._outputs[0] = (b'SWP\x00\x00\x00\x00\x00\x00\x00\x04\x00\x00\x00\x00\x00\x00\x00\x00\x00', 10)
-		self.assertRaises(TransactionEncoding.NotValidSwapBillTransaction, ToStateTransaction, tx)
+		self.assertRaises(TransactionEncoding.NotValidSwapBillTransaction, TransactionEncoding.ToStateTransaction, tx)
 
 	def test_types(self):
-		tx = FromStateTransaction('Burn', [], ('destination',), ('_pkh',), {'amount':10})
+		tx = TransactionEncoding.FromStateTransaction('Burn', [], ('destination',), ('_pkh',), {'amount':10})
 		self.assertDictEqual(tx.__dict__, {'_inputs': [], '_outputs': [(b'SWP\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00', 10), ('_pkh', 0)]})
-		tx = FromStateTransaction('Pay', [('sourceTXID',4)], ('change','destination'), ('changePKH','destinationPKH'), {'amount':20, 'maxBlock':100})
+		tx = TransactionEncoding.FromStateTransaction('Pay', [('sourceTXID',4)], ('change','destination'), ('changePKH','destinationPKH'), {'amount':20, 'maxBlock':100})
 		self.assertDictEqual(tx.__dict__, {'_inputs': [('sourceTXID', 4)], '_outputs': [(b'SWP\x01\x14\x00\x00\x00\x00\x00d\x00\x00\x00\x00\x00\x00\x00\x00\x00', 0), ('changePKH', 0), ('destinationPKH', 0)]})
 		self.checkIgnoredBytes(tx, 6)
-		tx = FromStateTransaction(
+		tx = TransactionEncoding.FromStateTransaction(
 		    'LTCBuyOffer',
 		    [('sourceTXID',5)],
 		    ('change','ltcBuy'), ('changePKH','ltcBuyPKH'),
@@ -89,7 +100,7 @@ class Test(unittest.TestCase):
 		)
 		self.assertDictEqual(tx.__dict__, {'_outputs': [(b'SWP\x02\x16\x00\x00\x00\x00\x00\x00\x00\x00\x00{\x00\x00\x00\x00\x00', 0), ('changePKH', 0), ('ltcBuyPKH', 0), ('ltcSellPKH', 0)], '_inputs': [('sourceTXID', 5)]} )
 		self.checkIgnoredBytes(tx, 2)
-		tx = FromStateTransaction(
+		tx = TransactionEncoding.FromStateTransaction(
 		    'LTCSellOffer',
 		    [('sourceTXID',3)],
 		    ('change','ltcSell'), ('changePKH','ltcSellPKH'),
@@ -97,7 +108,7 @@ class Test(unittest.TestCase):
 		)
 		self.assertDictEqual(tx.__dict__, {'_inputs': [('sourceTXID', 3)], '_outputs': [(b'SWP\x03\x16\x00\x00\x00\x00\x00\x00\x00\x00\x00{\x00\x00\x00\x00\x00', 0), ('changePKH', 0), ('ltcSellPKH', 0)]} )
 		self.checkIgnoredBytes(tx, 2)
-		tx = FromStateTransaction(
+		tx = TransactionEncoding.FromStateTransaction(
 		    'LTCExchangeCompletion',
 		    None,
 		    (), (),
@@ -108,10 +119,10 @@ class Test(unittest.TestCase):
 
 	def test_forwarding(self):
 		# cannot encode forward to future network version transactions explicitly from state transactions
-		self.assertRaisesRegexp(Exception, "('Unknown transaction type string', 'ForwardToFutureNetworkVersion')", FromStateTransaction, 'ForwardToFutureNetworkVersion', [('sourceTXID',4)], ('change',), ('changePKH',), {'amount':999, 'maxBlock':100})
+		self.assertRaisesRegexp(Exception, "('Unknown transaction type string', 'ForwardToFutureNetworkVersion')", TransactionEncoding.FromStateTransaction, 'ForwardToFutureNetworkVersion', [('sourceTXID',4)], ('change',), ('changePKH',), {'amount':999, 'maxBlock':100})
 		# pay transactions satisfy format requirements for forward to future network transactions
 		# so hack the type code for a pay transaction to test this
-		tx = FromStateTransaction('Pay', [('sourceTXID',4)], ('change','destination'), ('changePKH','destinationPKH'), {'amount':20, 'maxBlock':100})
+		tx = TransactionEncoding.FromStateTransaction('Pay', [('sourceTXID',4)], ('change','destination'), ('changePKH','destinationPKH'), {'amount':20, 'maxBlock':100})
 		tx._outputs[0] = (b'SWP\x0f\x14\x00\x00\x00\x00\x00d\x00\x00\x00\x00\x00\x00\x00\x00\x00', 0)
 		transactionType, sourceAccounts, outputs, details = TransactionEncoding.ToStateTransaction(tx)
 		self.assertEqual(transactionType, 'ForwardToFutureNetworkVersion')
