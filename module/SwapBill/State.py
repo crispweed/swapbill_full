@@ -10,11 +10,6 @@ class InvalidTransactionType(Exception):
 class OutputsSpecDoesntMatch(Exception):
 	pass
 
-class BuyDetails(object):
-	pass
-class SellDetails(object):
-	pass
-
 class State(object):
 	def __init__(self, startBlockIndex, startBlockHash, minimumBalance=1*e(7)):
 		## state is initialised at the start of the block with startBlockIndex
@@ -137,7 +132,7 @@ class State(object):
 		if self._balances[sourceAccount] > amount and self._balances[sourceAccount] < amount + self._minimumBalance:
 			return False, 'transaction includes change output, with change amount below minimum balance'
 		if sourceAccount in self._balanceRefCounts:
-			return False, "source account is linked to an outstanding trade offer or pending exchange and can't be spent until the trade is completed or expires"
+			return False, "source account is not currently spendable (e.g. this may be locked until a trade completes)"
 		if maxBlock < self._currentBlockIndex:
 			return True, 'max block for transaction has been exceeded'
 		return True, ''
@@ -157,7 +152,7 @@ class State(object):
 			if not sourceAccount in self._balances:
 				return False, 'at least one source account does not exist'
 			if sourceAccount in self._balanceRefCounts:
-				return False, "at least one source account is linked to an outstanding trade offer or pending exchange and can't be spent until the trade is completed or expires"
+				return False, "at least one source account is not currently spendable (e.g. this may be locked until a trade completes)"
 		return True, ''
 	def _apply_Collect(self, txID, sourceAccounts):
 		amount = 0
@@ -183,7 +178,7 @@ class State(object):
 		if self._balances[sourceAccount] < swapBillOffered + self._minimumBalance:
 			return False, 'insufficient balance in source account (offer not posted)'
 		if sourceAccount in self._balanceRefCounts:
-			return False, "source account is linked to an outstanding trade offer or pending exchange and can't be spent until the trade is completed or expires"
+			return False, "source account is not currently spendable (e.g. this may be locked until a trade completes)"
 		try:
 			buy = TradeOffer.BuyOffer(swapBillOffered=swapBillOffered, rate=exchangeRate)
 		except TradeOffer.OfferIsBelowMinimumExchange:
@@ -253,7 +248,7 @@ class State(object):
 		if self._balances[sourceAccount] < swapBillDeposit + self._minimumBalance:
 			return False, 'insufficient balance in source account (offer not posted)'
 		if sourceAccount in self._balanceRefCounts:
-			return False, "source account is linked to an outstanding trade offer or pending exchange and can't be spent until the trade is completed or expires"
+			return False, "source account is not currently spendable (e.g. this may be locked until a trade completes)"
 		try:
 			sell = TradeOffer.SellOffer(swapBillDeposit=swapBillDeposit, ltcOffered=ltcOffered, rate=exchangeRate)
 		except TradeOffer.OfferIsBelowMinimumExchange:
@@ -330,6 +325,30 @@ class State(object):
 		self._removeAccountRef(exchangeDetails.sellerReceivingAccount)
 		self._pendingExchanges.pop(pendingExchangeIndex)
 
+	#def _check_BackLTCSells(self, outputs, sourceAccount, backingAmount, maxBlock):
+		#if outputs != ('change', 'refund'):
+			#raise OutputsSpecDoesntMatch()
+		#assert type(backingAmount) is int
+		#assert backingAmount >= 0
+		#if backingAmount < self._minimumBalance:
+			#return False, 'amount is below minimum balance'
+		#if maxBlock < self._currentBlockIndex:
+			#return False, 'max block for transaction has been exceeded'
+		#if not sourceAccount in self._balances:
+			#return False, 'source account does not exist'
+		#if self._balances[sourceAccount] < backingAmount:
+			#return False, 'insufficient balance in source account (transaction ignored)'
+		#if self._balances[sourceAccount] > backingAmount and self._balances[sourceAccount] < backingAmount + self._minimumBalance:
+			#return False, 'transaction includes change output, with change amount below minimum balance'
+		#if sourceAccount in self._balanceRefCounts:
+			#return False, "source account is not currently spendable (e.g. this may be locked until a trade completes)"
+		#return True, ''
+	#def _apply_BackLTCSells(self, txID, sourceAccount, backingAmount, maxBlock):
+		#available = self._consumeAccount(sourceAccount)
+		#self._totalForwarded += amount
+		#if available > amount:
+			#self._addAccount((txID, 1), available - amount)
+
 	def _check_ForwardToFutureNetworkVersion(self, outputs, sourceAccount, amount, maxBlock):
 		if outputs != ('change',):
 			raise OutputsSpecDoesntMatch()
@@ -346,7 +365,7 @@ class State(object):
 		if self._balances[sourceAccount] > amount and self._balances[sourceAccount] < amount + self._minimumBalance:
 			return False, 'transaction includes change output, with change amount below minimum balance'
 		if sourceAccount in self._balanceRefCounts:
-			return False, "source account is linked to an outstanding trade offer or pending exchange and can't be spent until the trade is completed or expires"
+			return False, "source account is not currently spendable (e.g. this may be locked until a trade completes)"
 		return True, ''
 	def _apply_ForwardToFutureNetworkVersion(self, txID, sourceAccount, amount, maxBlock):
 		available = self._consumeAccount(sourceAccount)

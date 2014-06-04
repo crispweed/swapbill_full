@@ -24,6 +24,12 @@ _mappingByTypeCode = (
 	),
     ('LTCExchangeCompletion', 0, (('pendingExchangeIndex', 6, None, 10), None), (), (('destinationAddress', 'destinationAmount'),)),
     ('Collect', None, (('_numberOfSources', 2, None, 14), None), ('destination',), ()),
+    #('BackLTCSells',
+     #1,
+     #(('backingAmount', 6, 'maxBlock', 4, None, 6), None),
+     #('change', 'refund'),
+     #()
+	#),
 	)
 
 _forwardCompatibilityMapping = ('ForwardToFutureNetworkVersion', 1, (('amount', 6, 'maxBlock', 4, None, 6), None), ('change',), ())

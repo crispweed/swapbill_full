@@ -329,7 +329,7 @@ class Test(unittest.TestCase):
 
 		# refund account can't be spent yet as it is locked during the trade
 		reason = self.Apply_AssertFails(state, 'Pay', sourceAccount=refundA, amount=1, maxBlock=200)
-		self.assertEqual(reason, "source account is linked to an outstanding trade offer or pending exchange and can't be spent until the trade is completed or expires")
+		self.assertEqual(reason, "source account is not currently spendable (e.g. this may be locked until a trade completes)")
 		self.assertEqual(state._balances, {changeA:70000000-1, burnB:200000000, burnC:200000000, refundA:1})
 
 		# B wants to sell
@@ -501,11 +501,11 @@ class Test(unittest.TestCase):
 		self.assertEqual(state._LTCSells.size(), 1)
 		# receiving account can't be spent yet as this is locked until exchange completed
 		reason = self.Apply_AssertFails(state, 'Pay', sourceAccount=receiveB, amount=1, maxBlock=200)
-		self.assertEqual(reason, "source account is linked to an outstanding trade offer or pending exchange and can't be spent until the trade is completed or expires")
+		self.assertEqual(reason, "source account is not currently spendable (e.g. this may be locked until a trade completes)")
 		self.assertEqual(state.getSpendableAmount(receiveB), 0)
 		# same for sell refund account
 		reason = self.Apply_AssertFails(state, 'Pay', sourceAccount=refundA, amount=1, maxBlock=200)
-		self.assertEqual(reason, "source account is linked to an outstanding trade offer or pending exchange and can't be spent until the trade is completed or expires")
+		self.assertEqual(reason, "source account is not currently spendable (e.g. this may be locked until a trade completes)")
 		self.assertEqual(state.getSpendableAmount(receiveB), 0)
 		# but sell should be matched by this larger offer
 		burnC = self.Burn(4*e(8))
@@ -545,10 +545,10 @@ class Test(unittest.TestCase):
 		# refund account can't be spent yet as this is locked until exchange completed
 		# (bunch of tests for stuff not being able to use this follow)
 		reason = self.Apply_AssertFails(state, 'Pay', sourceAccount=refundA, amount=1, maxBlock=200)
-		self.assertEqual(reason, "source account is linked to an outstanding trade offer or pending exchange and can't be spent until the trade is completed or expires")
+		self.assertEqual(reason, "source account is not currently spendable (e.g. this may be locked until a trade completes)")
 		self.assertEqual(state.getSpendableAmount(refundA), 0)
 		reason = self.Apply_AssertFails(state, 'Collect', sourceAccounts=[changeA, refundA])
-		self.assertEqual(reason, "at least one source account is linked to an outstanding trade offer or pending exchange and can't be spent until the trade is completed or expires")
+		self.assertEqual(reason, "at least one source account is not currently spendable (e.g. this may be locked until a trade completes)")
 		# TODO - get these tests for buy and sell offers failing if account locked back in place somewhere
 		#details = {
 		#'sourceAccount':refundA,
@@ -557,17 +557,17 @@ class Test(unittest.TestCase):
 		#'receivingAddress':'madeUpAddressButNotUsed'
 		#}
 		#reason = self.Apply_AssertFails(state, 'LTCBuyOffer', **details)
-		#self.assertEqual(reason, "source account is linked to an outstanding trade offer or pending exchange and can't be spent until the trade is completed or expires")
+		#self.assertEqual(reason, "source account is not currently spendable (e.g. this may be locked until a trade completes)")
 		#details = {
 		#'sourceAccount':refundA,
 		#'ltcOffered':100000//2, 'exchangeRate':0x80000000,
 		#'maxBlock':100
 		#}
 		#reason = self.Apply_AssertFails(state, 'LTCSellOffer', **details)
-		#self.assertEqual(reason, "source account is linked to an outstanding trade offer or pending exchange and can't be spent until the trade is completed or expires")
+		#self.assertEqual(reason, "source account is not currently spendable (e.g. this may be locked until a trade completes)")
 		details = {'sourceAccount':refundA, 'amount':1, 'maxBlock':200}
 		reason = self.Apply_AssertFails(state, 'ForwardToFutureNetworkVersion', **details)
-		self.assertEqual(reason, "source account is linked to an outstanding trade offer or pending exchange and can't be spent until the trade is completed or expires")
+		self.assertEqual(reason, "source account is not currently spendable (e.g. this may be locked until a trade completes)")
 		# (end of bunch of tests for stuff not being able to use refund account)
 		self.assertEqual(state._balances, {changeB:1*e(7)-depositB-1, receiveB:1, changeA:3, refundA:1})
 		# but buy should be matched by this larger offer
@@ -667,7 +667,7 @@ class Test(unittest.TestCase):
 		self.assertEqual(state._balances, {changeB:2*e(7)-deposit-1, receiveB:10625000+1, refundA:1})
 		# but receiving account can't be spent yet as this is locked until exchange completed
 		reason = self.Apply_AssertFails(state, 'Pay', sourceAccount=receiveB, amount=1, maxBlock=200)
-		self.assertEqual(reason, "source account is linked to an outstanding trade offer or pending exchange and can't be spent until the trade is completed or expires")
+		self.assertEqual(reason, "source account is not currently spendable (e.g. this may be locked until a trade completes)")
 		self.assertEqual(state._balances, {changeB:2*e(7)-deposit-1, receiveB:10625000+1, refundA:1})
 		# a goes on to buy the rest
 		burnA2 = self.Burn(10000001)
@@ -777,7 +777,7 @@ class Test(unittest.TestCase):
 		self.assertEqual(len(state._pendingExchanges), 1)
 		# at this point, refund account should still be locked for the trade
 		reason = self.Apply_AssertFails(state, 'Pay', sourceAccount=refund, amount=1, maxBlock=200)
-		self.assertEqual(reason, "source account is linked to an outstanding trade offer or pending exchange and can't be spent until the trade is completed or expires")
+		self.assertEqual(reason, "source account is not currently spendable (e.g. this may be locked until a trade completes)")
 		# go ahead and complete last pending exchange
 		self.Completion(state, 2, 'receiveLTC', 25*e(5))
 		# matched seller gets deposit refund + swapbill counterparty payment
@@ -823,7 +823,7 @@ class Test(unittest.TestCase):
 		self.assertEqual(len(state._pendingExchanges), 1)
 		# at this point, receive account should still be locked for the trade
 		reason = self.Apply_AssertFails(state, 'Pay', sourceAccount=receive, amount=1, maxBlock=200)
-		self.assertEqual(reason, "source account is linked to an outstanding trade offer or pending exchange and can't be spent until the trade is completed or expires")
+		self.assertEqual(reason, "source account is not currently spendable (e.g. this may be locked until a trade completes)")
 		# go ahead and complete last pending exchange
 		self.Completion(state, 2, 'receiveLTC', 25*e(5))
 		# seller gets deposit refund + swapbill counterparty payment for this trade
