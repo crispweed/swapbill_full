@@ -114,10 +114,11 @@ def ToStateTransaction(tx):
 			details[amountMapping] = tx.outputAmount(1 + len(outputs) + i)
 	return transactionType, sourceAccounts, outputs, details
 
-def FromStateTransaction(transactionType, sourceAccounts, outputs, outputPubKeyHashes, originalDetails):
+def FromStateTransaction(transactionType, sourceAccounts, outputs, outputPubKeyHashes, details):
 	assert len(outputs) == len(outputPubKeyHashes)
 	typeCode, mapping = _mappingFromTypeString(transactionType)
 	tx = HostTransaction.InMemoryTransaction()
+	originalDetails = details
 	details = originalDetails.copy()
 	funded = (len(mapping[2]) > 0)
 	assert funded == (sourceAccounts is not None)

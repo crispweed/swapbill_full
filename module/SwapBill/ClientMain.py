@@ -154,15 +154,15 @@ def Main(startBlockIndex, startBlockHash, useTestNet, commandLineArgs=sys.argv[1
 			except Host.InsufficientTransactionFees:
 				raise Exception("Failed: Unexpected failure to meet transaction fee requirement. (Lots of dust inputs?)")
 
-	def CheckAndSend(transactionType, outputs, outputPubKeys, details):
-		canApply, errorText = state.checkTransaction(transactionType, outputs, details)
+	def CheckAndSend(transactionType, sourceAccounts, outputs, outputPubKeys, details):
+		canApply, errorText = state.checkTransaction(transactionType, outputs=outputs, transactionDetails=details, sourceAccounts=sourceAccounts)
 		if errorText != '':
 			raise TransactionNotSuccessfulAgainstCurrentState('Transaction would not complete successfully against current state:', errorText)
 		assert canApply
 		change = host.getNewNonSwapBillAddress()
 		print('attempting to send ' + FormatTransactionForUserDisplay.Format(host, transactionType, outputs, outputPubKeys, details), file=out)
 		backingUnspent = transactionBuildLayer.getUnspent()
-		baseTX = TransactionEncoding.FromStateTransaction(transactionType, outputs, outputPubKeys, details)
+		baseTX = TransactionEncoding.FromStateTransaction(transactionType, sourceAccounts, outputs, outputPubKeys, details, )
 		baseInputsAmount = 0
 		for i in range(baseTX.numberOfInputs()):
 			txID = baseTX.inputTXID(i)
@@ -186,46 +186,46 @@ def Main(startBlockIndex, startBlockHash, useTestNet, commandLineArgs=sys.argv[1
 		outputPubKeyHashes = (host.getNewSwapBillAddress(),)
 		details = {'amount':int(args.amount)}
 		transactionBuildLayer.startTransactionConstruction()
-		return CheckAndSend(transactionType, outputs, outputPubKeyHashes, details)
+		return CheckAndSend(transactionType, [], outputs, outputPubKeyHashes, details)
 
 	elif args.action == 'pay':
 		transactionType = 'Pay'
+		transactionBuildLayer.startTransactionConstruction()
+		sourceAccounts = [transactionBuildLayer.getActiveAccount(state)]
 		outputs = ('change', 'destination')
 		outputPubKeyHashes = (host.getNewSwapBillAddress(), CheckAndReturnPubKeyHash(args.toAddress))
-		transactionBuildLayer.startTransactionConstruction()
 		details = {
-		    'sourceAccount':transactionBuildLayer.getActiveAccount(state),
 		    'amount':int(args.amount),
 		    'maxBlock':state._currentBlockIndex + args.blocksUntilExpiry
 		}
-		return CheckAndSend(transactionType, outputs, outputPubKeyHashes, details)
+		return CheckAndSend(transactionType, sourceAccounts, outputs, outputPubKeyHashes, details)
 
 	elif args.action == 'post_ltc_buy':
 		transactionType = 'LTCBuyOffer'
+		transactionBuildLayer.startTransactionConstruction()
+		sourceAccounts = [transactionBuildLayer.getActiveAccount(state)]
 		outputs = ('change', 'ltcBuy')
 		outputPubKeyHashes = (host.getNewSwapBillAddress(), host.getNewSwapBillAddress())
-		transactionBuildLayer.startTransactionConstruction()
 		details = {
-		    'sourceAccount':transactionBuildLayer.getActiveAccount(state),
 		    'swapBillOffered':int(args.swapBillOffered),
 		    'exchangeRate':ExchangeRateFromArgs(args),
 		    'receivingAddress':host.getNewNonSwapBillAddress(),
 		    'maxBlock':state._currentBlockIndex + args.blocksUntilExpiry
 		}
-		return CheckAndSend(transactionType, outputs, outputPubKeyHashes, details)
+		return CheckAndSend(transactionType, sourceAccounts, outputs, outputPubKeyHashes, details)
 
 	elif args.action == 'post_ltc_sell':
 		transactionType = 'LTCSellOffer'
+		transactionBuildLayer.startTransactionConstruction()
+		sourceAccounts = [transactionBuildLayer.getActiveAccount(state)]
 		outputs = ('change', 'ltcSell')
 		outputPubKeyHashes = (host.getNewSwapBillAddress(), host.getNewSwapBillAddress())
-		transactionBuildLayer.startTransactionConstruction()
 		details = {
-		    'sourceAccount':transactionBuildLayer.getActiveAccount(state),
 		    'ltcOffered':int(args.ltcOffered),
 		    'exchangeRate':ExchangeRateFromArgs(args),
 		    'maxBlock':state._currentBlockIndex + args.blocksUntilExpiry
 		}
-		return CheckAndSend(transactionType, outputs, outputPubKeyHashes, details)
+		return CheckAndSend(transactionType, sourceAccounts, outputs, outputPubKeyHashes, details)
 
 	elif args.action == 'complete_ltc_sell':
 		transactionType = 'LTCExchangeCompletion'
@@ -239,18 +239,35 @@ def Main(startBlockIndex, startBlockHash, useTestNet, commandLineArgs=sys.argv[1
 		    'destinationAmount':exchange.ltc
 		}
 		transactionBuildLayer.startTransactionConstruction()
-		return CheckAndSend(transactionType, (), (), details)
+		return CheckAndSend(transactionType, None, (), (), details)
 
 	elif args.action == 'collect':
-		transactionType = 'Collect'
+		#transactionType = 'Collect'
+		#transactionBuildLayer.startTransactionConstruction()
+		#sourceAccounts = transactionBuildLayer.getAllOwnedAndSpendable(state)
+		#if len(sourceAccounts) < 2:
+			#raise ExceptionReportedToUser('There are currently less than two spendable swapbill outputs.')
+		#outputs = ('destination',)
+		#outputPubKeyHashes = (host.getNewSwapBillAddress(),)
+		#details = {}
+		#return CheckAndSend(transactionType, sourceAccounts, outputs, outputPubKeyHashes, details)
+		spendable = 0
+		for account in ownedAccounts.spendableAccounts:
+			assert account in state._balances
+			spendable += state.getSpendableAmount(account)
+		transactionType = 'Pay'
 		transactionBuildLayer.startTransactionConstruction()
 		sourceAccounts = transactionBuildLayer.getAllOwnedAndSpendable(state)
 		if len(sourceAccounts) < 2:
 			raise ExceptionReportedToUser('There are currently less than two spendable swapbill outputs.')
-		outputs = ('destination',)
-		outputPubKeyHashes = (host.getNewSwapBillAddress(),)
-		details = {'sourceAccounts':sourceAccounts}
-		return CheckAndSend(transactionType, outputs, outputPubKeyHashes, details)
+		outputs = ('change', 'destination')
+		collectAddress = host.getNewSwapBillAddress()
+		outputPubKeyHashes = (collectAddress, collectAddress)
+		details = {
+			'amount':spendable,
+			'maxBlock':0xffffffff
+		}
+		return CheckAndSend(transactionType, sourceAccounts, outputs, outputPubKeyHashes, details)
 
 	elif args.action == 'get_receive_address':
 		pubKeyHash = host.getNewSwapBillAddress()

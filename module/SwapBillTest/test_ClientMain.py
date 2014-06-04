@@ -498,7 +498,9 @@ class Test(unittest.TestCase):
         info = GetStateInfo(host)
         self.assertEqual(info['balances'], {firstBurnTarget:1*e(7), secondBurnTarget:15*e(6), thirdBurnTarget:16*e(6)})
         RunClient(host, ['collect'])
-        collectOutput = "0" + str(nextTX) + ":1"
+        #collectOutput = "0" + str(nextTX) + ":1"
+        # had to change this with collect emulated with a pay
+        collectOutput = "0" + str(nextTX) + ":2"
         nextTX += 1
         info = GetStateInfo(host)
         self.assertEqual(info['balances'], {collectOutput:41*e(6)})
@@ -763,8 +765,11 @@ class Test(unittest.TestCase):
         self.assertEqual(info['syncOutput'].count(': LTCBuyOffer'), 2)
         self.assertEqual(info['syncOutput'].count(': LTCSellOffer'), 2)
         self.assertEqual(info['syncOutput'].count(': LTCExchangeCompletion'), 1)
-        self.assertEqual(info['syncOutput'].count(': Pay'), 0)
-        self.assertEqual(info['syncOutput'].count(': Collect'), 1)
+        #self.assertEqual(info['syncOutput'].count(': Pay'), 0)
+        #self.assertEqual(info['syncOutput'].count(': Collect'), 1)
+        # collect is currently emulated with a pay
+        self.assertEqual(info['syncOutput'].count(': Pay'), 1)
+        self.assertEqual(info['syncOutput'].count(': Collect'), 0)
         self.assertEqual(info['syncOutput'].count('trade offer or pending exchange expired'), 1)
         host._setOwner('clive')
         info = GetStateInfo(host, includePending=False, forceRescan=True)

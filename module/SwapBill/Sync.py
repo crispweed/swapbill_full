@@ -16,12 +16,12 @@ def _processTransactions(host, state, ownedAccounts, transactions, applyToState,
 			continue
 		report = ownedAccounts.updateForSpent(hostTX, state)
 		try:
-			transactionType, outputs, transactionDetails = TransactionEncoding.ToStateTransaction(hostTX)
+			transactionType, sourceAccounts, outputs, transactionDetails = TransactionEncoding.ToStateTransaction(hostTX)
 			appliedSuccessfully = True
 		except (TransactionEncoding.NotValidSwapBillTransaction, TransactionEncoding.UnsupportedTransaction):
 			appliedSuccessfully = False
 			transactionType = 'InvalidTransaction'
-		if appliedSuccessfully and not state.checkTransaction(transactionType, outputs, transactionDetails)[0]:
+		if appliedSuccessfully and not state.checkTransaction(transactionType, outputs, transactionDetails, sourceAccounts=sourceAccounts)[0]:
 			appliedSuccessfully = False
 		if not appliedSuccessfully:
 			if report != '':
@@ -32,7 +32,7 @@ def _processTransactions(host, state, ownedAccounts, transactions, applyToState,
 			#print(reportPrefix + ': ' + txID)
 			inBetweenReport = ownedAccounts.checkForTradeOfferChanges(state)
 			assert inBetweenReport == ''
-			state.applyTransaction(transactionType, txID, outputs, transactionDetails)
+			state.applyTransaction(transactionType, txID, outputs, transactionDetails, sourceAccounts=sourceAccounts)
 			report += ownedAccounts.checkForTradeOfferChanges(state)
 			report += ownedAccounts.updateForNewOutputs(host, state, txID, hostTX, outputs, scriptPubKeys)
 		if report != '':
