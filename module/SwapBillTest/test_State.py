@@ -54,15 +54,16 @@ class Test(unittest.TestCase):
 		self.state.applyTransaction(transactionType='Burn', txID=txID, outputs=('destination',), transactionDetails={'amount':amount})
 		return (txID, 1)
 
-	def Apply_AssertSucceeds(self, state, transactionType, **details):
+	def Apply_AssertSucceeds(self, state, transactionType, expectedError='', **details):
 		outputs = self.outputsLookup[transactionType]
 		### note that applyTransaction now calls check and asserts success internally
 		### but this then also asserts that there is no warning
 		canApply, reason = state.checkTransaction(transactionType, outputs, details)
-		self.assertEqual(reason, '')
+		self.assertEqual(reason, expectedError)
 		self.assertEqual(canApply, True)
 		txID = self.TXID()
 		state.applyTransaction(transactionType, txID=txID, outputs=outputs, transactionDetails=details)
+		self.assertEqual(totalAccountedFor(state), state._totalCreated)
 		txOutputs = {}
 		for i in range(len(outputs)):
 			txOutputs[outputs[i]] = (txID, i + 1)
@@ -78,6 +79,7 @@ class Test(unittest.TestCase):
 		self.assertRaises(AssertionError, state.applyTransaction, transactionType, txID='AssertFails_TXID', outputs=outputs, transactionDetails=details)
 		self.assertDictEqual(state._balances, balancesBefore)
 		self.assertEqual(exchangesBefore, len(state._pendingExchanges))
+		self.assertEqual(totalAccountedFor(state), state._totalCreated)
 		return reason
 
 	def test_burn(self):
@@ -115,7 +117,6 @@ class Test(unittest.TestCase):
 		outputs = self.Apply_AssertSucceeds(state, 'ForwardToFutureNetworkVersion', **details)
 		change = outputs['change']
 		self.assertEqual(state._balances, {change:99999990})
-		self.assertEqual(totalAccountedFor(state), state._totalCreated)
 		self.assertEqual(state._totalForwarded, 10)
 		details = {'sourceAccount':change, 'amount':10, 'maxBlock':200}
 		details['amount'] = 100000000
@@ -128,23 +129,23 @@ class Test(unittest.TestCase):
 		reason = self.Apply_AssertFails(state, 'ForwardToFutureNetworkVersion', **details)
 		self.assertEqual(reason, 'amount is below minimum balance')
 		details['amount'] = 10
-		details['maxBlock'] = 99
-		reason = self.Apply_AssertFails(state, 'ForwardToFutureNetworkVersion', **details)
-		self.assertEqual(reason, 'max block for transaction has been exceeded')
-		reason = self.Apply_AssertFails(state, 'ForwardToFutureNetworkVersion', **details)
-		details['maxBlock'] = 100
 		details['sourceAccount'] = 'madeUpSourceAccount'
 		reason = self.Apply_AssertFails(state, 'ForwardToFutureNetworkVersion', **details)
 		self.assertEqual(reason, 'source account does not exist' )
-		self.assertEqual(state._balances, {change:99999990})
-		self.assertEqual(totalAccountedFor(state), state._totalCreated)
+		details['sourceAccount'] = change
 		self.assertEqual(state._totalForwarded, 10)
+		details['maxBlock'] = 99
+		outputs = self.Apply_AssertSucceeds(state, 'ForwardToFutureNetworkVersion', expectedError='max block for transaction has been exceeded', **details)
+		change2 = outputs['change']
+		details['maxBlock'] = 100
+		# if forwarding transactions expire, amount has to be paid back as change
+		# (for same reason as other transactions such as pay - we've used the source account, and any balance left associated with this account becomes unredeemable)
+		self.assertEqual(state._balances, {change2:99999990})
 		burn2 = self.Burn(20)
-		self.assertEqual(state._balances, {change:99999990, burn2:20})
+		self.assertEqual(state._balances, {change2:99999990, burn2:20})
 		details = {'sourceAccount':burn2, 'amount':11, 'maxBlock':200}
 		reason = self.Apply_AssertFails(state, 'ForwardToFutureNetworkVersion', **details)
 		self.assertEqual(reason, 'transaction includes change output, with change amount below minimum balance')
-		self.assertEqual(totalAccountedFor(state), state._totalCreated)
 
 	def test_burn_and_pay(self):
 		state = State.State(100, 'mochhash', minimumBalance=10)

@@ -368,8 +368,6 @@ class State(object):
 		assert amount >= 0
 		if amount < self._minimumBalance:
 			return False, 'amount is below minimum balance'
-		if maxBlock < self._currentBlockIndex:
-			return False, 'max block for transaction has been exceeded'
 		if not sourceAccount in self._balances:
 			return False, 'source account does not exist'
 		if self._balances[sourceAccount] < amount:
@@ -378,9 +376,14 @@ class State(object):
 			return False, 'transaction includes change output, with change amount below minimum balance'
 		if sourceAccount in self._balanceRefCounts:
 			return False, "source account is not currently spendable (e.g. this may be locked until a trade completes)"
+		if maxBlock < self._currentBlockIndex:
+			return True, 'max block for transaction has been exceeded'
 		return True, ''
 	def _apply_ForwardToFutureNetworkVersion(self, txID, sourceAccount, amount, maxBlock):
 		available = self._consumeAccount(sourceAccount)
+		if maxBlock < self._currentBlockIndex:
+			self._addAccount((txID, 1), available)
+			return
 		self._totalForwarded += amount
 		if available > amount:
 			self._addAccount((txID, 1), available - amount)
