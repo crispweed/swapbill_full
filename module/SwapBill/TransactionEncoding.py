@@ -28,6 +28,7 @@ _mappingByTypeCode = (
      #1,
      #(('backingAmount', 6, 'maxBlock', 4, None, 6), None),
      #('change', 'refund'),
+     #(('receivingAddress', None),)
      #()
 	#),
 	)

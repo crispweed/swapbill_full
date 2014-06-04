@@ -10,6 +10,12 @@ class InvalidTransactionType(Exception):
 class OutputsSpecDoesntMatch(Exception):
 	pass
 
+class LTCSellBacker(object):
+	def __init__(self, amount, maximumTransactionAmount, ltcReceiveAddress):
+		self.amount = amount
+		self.maximumTransactionAmount = maximumTransactionAmount
+		self.ltcReceiveAddress = ltcReceiveAddress
+
 class State(object):
 	def __init__(self, startBlockIndex, startBlockHash, minimumBalance=1*e(7)):
 		## state is initialised at the start of the block with startBlockIndex
@@ -26,6 +32,8 @@ class State(object):
 		self._LTCSells = TradeOfferHeap.Heap(startBlockIndex, True) # higher exchange rate is better offer
 		self._nextExchangeIndex = 0
 		self._pendingExchanges = {}
+		#self._nextBackerIndex = 0
+		#self._ltcSellBackers = {}
 
 	def getSpendableAmount(self, account):
 		if account in self._balanceRefCounts:
@@ -325,13 +333,17 @@ class State(object):
 		self._removeAccountRef(exchangeDetails.sellerReceivingAccount)
 		self._pendingExchanges.pop(pendingExchangeIndex)
 
-	#def _check_BackLTCSells(self, outputs, sourceAccount, backingAmount, maxBlock):
+	#def _check_BackLTCSells(self, outputs, sourceAccount, backingAmount, transactionMax, receivingAddress, maxBlock):
 		#if outputs != ('change', 'refund'):
 			#raise OutputsSpecDoesntMatch()
 		#assert type(backingAmount) is int
 		#assert backingAmount >= 0
+		#assert type(transactionMax) is int
+		#assert transactionMax >= 0
 		#if backingAmount < self._minimumBalance:
 			#return False, 'amount is below minimum balance'
+		#if backingAmount < transactionMax * 100:
+			#return False, 'not enough transactions covered'
 		#if maxBlock < self._currentBlockIndex:
 			#return False, 'max block for transaction has been exceeded'
 		#if not sourceAccount in self._balances:
@@ -343,7 +355,7 @@ class State(object):
 		#if sourceAccount in self._balanceRefCounts:
 			#return False, "source account is not currently spendable (e.g. this may be locked until a trade completes)"
 		#return True, ''
-	#def _apply_BackLTCSells(self, txID, sourceAccount, backingAmount, maxBlock):
+	#def _apply_BackLTCSells(self, txID, sourceAccount, backingAmount, transactionMax, receivingAddress, maxBlock):
 		#available = self._consumeAccount(sourceAccount)
 		#self._totalForwarded += amount
 		#if available > amount:
