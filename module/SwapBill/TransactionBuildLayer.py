@@ -29,8 +29,8 @@ class TransactionBuildLayer(object):
 		best = None
 		bestAmount = 0
 		for account in self._ownedAccounts.spendableAccounts:
-			assert state.getSpendableAmount(account) > 0
-			amount = state._balances[account]
+			amount = state.getSpendableAmount(account)
+			assert amount > 0
 			if amount > bestAmount:
 				best = account
 				bestAmount = amount

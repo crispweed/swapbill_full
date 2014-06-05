@@ -140,7 +140,7 @@ class Test(unittest.TestCase):
 		tx._outputs[0] = (b'SWP\x80\x14\x00\x00\x00\x00\x00d\x00\x00\x00\x00\x00\x00\x00\x00\x00', 0)
 		transactionType, sourceAccounts, outputs, details = TransactionEncoding.ToStateTransaction(tx)
 		self.assertEqual(transactionType, 'LTCExchangeCompletion')
-		# codes after unfunded not supported (increase the typecode byte, if more unfunded addedà
+		# codes after unfunded not supported (increase the typecode byte, if more unfunded added)
 		tx._outputs[0] = (b'SWP\x90\x14\x00\x00\x00\x00\x00d\x00\x00\x00\x00\x00\x00\x00\x00\x00', 0)
 		self.assertRaises(TransactionEncoding.UnsupportedTransaction, TransactionEncoding.ToStateTransaction, tx)
 		# and ditto up to end of typecode byte range

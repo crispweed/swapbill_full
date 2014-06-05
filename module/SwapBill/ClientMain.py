@@ -121,9 +121,9 @@ def Main(startBlockIndex, startBlockHash, useTestNet, commandLineArgs=sys.argv[1
 		state, ownedAccounts = SyncAndReturnStateAndOwnedAccounts(dataDir, startBlockIndex, startBlockHash, host, includePending=includePending, forceRescan=args.forceRescan, out=syncOut)
 		elapsedTime = time.clock() - startTime
 		formattedBalances = {}
-		for account in state._balances:
+		for account in state._balances._balances:
 			key = host.formatAccountForEndUser(account)
-			formattedBalances[key] = state._balances[account]
+			formattedBalances[key] = state._balances.balanceFor(account)
 		info = {
 		    'totalCreated':state._totalCreated,
 		    'atEndOfBlock':state._currentBlockIndex - 1, 'balances':formattedBalances, 'syncOutput':syncOut.getvalue(),
@@ -253,7 +253,6 @@ def Main(startBlockIndex, startBlockHash, useTestNet, commandLineArgs=sys.argv[1
 		#return CheckAndSend(transactionType, sourceAccounts, outputs, outputPubKeyHashes, details)
 		spendable = 0
 		for account in ownedAccounts.spendableAccounts:
-			assert account in state._balances
 			spendable += state.getSpendableAmount(account)
 		transactionType = 'Pay'
 		transactionBuildLayer.startTransactionConstruction()
@@ -278,19 +277,16 @@ def Main(startBlockIndex, startBlockHash, useTestNet, commandLineArgs=sys.argv[1
 		spendable = 0
 		activeAccountAmount = 0
 		for account in ownedAccounts.spendableAccounts:
-			assert account in state._balances
-			amount = state._balances[account]
+			amount = state._balances.balanceFor(account)
 			total += amount
 			spendable += state.getSpendableAmount(account)
 			if amount > activeAccountAmount:
 				activeAccountAmount = amount
 		for account in ownedAccounts.sellOffers:
-			assert account in state._balances
-			amount = state._balances[account]
+			amount = state._balances.balanceFor(account)
 			total += amount
 		for account in ownedAccounts.buyOffers:
-			assert account in state._balances
-			amount = state._balances[account]
+			amount = state._balances.balanceFor(account)
 			total += amount
 		return {'spendable':spendable, 'total':total, 'active':activeAccountAmount}
 

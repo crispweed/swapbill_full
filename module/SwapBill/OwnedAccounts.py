@@ -16,7 +16,7 @@ class OwnedAccounts(object):
 			assert not spentAccount in self.buyOffers
 			if spentAccount in self.spendableAccounts:
 				self.spendableAccounts.pop(spentAccount)
-				report += ' - ' + str(state._balances[spentAccount]) + ' swapbill output consumed\n'
+				report += ' - ' + str(state._balances.balanceFor(spentAccount)) + ' swapbill output consumed\n'
 		return report
 
 	def _checkForTradeOfferChanges(self, state, offers, offerType):
@@ -27,11 +27,11 @@ class OwnedAccounts(object):
 			if not account in state._tradeOfferChangeCounts:
 				self.spendableAccounts[account] = outputDetails
 				toRemove.append(account)
-				report += ' - ' + offerType + ' offer completed, receiving output with ' + str(state._balances[account]) + ' swapbill unlocked\n'
+				report += ' - ' + offerType + ' offer completed, receiving output with ' + str(state._balances.balanceFor(account)) + ' swapbill unlocked\n'
 			elif state._tradeOfferChangeCounts[account] != changeCount:
 				assert state._tradeOfferChangeCounts[account] == changeCount + 1
 				offers[account][0] = state._tradeOfferChangeCounts[account]
-				report += ' - ' + offerType + ' offer updated (receiving output contains ' + str(state._balances[account]) + ' swapbill)\n'
+				report += ' - ' + offerType + ' offer updated (receiving output contains ' + str(state._balances.balanceFor(account)) + ' swapbill)\n'
 		for accountToRemove in toRemove:
 			offers.pop(accountToRemove)
 		return report
@@ -42,7 +42,7 @@ class OwnedAccounts(object):
 		report = ''
 		for i in range(len(outputs)):
 			newOwnedAccount = (txID, i + 1)
-			if not newOwnedAccount in state._balances:
+			if not state._balances.accountHasBalance(newOwnedAccount):
 				continue # output not created by transaction
 			privateKey = host.privateKeyForPubKeyHash(hostTX.outputPubKeyHash(i + 1))
 			if privateKey is None:
@@ -51,12 +51,12 @@ class OwnedAccounts(object):
 			outputDetails = (hostTX.outputAmount(i + 1), privateKey, scriptPubKeys[i + 1])
 			if outputs[i] == 'ltcBuy':
 				self.buyOffers[newOwnedAccount] = [state._tradeOfferChangeCounts[newOwnedAccount], outputDetails]
-				report += ' - created buy offer, refund output seeded with ' + str(state._balances[newOwnedAccount]) + ' swapbill and locked until trade completed\n'
+				report += ' - created buy offer, refund output seeded with ' + str(state._balances.balanceFor(newOwnedAccount)) + ' swapbill and locked until trade completed\n'
 				continue
 			if outputs[i] == 'ltcSell':
 				self.sellOffers[newOwnedAccount] = [state._tradeOfferChangeCounts[newOwnedAccount], outputDetails]
-				report += ' - created sell offer, receiving output seeded with ' + str(state._balances[newOwnedAccount]) + ' swapbill and locked until trade completed\n'
+				report += ' - created sell offer, receiving output seeded with ' + str(state._balances.balanceFor(newOwnedAccount)) + ' swapbill and locked until trade completed\n'
 				continue
 			self.spendableAccounts[newOwnedAccount] = outputDetails
-			report += ' - ' + str(state._balances[newOwnedAccount]) + ' swapbill output added\n'
+			report += ' - ' + str(state._balances.balanceFor(newOwnedAccount)) + ' swapbill output added\n'
 		return report
