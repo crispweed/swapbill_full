@@ -438,31 +438,26 @@ class Test(unittest.TestCase):
 		self.assertEqual(state._LTCBuys.size(), 0)
 		self.assertEqual(state._LTCSells.size(), 1)
 		self.assertEqual(len(state._pendingExchanges), 0)
-		self.assertEqual(totalAccountedFor(state), state._totalCreated)
 
 	def SellOffer(self, state, source, ltcOffered, exchangeRate, maxBlock=200):
 		details = {'ltcOffered':ltcOffered, 'exchangeRate':exchangeRate, 'maxBlock':maxBlock}
 		outputs = self.Apply_AssertSucceeds(state, 'LTCSellOffer', sourceAccounts=[source], **details)
-		self.assertEqual(totalAccountedFor(state), state._totalCreated)
 		return outputs['change'], outputs['ltcSell']
 	def BuyOffer(self, state, source, receiveAddress, swapBillOffered, exchangeRate, maxBlock=200):
 		details = {'receivingAddress':receiveAddress, 'swapBillOffered':swapBillOffered, 'exchangeRate':exchangeRate, 'maxBlock':maxBlock}
 		outputs = self.Apply_AssertSucceeds(state, 'LTCBuyOffer', sourceAccounts=[source], **details)
-		self.assertEqual(totalAccountedFor(state), state._totalCreated)
 		return outputs['change'], outputs['ltcBuy']
 	def Completion(self, state, pendingExchangeIndex, destinationAddress, destinationAmount):
 		details = {'pendingExchangeIndex':pendingExchangeIndex, 'destinationAddress':destinationAddress, 'destinationAmount':destinationAmount}
 		self.Apply_AssertSucceeds(state, 'LTCExchangeCompletion', **details)
-		self.assertEqual(totalAccountedFor(state), state._totalCreated)
 
 	def test_ltc_buy_change_added_to_refund(self):
 		Constraints.minimumSwapBillBalance = 1*e(8)
 		state = State.State(100, 'starthash')
 		self.state = state
 		burn = self.Burn(22*e(7))
-		change, refund = self.BuyOffer(state, burn, 'madeUpReceiveAddress', swapBillOffered=3*e(7), exchangeRate=0x80000000)
-		self.assertEqual(state._balances._balances, {refund:19*e(7)})
-		self.assertEqual(totalAccountedFor(state), state._totalCreated)
+		change, refund = self.BuyOffer(state, burn, 'madeUpReceiveAddress', swapBillOffered=1*e(8), exchangeRate=0x80000000)
+		self.assertEqual(state._balances._balances, {refund:12*e(7)})
 	def test_ltc_sell_change_added_to_receiving(self):
 		Constraints.minimumSwapBillBalance = 1*e(8)
 		state = State.State(100, 'starthash')

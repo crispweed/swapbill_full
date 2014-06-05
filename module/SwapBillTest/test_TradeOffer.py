@@ -60,14 +60,16 @@ class Test(unittest.TestCase):
 	def test_offer_creation(self):
 		self.assertRaises(OfferIsBelowMinimumExchange, TradeOffer.BuyOffer, 5000, 1503238553)
 		self.assertRaises(OfferIsBelowMinimumExchange, TradeOffer.BuyOffer, 2*e(6), 0x70000000)
-		buy = TradeOffer.BuyOffer(2*e(6), 0x80000000)
-		self.assertDictEqual(buy.__dict__, {'rate': 2147483648, '_swapBillOffered': 2000000})
+		self.assertRaises(OfferIsBelowMinimumExchange, TradeOffer.BuyOffer, 2*e(6), 0x80000000) # swapbill offered below minimum balance
+		self.assertRaises(OfferIsBelowMinimumExchange, TradeOffer.BuyOffer, 1*e(7)-1, 0x80000000)
+		buy = TradeOffer.BuyOffer(1*e(7), 0x80000000)
+		self.assertDictEqual(buy.__dict__, {'rate': 2147483648, '_swapBillOffered': 1*e(7)})
 		self.assertRaises(OfferIsBelowMinimumExchange, TradeOffer.SellOffer, 100, Constraints.minimumExchangeLTC-1, 0x70000000)
 		sell = TradeOffer.SellOffer(100, Constraints.minimumExchangeLTC, 0x70000000)
 		self.assertDictEqual(sell.__dict__, {'_swapBillDeposit': 100, 'rate': 1879048192, '_ltcOffered': 1000000})
 
 	def test_meet_or_overlap(self):
-		buy = TradeOffer.BuyOffer(2*e(6), 0x80000000)
+		buy = TradeOffer.BuyOffer(1*e(7), 0x80000000)
 		sell = TradeOffer.SellOffer(100, Constraints.minimumExchangeLTC, 0x70000000)
 		self.assertFalse(TradeOffer.OffersMeetOrOverlap(buy=buy, sell=sell))
 		sell = TradeOffer.SellOffer(100, Constraints.minimumExchangeLTC, 0x80000000)
@@ -89,9 +91,12 @@ class Test(unittest.TestCase):
 		self.assertDictEqual(exchange.__dict__, {'swapBillAmount': 2*e(7), 'ltc': 1*e(7), 'swapBillDeposit': 2*e(7)//16})
 		# offer adjustments and next match call
 		sell = TradeOffer.SellOffer(12*e(6)//16, 6*e(6), 0x80000000)
+		self.assertRaises(RemainderIsBelowMinimumExchange, TradeOffer.MatchOffers, buy=buy, sell=sell)
+		# offer adjustments and next match call
+		buy = TradeOffer.BuyOffer(22*e(6), 0x80000000)
 		exchange, outstandingBuy, outstandingSell = TradeOffer.MatchOffers(buy=buy, sell=sell)
 		# sell should be consumed, and buy remainder left outstanding
-		self.assertDictEqual(outstandingBuy.__dict__, {'rate': 0x80000000, '_swapBillOffered': 8*e(6)})
+		self.assertDictEqual(outstandingBuy.__dict__, {'rate': 0x80000000, '_swapBillOffered': 1*e(7)})
 		self.assertIsNone(outstandingSell)
 		self.assertDictEqual(exchange.__dict__, {'swapBillAmount': 12*e(6), 'ltc': 6*e(6), 'swapBillDeposit': 12*e(6)//16})
 		# offer adjustments and next match call
@@ -113,9 +118,12 @@ class Test(unittest.TestCase):
 		self.assertDictEqual(exchange.__dict__, {'swapBillAmount': 2*e(7), 'ltc': 1*e(7), 'swapBillDeposit': 1111112})
 		# offer adjustments and next match call
 		sell = TradeOffer.SellOffer(666667, 6*e(6), 0x90000000)
+		self.assertRaises(RemainderIsBelowMinimumExchange, TradeOffer.MatchOffers, buy=buy, sell=sell)
+		# offer adjustments and next match call
+		buy = TradeOffer.BuyOffer(22*e(6), 0x70000000)
 		exchange, outstandingBuy, outstandingSell = TradeOffer.MatchOffers(buy=buy, sell=sell)
 		# sell should be consumed, and buy remainder left outstanding
-		self.assertDictEqual(outstandingBuy.__dict__, {'rate': 0x70000000, '_swapBillOffered': 8*e(6)})
+		self.assertDictEqual(outstandingBuy.__dict__, {'rate': 0x70000000, '_swapBillOffered': 1*e(7)})
 		self.assertIsNone(outstandingSell)
 		self.assertDictEqual(exchange.__dict__, {'swapBillAmount': 12*e(6), 'ltc': 6*e(6), 'swapBillDeposit': 666667})
 		# offer adjustments and next match call

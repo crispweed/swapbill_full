@@ -10,12 +10,17 @@ class BuyOffer(object):
 	def __init__(self, swapBillOffered, rate):
 		if _ltcWithExchangeRate(rate, swapBillOffered) < Constraints.minimumExchangeLTC:
 			raise OfferIsBelowMinimumExchange()
+		if swapBillOffered < Constraints.minimumSwapBillBalance:
+			raise OfferIsBelowMinimumExchange()
 		self._swapBillOffered = swapBillOffered
 		self.rate = rate
 	def _subtractExchanged(self, exchangeSwapBill):
 		assert exchangeSwapBill < self._swapBillOffered
 		remainder = self._swapBillOffered - exchangeSwapBill
 		if _ltcWithExchangeRate(self.rate, remainder) < Constraints.minimumExchangeLTC:
+			# ** offer must not be modified at this point
+			raise RemainderIsBelowMinimumExchange()
+		if remainder < Constraints.minimumSwapBillBalance:
 			# ** offer must not be modified at this point
 			raise RemainderIsBelowMinimumExchange()
 		self._swapBillOffered = remainder
