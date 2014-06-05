@@ -8,9 +8,12 @@ class InvalidTransactionParameters(Exception):
 	pass
 class InvalidTransactionType(Exception):
 	pass
-class TransactionNotAllowed(Exception):
+
+class BadlyFormedTransaction(Exception):
 	pass
-class TransactionWouldntHaveIntendedEffect(Exception):
+class TransactionFailsAgainstCurrentState(Exception):
+	pass
+class InsufficientFundsForTransaction(Exception):
 	pass
 
 class LTCSellBacker(object):
@@ -111,7 +114,7 @@ class State(object):
 	def _fundedTransaction_Burn(self, txID, swapBillInput, amount, outputs):
 		assert outputs == ('destination',)
 		if swapBillInput + amount < Constraints.minimumSwapBillBalance:
-			raise TransactionNotAllowed('burn output is below minimum balance')
+			raise BadlyFormedTransaction('burn output is below minimum balance')
 		if txID is None:
 			return
 		self._totalCreated += amount
@@ -120,17 +123,15 @@ class State(object):
 
 	def _fundedTransaction_Pay(self, txID, swapBillInput, amount, maxBlock, outputs):
 		assert outputs == ('change', 'destination')
-		if maxBlock < self._currentBlockIndex:
-			if txID is None:
-				raise TransactionWouldntHaveIntendedEffect('max block for transaction has been exceeded')
-			return swapBillInput
 		if amount < Constraints.minimumSwapBillBalance:
-			raise TransactionNotAllowed('amount is below minimum balance')
+			raise BadlyFormedTransaction('amount is below minimum balance')
+		if maxBlock < self._currentBlockIndex:
+			raise TransactionFailsAgainstCurrentState('max block for transaction has been exceeded')
 		if swapBillInput < amount:
-			raise TransactionNotAllowed('insufficient swapbill input')
+			raise InsufficientFundsForTransaction()
 		change = swapBillInput - amount
 		if change > 0 and change < Constraints.minimumSwapBillBalance:
-			raise TransactionNotAllowed('transaction would generate change output with change amount below minimum balance')
+			raise InsufficientFundsForTransaction()
 		if txID is None:
 			return
 		self._balances.add((txID, 2), amount)
@@ -139,17 +140,15 @@ class State(object):
 	def _fundedTransaction_LTCBuyOffer(self, txID, swapBillInput, swapBillOffered, exchangeRate, receivingAddress, maxBlock, outputs):
 		assert outputs == ('change', 'ltcBuy')
 		assert exchangeRate < 0x100000000
-		if maxBlock < self._currentBlockIndex:
-			if txID is None:
-				raise TransactionWouldntHaveIntendedEffect('max block for transaction has been exceeded')
-			return swapBillInput
-		change = swapBillInput - swapBillOffered - Constraints.minimumSwapBillBalance
-		if change < 0:
-			raise TransactionNotAllowed('insufficient swapbill input')
 		try:
 			buy = TradeOffer.BuyOffer(swapBillOffered=swapBillOffered, rate=exchangeRate)
 		except TradeOffer.OfferIsBelowMinimumExchange:
-			raise TransactionNotAllowed('does not satisfy minimum exchange amount')
+			raise BadlyFormedTransaction('does not satisfy minimum exchange amount')
+		if maxBlock < self._currentBlockIndex:
+			raise TransactionFailsAgainstCurrentState('max block for transaction has been exceeded')
+		change = swapBillInput - swapBillOffered - Constraints.minimumSwapBillBalance
+		if change < 0:
+			raise InsufficientFundsForTransaction()
 		if txID is None:
 			return
 		refundAccount = (txID, 2)
@@ -158,7 +157,6 @@ class State(object):
 			self._balances.addTo(refundAccount, change)
 			change = 0
 		self._addFirstTradeRef(refundAccount)
-		buy = TradeOffer.BuyOffer(swapBillOffered=swapBillOffered, rate=exchangeRate)
 		buy.receivingAccount = receivingAddress
 		buy.refundAccount = refundAccount
 		buy.expiry = maxBlock
@@ -188,18 +186,16 @@ class State(object):
 	def _fundedTransaction_LTCSellOffer(self, txID, swapBillInput, ltcOffered, exchangeRate, maxBlock, outputs):
 		assert outputs == ('change', 'ltcSell')
 		assert exchangeRate < 0x100000000
-		if maxBlock < self._currentBlockIndex:
-			if txID is None:
-				raise TransactionWouldntHaveIntendedEffect('max block for transaction has been exceeded')
-			return swapBillInput
 		swapBillDeposit = TradeOffer.DepositRequiredForLTCSell(exchangeRate=exchangeRate, ltcOffered=ltcOffered)
-		change = swapBillInput - swapBillDeposit - Constraints.minimumSwapBillBalance
-		if change < 0:
-			raise TransactionNotAllowed('insufficient swapbill input')
 		try:
 			sell = TradeOffer.SellOffer(swapBillDeposit=swapBillDeposit, ltcOffered=ltcOffered, rate=exchangeRate)
 		except TradeOffer.OfferIsBelowMinimumExchange:
-			raise TransactionNotAllowed('does not satisfy minimum exchange amount')
+			raise BadlyFormedTransaction('does not satisfy minimum exchange amount')
+		if maxBlock < self._currentBlockIndex:
+			raise TransactionFailsAgainstCurrentState('max block for transaction has been exceeded')
+		change = swapBillInput - swapBillDeposit - Constraints.minimumSwapBillBalance
+		if change < 0:
+			raise InsufficientFundsForTransaction()
 		if txID is None:
 			return
 		receivingAccount = (txID, 2)
@@ -208,7 +204,6 @@ class State(object):
 			self._balances.addTo(receivingAccount, change)
 			change = 0
 		self._addFirstTradeRef(receivingAccount)
-		sell = TradeOffer.SellOffer(swapBillDeposit=swapBillDeposit, ltcOffered=ltcOffered, rate=exchangeRate)
 		sell.receivingAccount = receivingAccount
 		sell.expiry = maxBlock
 		toReAdd = []
@@ -236,17 +231,15 @@ class State(object):
 
 	def _fundedTransaction_ForwardToFutureNetworkVersion(self, txID, swapBillInput, amount, maxBlock, outputs):
 		assert outputs == ('change',)
-		if maxBlock < self._currentBlockIndex:
-			if txID is None:
-				raise TransactionWouldntHaveIntendedEffect('max block for transaction has been exceeded')
-			return swapBillInput
 		if amount < Constraints.minimumSwapBillBalance:
-			raise TransactionNotAllowed('amount is below minimum balance')
+			raise BadlyFormedTransaction('amount is below minimum balance')
+		if maxBlock < self._currentBlockIndex:
+			raise TransactionFailsAgainstCurrentState('max block for transaction has been exceeded')
 		if swapBillInput < amount:
-			raise TransactionNotAllowed('insufficient swapbill input')
+			raise InsufficientFundsForTransaction()
 		change = swapBillInput - amount
 		if change > 0 and change < Constraints.minimumSwapBillBalance:
-			raise TransactionNotAllowed('transaction would generate change output with change amount below minimum balance')
+			raise InsufficientFundsForTransaction()
 		if txID is None:
 			return
 		self._totalForwarded += amount
@@ -255,15 +248,15 @@ class State(object):
 	def _unfundedTransaction_LTCExchangeCompletion(self, txID, pendingExchangeIndex, destinationAddress, destinationAmount, outputs):
 		assert outputs == ()
 		if not pendingExchangeIndex in self._pendingExchanges:
-			raise TransactionNotAllowed('no pending exchange with the specified index')
+			raise TransactionFailsAgainstCurrentState('no pending exchange with the specified index')
 		exchangeDetails = self._pendingExchanges[pendingExchangeIndex]
 		if destinationAddress != exchangeDetails.ltcReceiveAddress:
-			raise TransactionNotAllowed('destination account does not match destination for pending exchange with the specified index')
+			raise TransactionFailsAgainstCurrentState('destination account does not match destination for pending exchange with the specified index')
 		if destinationAmount < exchangeDetails.ltc:
-			raise TransactionNotAllowed('amount is less than required payment amount')
-		if destinationAmount > exchangeDetails.ltc and txID is None:
-			raise TransactionWouldntHaveIntendedEffect('amount is greater than required payment amount')
+			raise TransactionFailsAgainstCurrentState('amount is less than required payment amount')
 		if txID is None:
+			if destinationAmount > exchangeDetails.ltc:
+				raise TransactionFailsAgainstCurrentState('amount is greater than required payment amount')
 			return
 		# the seller completed their side of the exchange, so credit them the buyers swapbill
 		# and the seller is also refunded their deposit here
@@ -300,13 +293,17 @@ class State(object):
 				method(swapBillInput=swapBillInput, txID=None, outputs=outputs, **transactionDetails)
 		except TypeError as e:
 			raise InvalidTransactionParameters(e)
-		except TransactionNotAllowed as e:
+		except BadlyFormedTransaction as e:
 			return False, e.message
-		except TransactionWouldntHaveIntendedEffect as e:
+		except TransactionFailsAgainstCurrentState as e:
 			return True, e.message
 		return True, ''
 	def applyTransaction(self, transactionType, txID, outputs, transactionDetails, sourceAccounts=None):
-		assert self.checkTransaction(transactionType, outputs, transactionDetails, sourceAccounts)[0] == True
+		try:
+			canApply, reason = self.checkTransaction(transactionType, outputs, transactionDetails, sourceAccounts)
+		except InsufficientFundsForTransaction:
+			canApply = True
+		assert canApply
 		if sourceAccounts is None:
 			methodPrefix = '_unfundedTransaction_'
 		else:
@@ -321,7 +318,10 @@ class State(object):
 					# TODO consume this account also?
 					continue
 				swapBillInput += self._balances.consume(sourceAccount)
-			change = method(txID, swapBillInput, outputs=outputs, **transactionDetails)
+			try:
+				change = method(txID, swapBillInput, outputs=outputs, **transactionDetails)
+			except (TransactionFailsAgainstCurrentState, InsufficientFundsForTransaction):
+				change = swapBillInput
 			if change > 0:
 				assert change >= Constraints.minimumSwapBillBalance
 				self._balances.add((txID, 1), change)

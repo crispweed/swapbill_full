@@ -78,6 +78,14 @@ class Test(unittest.TestCase):
 		self.assertEqual(totalAccountedFor(state), state._totalCreated)
 		return reason
 
+	def Apply_AssertInsufficientFunds(self, state, transactionType, sourceAccounts=None, **details):
+		outputs = self.outputsLookup[transactionType]
+		self.assertRaises(State.InsufficientFundsForTransaction, state.checkTransaction, transactionType, outputs, transactionDetails=details, sourceAccounts=sourceAccounts)
+		txID = self.TXID()
+		state.applyTransaction(transactionType, txID, outputs=outputs, transactionDetails=details, sourceAccounts=sourceAccounts)
+		self.assertEqual(totalAccountedFor(state), state._totalCreated)
+		return (txID, 1)
+
 	def test_state_setup(self):
 		Constraints.minimumSwapBillBalance = Test._stored_minimumSwapBillBalance
 		state = State.State(100, 'mockhash')
@@ -266,18 +274,14 @@ class Test(unittest.TestCase):
 		self.assertEqual(reason, 'does not satisfy minimum exchange amount')
 
 	def test_trade_offers_leave_less_than_minimum_balance(self):
-		Constraints.minimumSwapBillBalance = 100000
+		Constraints.minimumSwapBillBalance = 1*e(7)
 		state = State.State(100, 'mockhash')
 		self.state = state
-		burnOutput = self.Burn(100000)
-		self.assertEqual(state._balances._balances, {burnOutput:100000})
-		reason = self.Apply_AssertFails(state, 'LTCBuyOffer', sourceAccounts=[burnOutput], swapBillOffered=1000000, exchangeRate=0x80000000, receivingAddress='a_receive', maxBlock=200)
-		self.assertEqual(reason, 'insufficient swapbill input')
-		self.assertEqual(state._balances._balances, {burnOutput:100000})
-		reason = self.Apply_AssertFails(state, 'LTCSellOffer', sourceAccounts=[burnOutput], ltcOffered=1000000//2, exchangeRate=0x80000000, maxBlock=200)
-		self.assertEqual(reason, 'insufficient swapbill input')
-		self.assertEqual(state._balances._balances, {burnOutput:100000})
-		self.assertEqual(totalAccountedFor(state), state._totalCreated)
+		burnOutput = self.Burn(1*e(7))
+		changeOutput = self.Apply_AssertInsufficientFunds(state, 'LTCBuyOffer', sourceAccounts=[burnOutput], swapBillOffered=1*e(7), exchangeRate=0x80000000, receivingAddress='a_receive', maxBlock=200)
+		self.assertEqual(state._balances._balances, {changeOutput:1*e(7)})
+		changeOutput = self.Apply_AssertInsufficientFunds(state, 'LTCSellOffer', sourceAccounts=[changeOutput], ltcOffered=1*e(7)//2, exchangeRate=0x80000000, maxBlock=200)
+		self.assertEqual(state._balances._balances, {changeOutput:1*e(7)})
 
 	def test_ltc_trading1(self):
 		# this test adds tests against the ltc transaction types, and also runs through a simple exchange scenario
@@ -501,8 +505,9 @@ class Test(unittest.TestCase):
 		self.assertEqual(state._LTCBuys.size(), 1)
 		self.assertEqual(state._LTCSells.size(), 1)
 		# receiving account can't be spent yet as this is locked until exchange completed
-		reason = self.Apply_AssertFails(state, 'Pay', sourceAccounts=[receiveB], amount=1, maxBlock=200)
-		self.assertEqual(reason, 'insufficient swapbill input')
+		change = self.Apply_AssertInsufficientFunds(state, 'Pay', sourceAccounts=[receiveB], amount=1, maxBlock=200)
+		# TODO update since funding changes
+
 		self.assertEqual(state.getSpendableAmount(receiveB), 0)
 		# same for sell refund account
 		reason = self.Apply_AssertFails(state, 'Pay', sourceAccounts=[refundA], amount=1, maxBlock=200)

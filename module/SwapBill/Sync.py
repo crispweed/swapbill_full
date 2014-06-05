@@ -21,8 +21,13 @@ def _processTransactions(host, state, ownedAccounts, transactions, applyToState,
 		except (TransactionEncoding.NotValidSwapBillTransaction, TransactionEncoding.UnsupportedTransaction):
 			appliedSuccessfully = False
 			transactionType = 'InvalidTransaction'
-		if appliedSuccessfully and not state.checkTransaction(transactionType, outputs, transactionDetails, sourceAccounts=sourceAccounts)[0]:
-			appliedSuccessfully = False
+		if appliedSuccessfully:
+			insufficientFunds = False
+			try:
+				if not state.checkTransaction(transactionType, outputs, transactionDetails, sourceAccounts=sourceAccounts)[0]:
+					appliedSuccessfully = False
+			except State.InsufficientFundsForTransaction:
+				insufficientFunds = True
 		if not appliedSuccessfully:
 			if report != '':
 				print(reportPrefix + ': ' + transactionType + ' failed to decode or apply', file=out)
@@ -38,6 +43,8 @@ def _processTransactions(host, state, ownedAccounts, transactions, applyToState,
 		if report != '':
 			print(reportPrefix + ': ' + transactionType, file=out)
 			print(report, end="", file=out)
+			if insufficientFunds:
+				report += ' (failed due to insufficient swapbill, all funds directed to change output)\n'
 
 def _processBlock(host, state, ownedAccounts, blockHash, reportPrefix, out):
 	transactions = host.getBlockTransactions(blockHash)
