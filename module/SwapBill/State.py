@@ -96,8 +96,13 @@ class State(object):
 		# and then we add new refs for offer remainders as necessary
 		self._pendingExchanges[key] = exchange
 		if buyRemainder is not None:
+			buyRemainder.receivingAccount = buy.receivingAccount
+			buyRemainder.refundAccount = buy.refundAccount
+			buyRemainder.expiry = buy.expiry
 			self._addTradeRef(buyRemainder.refundAccount)
 		if sellRemainder is not None:
+			sellRemainder.receivingAccount = sell.receivingAccount
+			sellRemainder.expiry = sell.expiry
 			self._addTradeRef(sellRemainder.receivingAccount)
 		return buyRemainder, sellRemainder
 
@@ -169,7 +174,7 @@ class State(object):
 			sell = self._LTCSells.popCurrentBest()
 			try:
 				buyRemainder, sellRemainder = self._matchOffersAndAddExchange(buy=buy, sell=sell)
-			except TradeOffer.RemainderIsBelowMinimumExchange:
+			except TradeOffer.OfferIsBelowMinimumExchange:
 				toReAdd.append(sell)
 				continue
 			if buyRemainder is not None:
@@ -223,7 +228,7 @@ class State(object):
 			buy = self._LTCBuys.popCurrentBest()
 			try:
 				buyRemainder, sellRemainder = self._matchOffersAndAddExchange(buy=buy, sell=sell)
-			except TradeOffer.RemainderIsBelowMinimumExchange:
+			except TradeOffer.OfferIsBelowMinimumExchange:
 				toReAdd.append(buy)
 				continue
 			if sellRemainder is not None:

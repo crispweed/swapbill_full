@@ -1,52 +1,18 @@
 from __future__ import print_function, division
 from SwapBill.HardCodedProtocolConstraints import Constraints
 
-class RemainderIsBelowMinimumExchange(Exception):
-	pass
 class OfferIsBelowMinimumExchange(Exception):
 	pass
 
-class BuyOffer(object):
-	def __init__(self, swapBillOffered, rate):
-		if _ltcWithExchangeRate(rate, swapBillOffered) < Constraints.minimumExchangeLTC:
-			raise OfferIsBelowMinimumExchange()
-		if swapBillOffered < Constraints.minimumSwapBillBalance:
-			raise OfferIsBelowMinimumExchange()
-		self._swapBillOffered = swapBillOffered
-		self.rate = rate
-	def _subtractExchanged(self, exchangeSwapBill):
-		assert exchangeSwapBill < self._swapBillOffered
-		remainder = self._swapBillOffered - exchangeSwapBill
-		if _ltcWithExchangeRate(self.rate, remainder) < Constraints.minimumExchangeLTC:
-			# ** offer must not be modified at this point
-			raise RemainderIsBelowMinimumExchange()
-		if remainder < Constraints.minimumSwapBillBalance:
-			# ** offer must not be modified at this point
-			raise RemainderIsBelowMinimumExchange()
-		self._swapBillOffered = remainder
+def MinimumBuyOfferWithRate(rate):
+	swapBillForMinLTC = Constraints.minimumExchangeLTC * 0x100000000 // rate
+	while _ltcWithExchangeRate(rate, swapBillForMinLTC) < Constraints.minimumExchangeLTC:
+		swapBillForMinLTC += 1
+	return max(swapBillForMinLTC, Constraints.minimumSwapBillBalance)
 
-class SellOffer(object):
-	def __init__(self, swapBillDeposit, ltcOffered, rate):
-		if ltcOffered < Constraints.minimumExchangeLTC:
-			raise OfferIsBelowMinimumExchange()
-		self._swapBillDeposit = swapBillDeposit
-		self._ltcOffered = ltcOffered
-		self.rate = rate
-	def _subtractExchanged(self, exchangeLTC, exchangeSwapBillDeposit):
-		assert exchangeLTC < self._ltcOffered
-		assert exchangeSwapBillDeposit < self._swapBillDeposit # otherwise deposit could go to zero, minimum exchange amount should prevent this
-		remainder = self._ltcOffered - exchangeLTC
-		if remainder < Constraints.minimumExchangeLTC:
-			# ** offer must not be modified at this point
-			raise RemainderIsBelowMinimumExchange()
-		self._ltcOffered = remainder
-		self._swapBillDeposit -= exchangeSwapBillDeposit
-
-class Exchange(object):
-	pass
-
-def _ltcWithExchangeRate(exchangeRate, swapBillAmount):
-	return swapBillAmount * exchangeRate // 0x100000000
+def MinimumSellOfferWithRate(rate):
+	ltcForMinSwapBill = _ltcWithExchangeRate(rate, Constraints.minimumSwapBillBalance)
+	return max(ltcForMinSwapBill, Constraints.minimumExchangeLTC)
 
 def DepositRequiredForLTCSell(exchangeRate, ltcOffered):
 	swapBillAmount = ltcOffered * 0x100000000 // exchangeRate
@@ -54,6 +20,27 @@ def DepositRequiredForLTCSell(exchangeRate, ltcOffered):
 	if deposit * Constraints.depositDivisor != swapBillAmount:
 		deposit += 1
 	return deposit
+
+class BuyOffer(object):
+	def __init__(self, swapBillOffered, rate):
+		if swapBillOffered < MinimumBuyOfferWithRate(rate):
+			raise OfferIsBelowMinimumExchange()
+		self._swapBillOffered = swapBillOffered
+		self.rate = rate
+
+class SellOffer(object):
+	def __init__(self, swapBillDeposit, ltcOffered, rate):
+		if ltcOffered < MinimumSellOfferWithRate(rate):
+			raise OfferIsBelowMinimumExchange()
+		self._swapBillDeposit = swapBillDeposit
+		self._ltcOffered = ltcOffered
+		self.rate = rate
+
+class Exchange(object):
+	pass
+
+def _ltcWithExchangeRate(exchangeRate, swapBillAmount):
+	return swapBillAmount * exchangeRate // 0x100000000
 
 def OffersMeetOrOverlap(buy, sell):
 	return buy.rate <= sell.rate
@@ -63,7 +50,7 @@ def MatchOffers(buy, sell):
 	appliedRate = (buy.rate + sell.rate) // 2
 
 	ltcToBeExchanged = _ltcWithExchangeRate(appliedRate, buy._swapBillOffered)
-	assert ltcToBeExchanged >= Constraints.minimumExchangeLTC ## should be guaranteed by buy and sell both satisfying this minimum requirement
+	assert ltcToBeExchanged >= Constraints.minimumExchangeLTC # should be guaranteed by buy and sell both satisfying this minimum requirement
 
 	exchange = Exchange()
 	outstandingBuy = None
@@ -75,16 +62,15 @@ def MatchOffers(buy, sell):
 		exchange.ltc = ltcToBeExchanged
 		exchange.swapBillDeposit = sell._swapBillDeposit * ltcToBeExchanged // sell._ltcOffered
 		if ltcToBeExchanged < sell._ltcOffered:
-			sell._subtractExchanged(ltcToBeExchanged, exchange.swapBillDeposit)
-			outstandingSell = sell
+			outstandingSell = SellOffer(swapBillDeposit=sell._swapBillDeposit - exchange.swapBillDeposit, ltcOffered=sell._ltcOffered - ltcToBeExchanged, rate=sell.rate)
 	else:
 		# ltc sell offer is consumed completely
 		exchange.ltc = sell._ltcOffered
 		exchange.swapBillDeposit = sell._swapBillDeposit
 		swapBillToBeExchanged =	buy._swapBillOffered * sell._ltcOffered // ltcToBeExchanged
+		assert swapBillToBeExchanged >= Constraints.minimumSwapBillBalance # should be guaranteed by the buy and sell offer minimum constraints
 		exchange.swapBillAmount = swapBillToBeExchanged
-		if swapBillToBeExchanged < buy._swapBillOffered: # TODO check whether this comparison is actually required
-			buy._subtractExchanged(swapBillToBeExchanged)
-			outstandingBuy = buy
+		if swapBillToBeExchanged != buy._swapBillOffered: # TODO check whether this comparison is actually required
+			outstandingBuy = BuyOffer(swapBillOffered=buy._swapBillOffered - swapBillToBeExchanged, rate=buy.rate)
 
 	return exchange, outstandingBuy, outstandingSell
