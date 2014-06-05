@@ -433,7 +433,7 @@ class Test(unittest.TestCase):
         # and this should not submit because there is no single output large enough for the payment
         self.assertRaises(TransactionNotSuccessfulAgainstCurrentState, RunClient, host, ['pay', '--amount', 16*e(6), '--toAddress', payTargetAddress])
 
-    def test_burn_and_collect(self):
+    def test_pay_from_multiple_outputs(self):
         host = InitHost()
         nextTX = 1
         host._addUnspent(100000000)
@@ -455,15 +455,16 @@ class Test(unittest.TestCase):
         nextTX += 1
         info = GetStateInfo(host)
         self.assertEqual(info['balances'], {firstBurnTarget:1*e(7), secondBurnTarget:15*e(6), thirdBurnTarget:16*e(6)})
-        RunClient(host, ['collect'])
-        #collectOutput = "0" + str(nextTX) + ":1"
-        # had to change this with collect emulated with a pay
-        collectOutput = "0" + str(nextTX) + ":2"
-        nextTX += 1
-        info = GetStateInfo(host)
-        self.assertEqual(info['balances'], {collectOutput:41*e(6)})
-        # and should not submit again because there is now only one owned output
-        self.assertRaisesRegexp(ExceptionReportedToUser, 'There are currently less than two spendable swapbill outputs.', RunClient, host, ['collect'])
+        host._setOwner('recipient')
+        payTargetAddress = host.formatAddressForEndUser(host.getNewSwapBillAddress())
+        host._setOwner(host.defaultOwner)
+        # TODO uncomment the following and make work
+        #RunClient(host, ['pay', '--amount', 41*e(6), '--toAddress', payTargetAddress])
+        #payChange = "0" + str(nextTX) + ":1"
+        #payTarget = "0" + str(nextTX) + ":2"
+        #nextTX += 1
+        #info = GetStateInfo(host)
+        #self.assertEqual(info['balances'], {payTarget:41*e(6)})
 
     def test_non_swapbill_transactions(self):
         host = InitHost()
