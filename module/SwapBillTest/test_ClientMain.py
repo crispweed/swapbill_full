@@ -458,13 +458,12 @@ class Test(unittest.TestCase):
         host._setOwner('recipient')
         payTargetAddress = host.formatAddressForEndUser(host.getNewSwapBillAddress())
         host._setOwner(host.defaultOwner)
-        # TODO uncomment the following and make work
-        #RunClient(host, ['pay', '--amount', 41*e(6), '--toAddress', payTargetAddress])
-        #payChange = "0" + str(nextTX) + ":1"
-        #payTarget = "0" + str(nextTX) + ":2"
-        #nextTX += 1
-        #info = GetStateInfo(host)
-        #self.assertEqual(info['balances'], {payTarget:41*e(6)})
+        RunClient(host, ['pay', '--amount', 41*e(6), '--toAddress', payTargetAddress])
+        payChange = "0" + str(nextTX) + ":1"
+        payTarget = "0" + str(nextTX) + ":2"
+        nextTX += 1
+        info = GetStateInfo(host)
+        self.assertEqual(info['balances'], {payTarget:41*e(6)})
 
     def test_non_swapbill_transactions(self):
         host = InitHost()
