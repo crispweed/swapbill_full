@@ -1,6 +1,7 @@
 from __future__ import print_function
 import binascii
 from SwapBill import TradeOfferHeap, TradeOffer, Balances
+from SwapBill.HardCodedProtocolConstraints import Constraints
 from SwapBill.Amounts import e
 
 class InvalidTransactionParameters(Exception):
@@ -17,12 +18,10 @@ class LTCSellBacker(object):
 		self.ltcReceiveAddress = ltcReceiveAddress
 
 class State(object):
-	def __init__(self, startBlockIndex, startBlockHash, minimumBalance=1*e(7)):
+	def __init__(self, startBlockIndex, startBlockHash):
 		## state is initialised at the start of the block with startBlockIndex
-		assert minimumBalance > 0
 		self._startBlockHash = startBlockHash
 		self._currentBlockIndex = startBlockIndex
-		self._minimumBalance = minimumBalance
 		self._balances = Balances.Balances()
 		self._tradeOfferChangeCounts = {}
 		self._totalCreated = 0
@@ -87,7 +86,7 @@ class State(object):
 		exchange, buyRemainder, sellRemainder = TradeOffer.MatchOffers(buy=buy, sell=sell)
 		self._tradeOfferChangeCounts[sell.receivingAccount] += 1
 		self._tradeOfferChangeCounts[buy.refundAccount] += 1
-		exchange.expiry = self._currentBlockIndex + 50
+		exchange.expiry = self._currentBlockIndex + Constraints.blocksForExchangeCompletion
 		exchange.ltcReceiveAddress = buy.receivingAccount
 		exchange.buyerAddress = buy.refundAccount
 		exchange.sellerReceivingAccount = sell.receivingAccount
@@ -105,7 +104,7 @@ class State(object):
 	def _check_Burn(self, swapBillInput, outputs, amount):
 		if outputs != ('destination',):
 			raise OutputsSpecDoesntMatch()
-		if swapBillInput + amount < self._minimumBalance:
+		if swapBillInput + amount < Constraints.minimumSwapBillBalance:
 			return False, 'burn output is below minimum balance'
 		return True, ''
 	def _apply_Burn(self, txID, swapBillInput, amount):
@@ -116,11 +115,11 @@ class State(object):
 	def _check_Pay(self, swapBillInput, outputs, amount, maxBlock):
 		if outputs != ('change', 'destination'):
 			raise OutputsSpecDoesntMatch()
-		if amount < self._minimumBalance:
+		if amount < Constraints.minimumSwapBillBalance:
 			return False, 'amount is below minimum balance'
 		if swapBillInput < amount:
 			return False, 'insufficient swapbill input'
-		if swapBillInput > amount and swapBillInput < amount + self._minimumBalance:
+		if swapBillInput > amount and swapBillInput < amount + Constraints.minimumSwapBillBalance:
 			return False, 'transaction would generate change output with change amount below minimum balance'
 		if maxBlock < self._currentBlockIndex:
 			return True, 'max block for transaction has been exceeded'
@@ -137,7 +136,7 @@ class State(object):
 		assert exchangeRate < 0x100000000
 		if swapBillOffered == 0:
 			return False, 'zero amount not permitted'
-		if swapBillInput < swapBillOffered + self._minimumBalance:
+		if swapBillInput < swapBillOffered + Constraints.minimumSwapBillBalance:
 			return False, 'insufficient swapbill input'
 		try:
 			buy = TradeOffer.BuyOffer(swapBillOffered=swapBillOffered, rate=exchangeRate)
@@ -150,10 +149,10 @@ class State(object):
 		if maxBlock < self._currentBlockIndex:
 			return swapBillInput
 		refundAccount = (txID, 2)
-		swapBillChange = swapBillInput - swapBillOffered - self._minimumBalance
+		swapBillChange = swapBillInput - swapBillOffered - Constraints.minimumSwapBillBalance
 		assert swapBillChange >= 0
-		self._balances.add(refundAccount, self._minimumBalance)
-		if swapBillChange < self._minimumBalance:
+		self._balances.add(refundAccount, Constraints.minimumSwapBillBalance)
+		if swapBillChange < Constraints.minimumSwapBillBalance:
 			self._balances.addTo(refundAccount, swapBillChange)
 			swapBillChange = 0
 		self._addFirstTradeRef(refundAccount)
@@ -191,7 +190,7 @@ class State(object):
 		if ltcOffered == 0:
 			return False, 'zero amount not permitted'
 		swapBillDeposit = TradeOffer.DepositRequiredForLTCSell(exchangeRate=exchangeRate, ltcOffered=ltcOffered)
-		if swapBillInput < swapBillDeposit + self._minimumBalance:
+		if swapBillInput < swapBillDeposit + Constraints.minimumSwapBillBalance:
 			return False, 'insufficient swapbill input'
 		try:
 			sell = TradeOffer.SellOffer(swapBillDeposit=swapBillDeposit, ltcOffered=ltcOffered, rate=exchangeRate)
@@ -205,10 +204,10 @@ class State(object):
 			return swapBillInput
 		receivingAccount = (txID, 2)
 		swapBillDeposit = TradeOffer.DepositRequiredForLTCSell(exchangeRate=exchangeRate, ltcOffered=ltcOffered)
-		swapBillChange = swapBillInput - swapBillDeposit - self._minimumBalance
+		swapBillChange = swapBillInput - swapBillDeposit - Constraints.minimumSwapBillBalance
 		assert swapBillChange >= 0
-		self._balances.add(receivingAccount, self._minimumBalance)
-		if swapBillChange < self._minimumBalance:
+		self._balances.add(receivingAccount, Constraints.minimumSwapBillBalance)
+		if swapBillChange < Constraints.minimumSwapBillBalance:
 			self._balances.addTo(receivingAccount, swapBillChange)
 			swapBillChange = 0
 		self._addFirstTradeRef(receivingAccount)
@@ -245,7 +244,7 @@ class State(object):
 		#assert backingAmount >= 0
 		#assert type(transactionMax) is int
 		#assert transactionMax >= 0
-		#if backingAmount < self._minimumBalance:
+		#if backingAmount < Constraints.minimumSwapBillBalance:
 			#return False, 'amount is below minimum balance'
 		#if backingAmount < transactionMax * 100:
 			#return False, 'not enough transactions covered'
@@ -253,7 +252,7 @@ class State(object):
 			#return False, 'source account does not exist'
 		#if self._balances[sourceAccount] < backingAmount:
 			#return False, 'insufficient swapbill input'
-		#if self._balances[sourceAccount] > backingAmount and self._balances[sourceAccount] < backingAmount + self._minimumBalance:
+		#if self._balances[sourceAccount] > backingAmount and self._balances[sourceAccount] < backingAmount + Constraints.minimumSwapBillBalance:
 			#return False, 'transaction would generate change output with change amount below minimum balance'
 		#if sourceAccount in self._balanceRefCounts:
 			#return False, "source account is not currently spendable (e.g. this may be locked until a trade completes)"
@@ -274,11 +273,11 @@ class State(object):
 			raise OutputsSpecDoesntMatch()
 		assert type(amount) is int
 		assert amount >= 0
-		if amount < self._minimumBalance:
+		if amount < Constraints.minimumSwapBillBalance:
 			return False, 'amount is below minimum balance'
 		if swapBillInput < amount:
 			return False, 'insufficient swapbill input'
-		if swapBillInput > amount and swapBillInput < amount + self._minimumBalance:
+		if swapBillInput > amount and swapBillInput < amount + Constraints.minimumSwapBillBalance:
 			return False, 'transaction would generate change output with change amount below minimum balance'
 		if maxBlock < self._currentBlockIndex:
 			return True, 'max block for transaction has been exceeded'
@@ -363,7 +362,7 @@ class State(object):
 				swapBillInput += self._balances.consume(sourceAccount)
 			change = method(txID, swapBillInput, **transactionDetails)
 			if change > 0:
-				assert change >= self._minimumBalance
+				assert change >= Constraints.minimumSwapBillBalance
 				self._balances.add((txID, 1), change)
 		else:
 			change = method(txID, **transactionDetails)

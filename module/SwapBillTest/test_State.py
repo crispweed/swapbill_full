@@ -2,6 +2,7 @@ from __future__ import print_function
 import unittest
 from SwapBill import State
 from SwapBill.State import OutputsSpecDoesntMatch, InvalidTransactionType, InvalidTransactionParameters
+from SwapBill.HardCodedProtocolConstraints import Constraints
 from SwapBill.Amounts import e
 
 def totalAccountedFor(state):
@@ -29,17 +30,26 @@ class Test(unittest.TestCase):
 	    'ForwardToFutureNetworkVersion':('change',)
 	    }
 
+	@classmethod
+	def setUpClass(cls):
+		cls._stored_minimumSwapBillBalance = Constraints.minimumSwapBillBalance
+	@classmethod
+	def tearDownClass(cls):
+		Constraints.minimumSwapBillBalance = cls._stored_minimumSwapBillBalance
+
 	def __init__(self, *args, **kwargs):
 		super(Test, self).__init__(*args, **kwargs)
 		self._nextTX = 0
 
 	def test_state_setup(self):
-		state = State.State(100, 'mockhash', minimumBalance=1)
+		Constraints.minimumSwapBillBalance = Test._stored_minimumSwapBillBalance
+		state = State.State(100, 'mockhash')
 		assert state.startBlockMatches('mockhash')
 		assert not state.startBlockMatches('mockhosh')
 
 	def test_bad_transactions(self):
-		state = State.State(100, 'mochhash', minimumBalance=1)
+		Constraints.minimumSwapBillBalance = 1
+		state = State.State(100, 'mochhash')
 		self.assertRaises(InvalidTransactionType, state.checkTransaction, 'Burnee', ('destination',), {'amount':1}, sourceAccounts=[])
 		self.assertRaises(InvalidTransactionParameters, state.checkTransaction, 'Burn', ('destination',), {}, sourceAccounts=[])
 		self.assertRaises(InvalidTransactionParameters, state.checkTransaction, 'Burn', ('destination',), {'amount':0, 'spuriousAdditionalDetail':0}, sourceAccounts=[])
@@ -87,7 +97,8 @@ class Test(unittest.TestCase):
 		return reason
 
 	def test_burn(self):
-		state = State.State(100, 'mockhash', minimumBalance=10)
+		Constraints.minimumSwapBillBalance = 10
+		state = State.State(100, 'mockhash')
 		self.assertRaises(OutputsSpecDoesntMatch, state.checkTransaction, 'Burn', (), {'amount':0}, sourceAccounts=[])
 		self.assertRaises(OutputsSpecDoesntMatch, state.checkTransaction, 'Burn', ('madeUpOutput',), {'amount':0}, sourceAccounts=[])
 		self.assertRaises(OutputsSpecDoesntMatch, state.checkTransaction, 'Burn', ('destination','destination'), {'amount':0}, sourceAccounts=[])
@@ -110,7 +121,8 @@ class Test(unittest.TestCase):
 		self.assertEqual(totalAccountedFor(state), state._totalCreated)
 
 	def test_forwarding(self):
-		state = State.State(100, 'mochhash', minimumBalance=10)
+		Constraints.minimumSwapBillBalance = 10
+		state = State.State(100, 'mochhash')
 		self.state = state
 		burn = self.Burn(100000000)
 		self.assertEqual(state._balances._balances, {burn:100000000})
@@ -150,7 +162,8 @@ class Test(unittest.TestCase):
 		self.assertEqual(reason, 'transaction would generate change output with change amount below minimum balance')
 
 	def test_burn_and_pay(self):
-		state = State.State(100, 'mochhash', minimumBalance=10)
+		Constraints.minimumSwapBillBalance = 10
+		state = State.State(100, 'mochhash')
 		self.state = state
 		output1 = self.Burn(10)
 		self.assertEqual(state._balances._balances, {output1:10})
@@ -211,7 +224,8 @@ class Test(unittest.TestCase):
 		self.assertEqual(state._balances._balances, {(payTX,1):20, ('tx4',1):10, ('tx4',2):20, ('tx7',2):10})
 
 	def test_pay_from_multiple(self):
-		state = State.State(100, 'mochhash', minimumBalance=1)
+		Constraints.minimumSwapBillBalance = 1
+		state = State.State(100, 'mochhash')
 		self.state = state
 		output1 = self.Burn(10)
 		self.assertEqual(state._balances._balances, {output1:10})
@@ -224,7 +238,8 @@ class Test(unittest.TestCase):
 		self.assertEqual(state._balances._balances, {('tx4', 2): 59, ('tx4', 1): 1})
 
 	def test_minimum_exchange_amount(self):
-		state = State.State(100, 'mockhash', minimumBalance=1)
+		Constraints.minimumSwapBillBalance = 1
+		state = State.State(100, 'mockhash')
 		self.state = state
 		burnOutput = self.Burn(10000)
 		self.assertEqual(state._balances._balances, {burnOutput:10000})
@@ -238,7 +253,8 @@ class Test(unittest.TestCase):
 		self.assertEqual(totalAccountedFor(state), state._totalCreated)
 
 	def test_trade_offers_leave_less_than_minimum_balance(self):
-		state = State.State(100, 'mockhash', minimumBalance=100000)
+		Constraints.minimumSwapBillBalance = 100000
+		state = State.State(100, 'mockhash')
 		self.state = state
 		burnOutput = self.Burn(100000)
 		self.assertEqual(state._balances._balances, {burnOutput:100000})
@@ -252,8 +268,8 @@ class Test(unittest.TestCase):
 
 	def test_ltc_trading1(self):
 		# this test adds tests against the ltc transaction types, and also runs through a simple exchange scenario
-		# let's give out some real money, and then try again
-		state = State.State(100, 'mochhash', minimumBalance=1)
+		Constraints.minimumSwapBillBalance = 1
+		state = State.State(100, 'mochhash')
 		self.state = state
 		burnA = self.Burn(100000000)
 		burnB = self.Burn(200000000)
@@ -440,14 +456,16 @@ class Test(unittest.TestCase):
 		self.assertEqual(totalAccountedFor(state), state._totalCreated)
 
 	def test_ltc_buy_change_added_to_refund(self):
-		state = State.State(100, 'starthash', minimumBalance=1*e(8))
+		Constraints.minimumSwapBillBalance = 1*e(8)
+		state = State.State(100, 'starthash')
 		self.state = state
 		burn = self.Burn(22*e(7))
 		change, refund = self.BuyOffer(state, burn, 'madeUpReceiveAddress', swapBillOffered=3*e(7), exchangeRate=0x80000000)
 		self.assertEqual(state._balances._balances, {refund:19*e(7)})
 		self.assertEqual(totalAccountedFor(state), state._totalCreated)
 	def test_ltc_sell_change_added_to_receiving(self):
-		state = State.State(100, 'starthash', minimumBalance=1*e(8))
+		Constraints.minimumSwapBillBalance = 1*e(8)
+		state = State.State(100, 'starthash')
 		self.state = state
 		burn = self.Burn(22*e(7))
 		change, receive = self.SellOffer(state, burn, ltcOffered=3*16*e(7)//2, exchangeRate=0x80000000)
@@ -456,7 +474,8 @@ class Test(unittest.TestCase):
 		self.assertEqual(totalAccountedFor(state), state._totalCreated)
 
 	def test_small_sell_remainder(self):
-		state = State.State(100, 'starthash', minimumBalance=1)
+		Constraints.minimumSwapBillBalance = 1
+		state = State.State(100, 'starthash')
 		self.state = state
 		burnB = self.Burn(1*e(7))
 		changeB, receiveB = self.SellOffer(state, burnB, ltcOffered=1*e(7)//2, exchangeRate=0x80000000)
@@ -499,7 +518,8 @@ class Test(unittest.TestCase):
 		self.assertEqual(totalAccountedFor(state), state._totalCreated)
 
 	def test_small_buy_remainder(self):
-		state = State.State(100, 'starthash', minimumBalance=1)
+		Constraints.minimumSwapBillBalance = 1
+		state = State.State(100, 'starthash')
 		self.state = state
 		burnB = self.Burn(1*e(7))
 		changeB, receiveB = self.SellOffer(state, burnB, ltcOffered=1*e(7)//2, exchangeRate=0x80000000)
@@ -562,7 +582,8 @@ class Test(unittest.TestCase):
 		self.assertEqual(totalAccountedFor(state), state._totalCreated)
 
 	def test_exact_match(self):
-		state = State.State(100, 'starthash', minimumBalance=1)
+		Constraints.minimumSwapBillBalance = 1
+		state = State.State(100, 'starthash')
 		self.state = state
 		burnB = self.Burn(1*e(7))
 		changeB, receiveB = self.SellOffer(state, burnB, ltcOffered=5*e(6), exchangeRate=0x80000000)
@@ -580,7 +601,8 @@ class Test(unittest.TestCase):
 
 	def test_pending_exchange_expires(self):
 		# based on test_exact_match, but with pending exchange left to expire
-		state = State.State(100, 'starthash', minimumBalance=1)
+		Constraints.minimumSwapBillBalance = 1
+		state = State.State(100, 'starthash')
 		self.state = state
 		burnB = self.Burn(1*e(7))
 		changeB, receiveB = self.SellOffer(state, burnB, ltcOffered=1*e(7)//2, exchangeRate=0x80000000)
@@ -601,7 +623,8 @@ class Test(unittest.TestCase):
 		self.assertEqual(totalAccountedFor(state), state._totalCreated)
 
 	def test_offers_dont_meet(self):
-		state = State.State(100, 'starthash', minimumBalance=1)
+		Constraints.minimumSwapBillBalance = 1
+		state = State.State(100, 'starthash')
 		self.state = state
 		burnB = self.Burn(1*e(7))
 		changeB, receiveB = self.SellOffer(state, burnB, ltcOffered=1*e(7)//4, exchangeRate=0x40000000)
@@ -615,7 +638,8 @@ class Test(unittest.TestCase):
 		self.assertEqual(totalAccountedFor(state), state._totalCreated)
 
 	def test_sell_remainder_outstanding(self):
-		state = State.State(100, 'starthash', minimumBalance=1)
+		Constraints.minimumSwapBillBalance = 1
+		state = State.State(100, 'starthash')
 		self.state = state
 		burnB = self.Burn(2*e(7))
 		changeB, receiveB = self.SellOffer(state, burnB, ltcOffered=2*e(7)//2, exchangeRate=0x80000000)
@@ -652,7 +676,8 @@ class Test(unittest.TestCase):
 		self.assertEqual(totalAccountedFor(state), state._totalCreated)
 
 	def test_buy_remainder_outstanding(self):
-		state = State.State(100, 'starthash', minimumBalance=1)
+		Constraints.minimumSwapBillBalance = 1
+		state = State.State(100, 'starthash')
 		self.state = state
 		burnB = self.Burn(20000000)
 		changeB, receiveB = self.SellOffer(state, burnB, ltcOffered=20000000//2, exchangeRate=0x80000000)
@@ -682,7 +707,8 @@ class Test(unittest.TestCase):
 		self.assertEqual(totalAccountedFor(state), state._totalCreated)
 
 	def test_trade_offers_expire(self):
-		state = State.State(100, 'starthash', minimumBalance=1)
+		Constraints.minimumSwapBillBalance = 1
+		state = State.State(100, 'starthash')
 		self.state = state
 		burnB = self.Burn(1*e(7))
 		changeB, receiveB = self.SellOffer(state, burnB, ltcOffered=1*e(7)//2, exchangeRate=0x80000000, maxBlock=101)
@@ -708,7 +734,8 @@ class Test(unittest.TestCase):
 		self.assertEqual(totalAccountedFor(state), state._totalCreated)
 
 	def test_buy_matches_multiple_sells(self):
-		state = State.State(100, 'starthash', minimumBalance=1)
+		Constraints.minimumSwapBillBalance = 1
+		state = State.State(100, 'starthash')
 		self.state = state
 		changeOutputs = []
 		receiveOutputs = []
@@ -758,7 +785,8 @@ class Test(unittest.TestCase):
 		self.assertEqual(totalAccountedFor(state), state._totalCreated)
 
 	def test_sell_matches_multiple_buys(self):
-		state = State.State(100, 'starthash', minimumBalance=1)
+		Constraints.minimumSwapBillBalance = 1
+		state = State.State(100, 'starthash')
 		self.state = state
 		refundOutputs = []
 		expectedBalances = {}

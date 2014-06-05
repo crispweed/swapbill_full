@@ -1,4 +1,5 @@
 from __future__ import print_function, division
+from SwapBill.HardCodedProtocolConstraints import Constraints
 
 class RemainderIsBelowMinimumExchange(Exception):
 	pass
@@ -7,21 +8,21 @@ class OfferIsBelowMinimumExchange(Exception):
 
 class BuyOffer(object):
 	def __init__(self, swapBillOffered, rate):
-		if _ltcWithExchangeRate(rate, swapBillOffered) < _minimumExchangeLTC:
+		if _ltcWithExchangeRate(rate, swapBillOffered) < Constraints.minimumExchangeLTC:
 			raise OfferIsBelowMinimumExchange()
 		self._swapBillOffered = swapBillOffered
 		self.rate = rate
 	def _subtractExchanged(self, exchangeSwapBill):
 		assert exchangeSwapBill < self._swapBillOffered
 		remainder = self._swapBillOffered - exchangeSwapBill
-		if _ltcWithExchangeRate(self.rate, remainder) < _minimumExchangeLTC:
+		if _ltcWithExchangeRate(self.rate, remainder) < Constraints.minimumExchangeLTC:
 			# ** offer must not be modified at this point
 			raise RemainderIsBelowMinimumExchange()
 		self._swapBillOffered = remainder
 
 class SellOffer(object):
 	def __init__(self, swapBillDeposit, ltcOffered, rate):
-		if ltcOffered < _minimumExchangeLTC:
+		if ltcOffered < Constraints.minimumExchangeLTC:
 			raise OfferIsBelowMinimumExchange()
 		self._swapBillDeposit = swapBillDeposit
 		self._ltcOffered = ltcOffered
@@ -30,7 +31,7 @@ class SellOffer(object):
 		assert exchangeLTC < self._ltcOffered
 		assert exchangeSwapBillDeposit < self._swapBillDeposit # otherwise deposit could go to zero, minimum exchange amount should prevent this
 		remainder = self._ltcOffered - exchangeLTC
-		if remainder < _minimumExchangeLTC:
+		if remainder < Constraints.minimumExchangeLTC:
 			# ** offer must not be modified at this point
 			raise RemainderIsBelowMinimumExchange()
 		self._ltcOffered = remainder
@@ -39,16 +40,13 @@ class SellOffer(object):
 class Exchange(object):
 	pass
 
-_minimumExchangeLTC = 1000000
-_depositDevisor = 16
-
 def _ltcWithExchangeRate(exchangeRate, swapBillAmount):
 	return swapBillAmount * exchangeRate // 0x100000000
 
 def DepositRequiredForLTCSell(exchangeRate, ltcOffered):
 	swapBillAmount = ltcOffered * 0x100000000 // exchangeRate
-	deposit = swapBillAmount // _depositDevisor
-	if deposit * _depositDevisor != swapBillAmount:
+	deposit = swapBillAmount // Constraints.depositDivisor
+	if deposit * Constraints.depositDivisor != swapBillAmount:
 		deposit += 1
 	return deposit
 
@@ -60,7 +58,7 @@ def MatchOffers(buy, sell):
 	appliedRate = (buy.rate + sell.rate) // 2
 
 	ltcToBeExchanged = _ltcWithExchangeRate(appliedRate, buy._swapBillOffered)
-	assert ltcToBeExchanged >= _minimumExchangeLTC ## should be guaranteed by buy and sell both satisfying this minimum requirement
+	assert ltcToBeExchanged >= Constraints.minimumExchangeLTC ## should be guaranteed by buy and sell both satisfying this minimum requirement
 
 	exchange = Exchange()
 	outstandingBuy = None

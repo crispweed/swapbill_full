@@ -2,6 +2,7 @@ from __future__ import print_function
 import unittest
 from SwapBill import TradeOffer
 from SwapBill.TradeOffer import RemainderIsBelowMinimumExchange, OfferIsBelowMinimumExchange
+from SwapBill.HardCodedProtocolConstraints import Constraints
 from SwapBill.Amounts import e
 
 def ValidateSell(sell):
@@ -46,7 +47,7 @@ class Test(unittest.TestCase):
 
 		## Matt's sell offer which didn't get added to state
 		self.assertEqual(TradeOffer._ltcWithExchangeRate(1503238553, 5000), 1749)
-		self.assertEqual(TradeOffer._minimumExchangeLTC, 1*e(6))
+		self.assertEqual(Constraints.minimumExchangeLTC, 1*e(6))
 
 	def test_deposit(self):
 		# deposit is rounded up
@@ -61,23 +62,23 @@ class Test(unittest.TestCase):
 		self.assertRaises(OfferIsBelowMinimumExchange, TradeOffer.BuyOffer, 2*e(6), 0x70000000)
 		buy = TradeOffer.BuyOffer(2*e(6), 0x80000000)
 		self.assertDictEqual(buy.__dict__, {'rate': 2147483648, '_swapBillOffered': 2000000})
-		self.assertRaises(OfferIsBelowMinimumExchange, TradeOffer.SellOffer, 100, TradeOffer._minimumExchangeLTC-1, 0x70000000)
-		sell = TradeOffer.SellOffer(100, TradeOffer._minimumExchangeLTC, 0x70000000)
+		self.assertRaises(OfferIsBelowMinimumExchange, TradeOffer.SellOffer, 100, Constraints.minimumExchangeLTC-1, 0x70000000)
+		sell = TradeOffer.SellOffer(100, Constraints.minimumExchangeLTC, 0x70000000)
 		self.assertDictEqual(sell.__dict__, {'_swapBillDeposit': 100, 'rate': 1879048192, '_ltcOffered': 1000000})
 
 	def test_meet_or_overlap(self):
 		buy = TradeOffer.BuyOffer(2*e(6), 0x80000000)
-		sell = TradeOffer.SellOffer(100, TradeOffer._minimumExchangeLTC, 0x70000000)
+		sell = TradeOffer.SellOffer(100, Constraints.minimumExchangeLTC, 0x70000000)
 		self.assertFalse(TradeOffer.OffersMeetOrOverlap(buy=buy, sell=sell))
-		sell = TradeOffer.SellOffer(100, TradeOffer._minimumExchangeLTC, 0x80000000)
+		sell = TradeOffer.SellOffer(100, Constraints.minimumExchangeLTC, 0x80000000)
 		self.assertTrue(TradeOffer.OffersMeetOrOverlap(buy=buy, sell=sell))
-		sell = TradeOffer.SellOffer(100, TradeOffer._minimumExchangeLTC, 0x90000000)
+		sell = TradeOffer.SellOffer(100, Constraints.minimumExchangeLTC, 0x90000000)
 		self.assertTrue(TradeOffer.OffersMeetOrOverlap(buy=buy, sell=sell))
 
 	def test_match(self):
 		# test assertion about offers meeting or overlapping
 		buy = TradeOffer.BuyOffer(2*e(7), 0x80000000)
-		sell = TradeOffer.SellOffer(142858, TradeOffer._minimumExchangeLTC, 0x70000000)
+		sell = TradeOffer.SellOffer(142858, Constraints.minimumExchangeLTC, 0x70000000)
 		self.assertRaises(AssertionError, TradeOffer.MatchOffers, buy=buy, sell=sell)
 		# offer adjustments and match call
 		sell = TradeOffer.SellOffer(2*e(7)//16, 1*e(7), 0x80000000)
