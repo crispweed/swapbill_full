@@ -251,6 +251,16 @@ class Test(unittest.TestCase):
 		self.assertEqual(reason, 'does not satisfy minimum exchange amount')
 		self.assertEqual(state._balances._balances, {burnOutput:10000})
 		self.assertEqual(totalAccountedFor(state), state._totalCreated)
+	def test_minimum_exchange_amount2(self):
+		Constraints.minimumSwapBillBalance = 1*e(7)
+		state = State.State(100, 'mockhash')
+		self.state = state
+		burnOutput = self.Burn(2*e(7))
+		# cannot post buy or sell offers, because of minimum exchange amount constraint
+		reason = self.Apply_AssertFails(state, 'LTCBuyOffer', sourceAccounts=[burnOutput], swapBillOffered=1*e(7)-1, exchangeRate=0x80000000, receivingAddress='a_receive', maxBlock=200)
+		self.assertEqual(reason, 'does not satisfy minimum exchange amount')
+		reason = self.Apply_AssertFails(state, 'LTCSellOffer', sourceAccounts=[burnOutput], ltcOffered=1*e(7)//2-1, exchangeRate=0x80000000, maxBlock=200)
+		self.assertEqual(reason, 'does not satisfy minimum exchange amount')
 
 	def test_trade_offers_leave_less_than_minimum_balance(self):
 		Constraints.minimumSwapBillBalance = 100000
