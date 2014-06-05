@@ -59,7 +59,7 @@ class MockHost(object):
 		self._nextSuppliedOutput = 0
 		self._unspent = []
 		self.holdNewTransactions = False
-		self.hideMemPool = False
+		#self.hideMemPool = False
 
 	def _setOwner(self, id):
 		assert not '_' in id
@@ -108,8 +108,8 @@ class MockHost(object):
 		return self._transactionsByBlock.get(i, [])
 
 	def getMemPoolTransactions(self):
-		if self.hideMemPool:
-			return []
+		#if self.hideMemPool:
+			#return []
 		return self._memPool
 
 	def _advance(self, numberOfBlocks):
