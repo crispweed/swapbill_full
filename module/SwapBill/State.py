@@ -39,10 +39,13 @@ class State(object):
 		#self._ltcSellBackers = {}
 
 	def _addFirstTradeRef(self, account):
-		self._balances.addFirstReference(account)
+		assert not self._balances.isReferenced(account)
+		assert not self._balances.isRedirected(account)
+		self._balances.addRef(account)
 		self._tradeOfferChangeCounts[account] = 0
 	def _addTradeRef(self, account):
-		self._balances.addReference(account)
+		assert self._balances.isReferenced(account)
+		self._balances.addRef(account)
 	def _removeTradeRef(self, account):
 		self._balances.removeReference(account)
 		if not self._balances.isReferenced(account):
@@ -111,17 +114,16 @@ class State(object):
 			self._addTradeRef(sellRemainder.receivingAccount)
 		return buyRemainder, sellRemainder
 
-	def _fundedTransaction_Burn(self, txID, swapBillInput, amount, outputs):
+	def _fundedTransaction_Burn(self, txID, swapBillInput, changeRequired, amount, outputs):
 		assert outputs == ('destination',)
 		if swapBillInput + amount < Constraints.minimumSwapBillBalance:
 			raise BadlyFormedTransaction('burn output is below minimum balance')
 		if txID is None:
 			return
 		self._totalCreated += amount
-		self._balances.add((txID, 1), swapBillInput + amount)
-		return 0
+		return swapBillInput + amount
 
-	def _fundedTransaction_Pay(self, txID, swapBillInput, amount, maxBlock, outputs):
+	def _fundedTransaction_Pay(self, txID, swapBillInput, changeRequired, amount, maxBlock, outputs):
 		assert outputs == ('change', 'destination')
 		if amount < Constraints.minimumSwapBillBalance:
 			raise BadlyFormedTransaction('amount is below minimum balance')
@@ -130,6 +132,8 @@ class State(object):
 		if swapBillInput < amount:
 			raise InsufficientFundsForTransaction()
 		change = swapBillInput - amount
+		if changeRequired and change == 0:
+			raise InsufficientFundsForTransaction()
 		if change > 0 and change < Constraints.minimumSwapBillBalance:
 			raise InsufficientFundsForTransaction()
 		if txID is None:
@@ -137,7 +141,7 @@ class State(object):
 		self._balances.add((txID, 2), amount)
 		return change
 
-	def _fundedTransaction_LTCBuyOffer(self, txID, swapBillInput, swapBillOffered, exchangeRate, receivingAddress, maxBlock, outputs):
+	def _fundedTransaction_LTCBuyOffer(self, txID, swapBillInput, changeRequired, swapBillOffered, exchangeRate, receivingAddress, maxBlock, outputs):
 		assert outputs == ('change', 'ltcBuy')
 		assert exchangeRate < 0x100000000
 		try:
@@ -146,16 +150,14 @@ class State(object):
 			raise BadlyFormedTransaction('does not satisfy minimum exchange amount')
 		if maxBlock < self._currentBlockIndex:
 			raise TransactionFailsAgainstCurrentState('max block for transaction has been exceeded')
-		change = swapBillInput - swapBillOffered - Constraints.minimumSwapBillBalance
-		if change < 0:
+		change = swapBillInput - swapBillOffered
+		# change is always required here, since we will add a trade ref
+		if change < Constraints.minimumSwapBillBalance:
 			raise InsufficientFundsForTransaction()
 		if txID is None:
 			return
-		refundAccount = (txID, 2)
-		self._balances.add(refundAccount, Constraints.minimumSwapBillBalance)
-		if change < Constraints.minimumSwapBillBalance:
-			self._balances.addTo(refundAccount, change)
-			change = 0
+		refundAccount = (txID, 1) # (now same as change account)
+		self._balances.addTemporarilyEmpty(refundAccount)
 		self._addFirstTradeRef(refundAccount)
 		buy.receivingAccount = receivingAddress
 		buy.refundAccount = refundAccount
@@ -299,11 +301,6 @@ class State(object):
 			return True, e.message
 		return True, ''
 	def applyTransaction(self, transactionType, txID, outputs, transactionDetails, sourceAccounts=None):
-		try:
-			canApply, reason = self.checkTransaction(transactionType, outputs, transactionDetails, sourceAccounts)
-		except InsufficientFundsForTransaction:
-			canApply = True
-		assert canApply
 		if sourceAccounts is None:
 			methodPrefix = '_unfundedTransaction_'
 		else:
@@ -312,18 +309,17 @@ class State(object):
 		if sourceAccounts is not None:
 			swapBillInput = 0
 			for sourceAccount in sourceAccounts:
-				if not self._balances.accountHasBalance(sourceAccount):
-					continue
-				if self._balances.isReferenced(sourceAccount):
-					# TODO consume this account also?
-					continue
-				swapBillInput += self._balances.consume(sourceAccount)
+				swapBillInput += self._balances.balanceFor_IfAny(sourceAccount)
 			try:
 				change = method(txID, swapBillInput, outputs=outputs, **transactionDetails)
 			except (TransactionFailsAgainstCurrentState, InsufficientFundsForTransaction):
 				change = swapBillInput
 			if change > 0:
 				assert change >= Constraints.minimumSwapBillBalance
-				self._balances.add((txID, 1), change)
+				self._balances.addOrAddTo((txID, 1), change)
+			for sourceAccount in sourceAccounts:
+				if self._balances.isReferenced(sourceAccount):
+
+				swapBillInput += self._balances.balanceFor_IfAny(sourceAccount)
 		else:
 			method(txID=txID, outputs=outputs, **transactionDetails)
