@@ -31,10 +31,6 @@ class Balances(object):
 	def balanceFor_IfAny(self, account):
 		return self.balances.get(account, 0)
 
-	def addTemporarilyEmpty(self, account):
-		assert not account in self.balances
-		self.balances[account] = 0
-
 	def add(self, account, amount):
 		assert not account in self.balances
 		self.balances[account] = amount
@@ -96,3 +92,7 @@ class Balances(object):
 		while account in self._redirects:
 			account = self._redirects[account]
 		return account
+
+	def addTo_Forwarded(self, account, amount):
+		account = self.getEndOfForwardingChainFrom(account)
+		self.balances[account] += amount

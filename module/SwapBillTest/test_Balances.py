@@ -12,8 +12,7 @@ class Test(unittest.TestCase):
 		balances.addOrAddTo('1', 5)
 		balances.addOrAddTo('2', 7)
 		self.assertDictEqual(balances.balances, {'1': 8, '2': 7})
-		self.assertRaises(AssertionError, balances.addTemporarilyEmpty, '2')
-		balances.addTemporarilyEmpty('3')
+		balances.add('3', 0) # zero balances are allowed as far as Balances class is concerned
 		self.assertDictEqual(balances.balances, {'1': 8, '2': 7, '3': 0})
 		self.assertTrue(balances.accountHasBalance('1'))
 		self.assertFalse(balances.accountHasBalance('unusedAccount'))
