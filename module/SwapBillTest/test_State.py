@@ -149,9 +149,9 @@ class Test(unittest.TestCase):
 		self.assertEqual(state._balances.balances, {burn:100000000})
 		details = {'amount':10, 'maxBlock':200}
 		# bad output specs
-		self.assertRaises(AssertionError, state.checkTransaction, 'ForwardToFutureNetworkVersion', (), details, sourceAccounts=[burn])
-		self.assertRaises(AssertionError, state.checkTransaction, 'ForwardToFutureNetworkVersion', ('madeUpOutput'), details, sourceAccounts=[burn])
-		self.assertRaises(AssertionError, state.checkTransaction, 'ForwardToFutureNetworkVersion', ('change', 'madeUpOutput'), details, sourceAccounts=[burn])
+		self.assertRaises(AssertionError, state.checkTransaction, 'ForwardToFutureNetworkVersion', outputs=(), transactionDetails=details, sourceAccounts=[burn])
+		self.assertRaises(AssertionError, state.checkTransaction, 'ForwardToFutureNetworkVersion', outputs=('madeUpOutput'), transactionDetails=details, sourceAccounts=[burn])
+		self.assertRaises(AssertionError, state.checkTransaction, 'ForwardToFutureNetworkVersion', outputs=('change', 'madeUpOutput'), transactionDetails=details, sourceAccounts=[burn])
 		# control with good output specs
 		outputs = self.Apply_AssertSucceeds(state, 'ForwardToFutureNetworkVersion', sourceAccounts=[burn], **details)
 		change = outputs['change']
@@ -159,30 +159,33 @@ class Test(unittest.TestCase):
 		self.assertEqual(state._totalForwarded, 10)
 		details = {'amount':10, 'maxBlock':200}
 		details['amount'] = 100000000
-		reason = self.Apply_AssertFails(state, 'ForwardToFutureNetworkVersion', sourceAccounts=[change], **details)
-		self.assertEqual(reason, 'insufficient swapbill input')
+		change2 = self.Apply_AssertInsufficientFunds(state, 'ForwardToFutureNetworkVersion', sourceAccounts=[change], **details)
+		self.assertEqual(state._balances.balances, {change2:99999990})
 		details['amount'] = 0
-		reason = self.Apply_AssertFails(state, 'ForwardToFutureNetworkVersion', sourceAccounts=[change], **details)
+		reason = self.Apply_AssertFails(state, 'ForwardToFutureNetworkVersion', sourceAccounts=[change2], **details)
 		self.assertEqual(reason, 'amount is below minimum balance')
 		details['amount'] = 9
-		reason = self.Apply_AssertFails(state, 'ForwardToFutureNetworkVersion', sourceAccounts=[change], **details)
+		reason = self.Apply_AssertFails(state, 'ForwardToFutureNetworkVersion', sourceAccounts=[change2], **details)
 		self.assertEqual(reason, 'amount is below minimum balance')
 		details['amount'] = 10
-		reason = self.Apply_AssertFails(state, 'ForwardToFutureNetworkVersion', sourceAccounts=['madeUpSourceAccount'], **details)
-		self.assertEqual(reason, 'insufficient swapbill input' )
+		self.Apply_AssertInsufficientFunds(state, 'ForwardToFutureNetworkVersion', sourceAccounts=['madeUpSourceAccount'], **details)
 		self.assertEqual(state._totalForwarded, 10)
+		self.assertEqual(state._balances.balances, {change2:99999990})
 		details['maxBlock'] = 99
-		outputs = self.Apply_AssertSucceeds(state, 'ForwardToFutureNetworkVersion', expectedError='max block for transaction has been exceeded', sourceAccounts=[change], **details)
-		change2 = outputs['change']
+		outputs = self.Apply_AssertSucceeds(state, 'ForwardToFutureNetworkVersion', expectedError='max block for transaction has been exceeded', sourceAccounts=[change2], **details)
+		change3 = outputs['change']
 		details['maxBlock'] = 100
+		self.assertEqual(state._totalForwarded, 10)
 		# if forwarding transactions expire, amount has to be paid back as change
 		# (for same reason as other transactions such as pay - we've used the source account, and any balance left associated with this account becomes unredeemable)
-		self.assertEqual(state._balances.balances, {change2:99999990})
+		self.assertEqual(state._balances.balances, {change3:99999990})
 		burn2 = self.Burn(20)
-		self.assertEqual(state._balances.balances, {change2:99999990, burn2:20})
+		self.assertEqual(state._balances.balances, {change3:99999990, burn2:20})
 		details = {'amount':11, 'maxBlock':200}
-		reason = self.Apply_AssertFails(state, 'ForwardToFutureNetworkVersion', sourceAccounts=[burn2], **details)
-		self.assertEqual(reason, 'transaction would generate change output with change amount below minimum balance')
+		# transaction would generate change output with change amount below minimum balance
+		change4 = self.Apply_AssertInsufficientFunds(state, 'ForwardToFutureNetworkVersion', sourceAccounts=[burn2], **details)
+		self.assertEqual(state._balances.balances, {change3:99999990, change4:20})
+		self.assertEqual(state._totalForwarded, 10)
 
 	def test_burn_and_pay(self):
 		Constraints.minimumSwapBillBalance = 10
@@ -609,15 +612,15 @@ class Test(unittest.TestCase):
 		burnB = self.Burn(1*e(7))
 		receiveB = self.SellOffer(state, burnB, ltcOffered=5*e(6), exchangeRate=0x80000000)
 		# deposit is 10000000 // 16 = 625000
-		self.assertEqual(state._balances.balances, {changeB: 1*e(7)-625000-1, receiveB:1})
+		self.assertEqual(state._balances.balances, {receiveB: 1*e(7)-625000})
 		burnA = self.Burn(1*e(7)+1)
 		refundA = self.BuyOffer(state, burnA, 'receiveLTC', swapBillOffered=1*e(7), exchangeRate=0x80000000)
 		# nothing refunded, no change to balances
-		self.assertEqual(state._balances.balances, {changeB:1*e(7)-625000-1, receiveB:1, refundA:1})
+		self.assertEqual(state._balances.balances, {receiveB:1*e(7)-625000, refundA:1})
 		self.assertEqual(len(state._pendingExchanges), 1)
 		self.Completion(state, 0, 'receiveLTC', 1*e(7) // 2)
 		self.assertEqual(len(state._pendingExchanges), 0)
-		self.assertEqual(state._balances.balances, {changeB:1*e(7)-625000-1, receiveB:1*e(7)+625000+1, refundA:1})
+		self.assertEqual(state._balances.balances, {receiveB:1*e(7)+1*e(7), refundA:1})
 		self.assertEqual(totalAccountedFor(state), state._totalCreated)
 
 	def test_pending_exchange_expires(self):
