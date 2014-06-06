@@ -106,12 +106,12 @@ class Test(unittest.TestCase):
 	def test_bad_transactions(self):
 		Constraints.minimumSwapBillBalance = 1
 		state = State.State(100, 'mochhash')
-		self.assertRaises(InvalidTransactionType, state.checkTransaction, 'Burnee', ('destination',), {'amount':1}, sourceAccounts=[])
-		self.assertRaises(InvalidTransactionParameters, state.checkTransaction, 'Burn', ('destination',), {}, sourceAccounts=[])
-		self.assertRaises(InvalidTransactionParameters, state.checkTransaction, 'Burn', ('destination',), {'amount':0, 'spuriousAdditionalDetail':0}, sourceAccounts=[])
-		# note that not including sourceAccounts currently has the effect of changing transaction type for the purpose of error reporting
-		self.assertRaises(InvalidTransactionType, state.checkTransaction, 'Burn', ('destination',), {'amount':1})
-		canApply, reason = state.checkTransaction('Burn', ('destination',), {'amount':1}, sourceAccounts=[])
+		self.assertRaises(InvalidTransactionType, state.checkTransaction, 'Burnee', outputs=('destination',), transactionDetails={'amount':1}, sourceAccounts=[])
+		self.assertRaises(InvalidTransactionParameters, state.checkTransaction, 'Burn', outputs=('destination',), transactionDetails={}, sourceAccounts=[])
+		self.assertRaises(InvalidTransactionParameters, state.checkTransaction, 'Burn', outputs=('destination',), transactionDetails={'amount':0, 'spuriousAdditionalDetail':0}, sourceAccounts=[])
+		# note that setting sourceAccounts to None currently has the effect of changing transaction type for the purpose of error reporting
+		self.assertRaises(InvalidTransactionType, state.checkTransaction, 'Burn', sourceAccounts=None, outputs=('destination',), transactionDetails={'amount':1})
+		canApply, reason = state.checkTransaction('Burn', outputs=('destination',), transactionDetails={'amount':1}, sourceAccounts=[])
 		self.assertTrue(canApply)
 		self.assertEqual(reason, '')
 
@@ -134,8 +134,8 @@ class Test(unittest.TestCase):
 		self.assertEqual(reason, '')
 		state.applyTransaction(transactionType='Burn', txID=self.TXID(), outputs=('destination',), transactionDetails={'amount':10}, sourceAccounts=[])
 		self.assertEqual(state._balances.balances, {('tx1',1):10})
-		# state should assert if you try to apply a bad transaction, and exit without any effect
-		self.assertRaises(AssertionError, state.applyTransaction, 'Burn', 'badTX', outputs=('destination',), transactionDetails={'amount':0}, sourceAccounts=[])
+		# bad transaction just forwards any inputs to change (none here)
+		state.applyTransaction('Burn', 'badTX', outputs=('destination',), transactionDetails={'amount':0}, sourceAccounts=[])
 		self.assertEqual(state._balances.balances, {('tx1',1):10})
 		state.applyTransaction(transactionType='Burn', txID=self.TXID(), outputs=('destination',), transactionDetails={'amount':20}, sourceAccounts=[])
 		self.assertEqual(state._balances.balances, {('tx1',1):10, ('tx2',1):20})
@@ -714,28 +714,28 @@ class Test(unittest.TestCase):
 		burnB = self.Burn(20000000)
 		receiveB = self.SellOffer(state, burnB, ltcOffered=20000000//2, exchangeRate=0x80000000)
 		# deposit is 20000000 // 16 = 1250000
-		self.assertEqual(state._balances.balances, {changeB:18750000-1, receiveB:1})
+		self.assertEqual(state._balances.balances, {receiveB:18750000})
 		burnA = self.Burn(30000001)
 		refundA = self.BuyOffer(state, burnA, 'receiveLTC', swapBillOffered=30000000, exchangeRate=0x80000000)
 		# nothing refunded, no change to balances
-		self.assertEqual(state._balances.balances, {changeB:18750000-1, receiveB:1, refundA:1})
+		self.assertEqual(state._balances.balances, {receiveB:18750000, refundA:1})
 		self.assertEqual(len(state._pendingExchanges), 1)
-		self.assertEqual(state._LTCBuys.size(), 1) ## half of buy offer is left outstanding
+		self.assertEqual(state._LTCBuys.size(), 1) # half of buy offer is left outstanding
 		self.assertEqual(state._LTCSells.size(), 0)
 		self.Completion(state, 0, 'receiveLTC', 20000000 // 2)
 		self.assertEqual(len(state._pendingExchanges), 0)
 		# b should be refunded all his deposit, and receives payment in swapbill
 		# refund account for a, is still locked by the buy offer
-		self.assertEqual(state._balances.balances, {changeB:18750000-1, receiveB:21250000+1, refundA:1})
+		self.assertEqual(state._balances.balances, {receiveB:18750000+21250000, refundA:1})
 		# b goes on to sell the rest
 		burnB2 = self.Burn(10000000)
-		changeB2, receiveB2 = self.SellOffer(state, burnB2, ltcOffered=10000000//2, exchangeRate=0x80000000)
-		# refund account for a, with zero amount, is still locked, now by the pending exchange
-		self.assertEqual(state._balances.balances, {changeB:18750000-1, receiveB:21250000+1, changeB2:9375000-1, receiveB2:1, refundA:1})
+		receiveB2 = self.SellOffer(state, burnB2, ltcOffered=10000000//2, exchangeRate=0x80000000)
+		# refund account for a, is still referenced now by the pending exchange
+		self.assertEqual(state._balances.balances, {receiveB:18750000+21250000, receiveB2:9375000, refundA:1})
 		self.assertEqual(len(state._pendingExchanges), 1)
 		self.Completion(state, 1, 'receiveLTC', 10000000 // 2)
 		self.assertEqual(len(state._pendingExchanges), 0)
-		self.assertEqual(state._balances.balances, {changeB:18750000-1, receiveB:21250000+1, changeB2:9375000-1, receiveB2:10625000+1, refundA:1})
+		self.assertEqual(state._balances.balances, {receiveB:18750000+21250000, receiveB2:9375000+10625000, refundA:1})
 		self.assertEqual(totalAccountedFor(state), state._totalCreated)
 
 	def test_trade_offers_expire(self):
