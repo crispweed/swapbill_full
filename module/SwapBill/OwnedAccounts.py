@@ -41,9 +41,8 @@ class OwnedAccounts(object):
 			privateKey = host.privateKeyForPubKeyHash(hostTX.outputPubKeyHash(i + 1))
 			if privateKey is None:
 				continue # output not ours (e.g. pay destination)
-			outputDetails = (hostTX.outputAmount(i + 1), privateKey, scriptPubKeys[i + 1])
 			if newOwnedAccount in state._balances.changeCounts:
 				self.tradeOfferChangeCounts[newOwnedAccount] = state._balances.changeCounts[newOwnedAccount]
-			self.accounts[newOwnedAccount] = outputDetails
+			self.accounts[newOwnedAccount] = (hostTX.outputAmount(i + 1), privateKey, scriptPubKeys[i + 1])
 			report += ' - ' + str(state._balances.balanceFor(newOwnedAccount)) + ' swapbill output added\n'
 		return report

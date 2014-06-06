@@ -118,7 +118,7 @@ class MockHost(object):
 	def getUnspent(self):
 		result = []
 		for entry in self._unspent:
-			if self.addressIsMine(entry['address']):
+			if self._addressIsMine(entry['address']):
 				result.append(entry)
 		return result
 
@@ -130,7 +130,7 @@ class MockHost(object):
 		self._nextSwapBill += 1
 		#print('new swap bill address', self._id, self._nextSwapBill)
 		return TextAsPubKeyHash(addressPrefix + self._id + '_swapbill' + str(self._nextSwapBill))
-	def addressIsMine(self, pubKeyHash):
+	def _addressIsMine(self, pubKeyHash):
 		try:
 			asText = PubKeyHashAsText(pubKeyHash)
 		except UnicodeDecodeError:
@@ -150,7 +150,7 @@ class MockHost(object):
 		if found is None:
 			raise ExceptionReportedToUser('RPC error sending signed transaction: (from Mock Host, no unspent found for input, maybe already spent?)')
 		pubKeyHash = found['address']
-		if self.addressIsMine(pubKeyHash):
+		if self._addressIsMine(pubKeyHash):
 			requiredPrivateKey = None
 		else:
 			requiredPrivateKey = self.privateKeyForPubKeyHash(pubKeyHash)

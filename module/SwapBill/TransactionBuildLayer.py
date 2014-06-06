@@ -25,13 +25,15 @@ class TransactionBuildLayer(object):
 			asInputs.append((output['txid'], output['vout']))
 		return amounts, asInputs
 
-	def getAllOwned(self, state):
+	def getSwapBillUnspent(self, state):
 		result = []
 		for account in self._ownedAccounts.accounts:
-			self._scriptPubKeyLookup[account] = self._ownedAccounts.accounts[account][2]
-			self._privateKeys.append(self._ownedAccounts.accounts[account][1])
 			result.append(account)
 		return result
+
+	def swapBillUnspentUsed(self, account):
+		self._scriptPubKeyLookup[account] = self._ownedAccounts.accounts[account][2]
+		self._privateKeys.append(self._ownedAccounts.accounts[account][1])
 
 	def checkIfThereIsAtLeastOneOutstandingTradeRef(self, state):
 		result = False

@@ -171,7 +171,7 @@ def Main(startBlockIndex, startBlockHash, useTestNet, commandLineArgs=sys.argv[1
 
 	def CheckAndSend_Funded(transactionType, outputs, outputPubKeys, details):
 		transactionBuildLayer.startTransactionConstruction()
-		swapBillUnspent = transactionBuildLayer.getAllOwned(state)
+		swapBillUnspent = transactionBuildLayer.getSwapBillUnspent(state)
 		sourceAccounts = []
 		while True:
 			try:
@@ -185,6 +185,7 @@ def Main(startBlockIndex, startBlockHash, useTestNet, commandLineArgs=sys.argv[1
 				break
 			if not swapBillUnspent:
 				raise ExceptionReportedToUser('Insufficient swapbill for transaction.')
+			transactionBuildLayer.swapBillUnspentUsed(swapBillUnspent[0])
 			sourceAccounts.append(swapBillUnspent[0])
 			swapBillUnspent = swapBillUnspent[1:]
 		return CheckAndSend_Common(transactionType, sourceAccounts, outputs, outputPubKeys, details)
