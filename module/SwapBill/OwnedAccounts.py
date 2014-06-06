@@ -4,39 +4,33 @@ from SwapBill import Base58Check
 
 class OwnedAccounts(object):
 	def __init__(self):
-		self.spendableAccounts = {}
-		self.buyOffers = {}
-		self.sellOffers = {}
+		self.accounts = {}
+		self.tradeOfferChangeCounts = {}
 
 	def updateForSpent(self, hostTX, state):
 		report = ''
 		for i in range(hostTX.numberOfInputs()):
 			spentAccount = (hostTX.inputTXID(i), hostTX.inputVOut(i))
-			assert not spentAccount in self.sellOffers
-			assert not spentAccount in self.buyOffers
-			if spentAccount in self.spendableAccounts:
-				self.spendableAccounts.pop(spentAccount)
+			if spentAccount in self.accounts:
+				self.accounts.pop(spentAccount)
 				report += ' - ' + str(state._balances.balanceFor(spentAccount)) + ' swapbill output consumed\n'
 		return report
 
-	def _checkForTradeOfferChanges(self, state, offers, offerType):
+	def checkForTradeOfferChanges(self, state):
 		report = ''
 		toRemove = []
-		for account in offers:
-			changeCount, outputDetails = offers[account]
-			if not account in state._tradeOfferChangeCounts:
-				self.spendableAccounts[account] = outputDetails
+		for account in self.tradeOfferChangeCounts:
+			changeCount = self.tradeOfferChangeCounts[account]
+			if not account in state._balances.changeCounts:
 				toRemove.append(account)
-				report += ' - ' + offerType + ' offer completed, receiving output with ' + str(state._balances.balanceFor(account)) + ' swapbill unlocked\n'
-			elif state._tradeOfferChangeCounts[account] != changeCount:
-				assert state._tradeOfferChangeCounts[account] == changeCount + 1
-				offers[account][0] = state._tradeOfferChangeCounts[account]
-				report += ' - ' + offerType + ' offer updated (receiving output contains ' + str(state._balances.balanceFor(account)) + ' swapbill)\n'
+				report += ' - trade offer completed\n'
+			elif state._balances.changeCounts[account] != changeCount:
+				assert state._balances.changeCounts[account] == changeCount + 1
+				self.tradeOfferChangeCounts[account] = state._balances.changeCounts[account]
+				report += ' - trade offer updated\n'
 		for accountToRemove in toRemove:
-			offers.pop(accountToRemove)
+			self.tradeOfferChangeCounts.pop(accountToRemove)
 		return report
-	def checkForTradeOfferChanges(self, state):
-		return self._checkForTradeOfferChanges(state, self.buyOffers, 'buy') + self._checkForTradeOfferChanges(state, self.sellOffers, 'sell')
 
 	def updateForNewOutputs(self, host, state, txID, hostTX, outputs, scriptPubKeys):
 		report = ''
@@ -47,16 +41,9 @@ class OwnedAccounts(object):
 			privateKey = host.privateKeyForPubKeyHash(hostTX.outputPubKeyHash(i + 1))
 			if privateKey is None:
 				continue # output not ours (e.g. pay destination)
-			affected = True
 			outputDetails = (hostTX.outputAmount(i + 1), privateKey, scriptPubKeys[i + 1])
-			if outputs[i] == 'ltcBuy':
-				self.buyOffers[newOwnedAccount] = [state._tradeOfferChangeCounts[newOwnedAccount], outputDetails]
-				report += ' - created buy offer, refund output seeded with ' + str(state._balances.balanceFor(newOwnedAccount)) + ' swapbill and locked until trade completed\n'
-				continue
-			if outputs[i] == 'ltcSell':
-				self.sellOffers[newOwnedAccount] = [state._tradeOfferChangeCounts[newOwnedAccount], outputDetails]
-				report += ' - created sell offer, receiving output seeded with ' + str(state._balances.balanceFor(newOwnedAccount)) + ' swapbill and locked until trade completed\n'
-				continue
-			self.spendableAccounts[newOwnedAccount] = outputDetails
+			if newOwnedAccount in state._balances.changeCounts:
+				self.tradeOfferChangeCounts[newOwnedAccount] = state._balances.changeCounts[newOwnedAccount]
+			self.accounts[newOwnedAccount] = outputDetails
 			report += ' - ' + str(state._balances.balanceFor(newOwnedAccount)) + ' swapbill output added\n'
 		return report

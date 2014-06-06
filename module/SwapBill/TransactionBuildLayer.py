@@ -25,28 +25,25 @@ class TransactionBuildLayer(object):
 			asInputs.append((output['txid'], output['vout']))
 		return amounts, asInputs
 
-	def getActiveAccount(self, state):
-		best = None
-		bestAmount = 0
-		for account in self._ownedAccounts.spendableAccounts:
-			amount = state.getSpendableAmount(account)
-			assert amount > 0
-			if amount > bestAmount:
-				best = account
-				bestAmount = amount
-		if bestAmount == 0:
-			raise ExceptionReportedToUser('No active swapbill balance currently available (you may need to wait for a transaction in progress to complete).')
-		self._scriptPubKeyLookup[best] = self._ownedAccounts.spendableAccounts[best][2]
-		self._privateKeys.append(self._ownedAccounts.spendableAccounts[best][1])
-		return best
-
-	def getAllOwnedAndSpendable(self, state):
+	def getAllOwned(self, state):
 		result = []
-		for account in self._ownedAccounts.spendableAccounts:
-			assert state.getSpendableAmount(account) > 0
-			self._scriptPubKeyLookup[account] = self._ownedAccounts.spendableAccounts[account][2]
-			self._privateKeys.append(self._ownedAccounts.spendableAccounts[account][1])
+		for account in self._ownedAccounts.accounts:
+			self._scriptPubKeyLookup[account] = self._ownedAccounts.accounts[account][2]
+			self._privateKeys.append(self._ownedAccounts.accounts[account][1])
 			result.append(account)
+		return result
+
+	def checkIfThereIsAtLeastOneOutstandingTradeRef(self, state):
+		result = False
+		for account in self._ownedAccounts.accounts:
+			if account in state._balances.changeCounts:
+				result = True
+				break
+		result_Check = bool(self._ownedAccounts.tradeOfferChangeCounts)
+		#if result_Check != result:
+			#print('self._ownedAccounts.accounts:', self._ownedAccounts.accounts)
+			#print('state._balances.changeCounts:', state._balances.changeCounts)
+		assert result_Check == result
 		return result
 
 	def sendTransaction(self, tx):

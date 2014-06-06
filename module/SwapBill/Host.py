@@ -83,15 +83,6 @@ class Host(object):
 		#return Address.ToPubKeyHash(self._addressVersion, self._rpcHost.call('getnewaddress', 'SwapBill'))
 		return self._wallet.addKeyPairAndReturnPubKeyHash()
 
-	def addressIsMine(self, pubKeyHash):
-		if self._wallet.hasKeyPairForPubKeyHash(pubKeyHash):
-			return True
-		address = Address.FromPubKeyHash(self._addressVersion, pubKeyHash)
-		validateResults = self._rpcHost.call('validateaddress', address)
-		result = validateResults['ismine']
-		assert result in (True, False)
-		return result
-
 	def privateKeyForPubKeyHash(self, pubKeyHash):
 		return self._wallet.privateKeyForPubKeyHash(pubKeyHash)
 

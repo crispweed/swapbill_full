@@ -17,6 +17,8 @@ try:
 	from SwapBill import FormatTransactionForUserDisplay
 	from SwapBill.Sync import SyncAndReturnStateAndOwnedAccounts
 	from SwapBill.ExceptionReportedToUser import ExceptionReportedToUser
+	from SwapBill.State import InsufficientFundsForTransaction
+	from SwapBill.HardCodedProtocolConstraints import Constraints
 except ImportError as e:
 	message = str(e)
 	start = 'No module named '
@@ -121,7 +123,7 @@ def Main(startBlockIndex, startBlockHash, useTestNet, commandLineArgs=sys.argv[1
 		state, ownedAccounts = SyncAndReturnStateAndOwnedAccounts(dataDir, startBlockIndex, startBlockHash, host, includePending=includePending, forceRescan=args.forceRescan, out=syncOut)
 		elapsedTime = time.clock() - startTime
 		formattedBalances = {}
-		for account in state._balances._balances:
+		for account in state._balances.balances:
 			key = host.formatAccountForEndUser(account)
 			formattedBalances[key] = state._balances.balanceFor(account)
 		info = {
@@ -131,7 +133,7 @@ def Main(startBlockIndex, startBlockHash, useTestNet, commandLineArgs=sys.argv[1
 		    'numberOfLTCBuyOffers':state._LTCBuys.size(),
 		    'numberOfLTCSellOffers':state._LTCSells.size(),
 		    'numberOfPendingExchanges':len(state._pendingExchanges),
-		    'numberOfSpendableOutputs':len(ownedAccounts.spendableAccounts)
+		    'numberOfOutputs':len(ownedAccounts.accounts)
 		}
 		return info
 
@@ -154,22 +156,46 @@ def Main(startBlockIndex, startBlockHash, useTestNet, commandLineArgs=sys.argv[1
 			except Host.InsufficientTransactionFees:
 				raise Exception("Failed: Unexpected failure to meet transaction fee requirement. (Lots of dust inputs?)")
 
-	def CheckAndSend(transactionType, sourceAccounts, outputs, outputPubKeys, details):
-		canApply, errorText = state.checkTransaction(transactionType, outputs=outputs, transactionDetails=details, sourceAccounts=sourceAccounts)
-		if errorText != '':
-			raise TransactionNotSuccessfulAgainstCurrentState('Transaction would not complete successfully against current state:', errorText)
-		assert canApply
+	def CheckAndSend_Common(transactionType, sourceAccounts, outputs, outputPubKeys, details):
 		change = host.getNewNonSwapBillAddress()
 		print('attempting to send ' + FormatTransactionForUserDisplay.Format(host, transactionType, outputs, outputPubKeys, details), file=out)
 		backingUnspent = transactionBuildLayer.getUnspent()
-		baseTX = TransactionEncoding.FromStateTransaction(transactionType, sourceAccounts, outputs, outputPubKeys, details, )
+		baseTX = TransactionEncoding.FromStateTransaction(transactionType, sourceAccounts, outputs, outputPubKeys, details)
 		baseInputsAmount = 0
 		for i in range(baseTX.numberOfInputs()):
 			txID = baseTX.inputTXID(i)
 			vOut = baseTX.inputVOut(i)
-			baseInputsAmount += ownedAccounts.spendableAccounts[(txID, vOut)][0]
+			baseInputsAmount += ownedAccounts.accounts[(txID, vOut)][0]
 		txID = SetFeeAndSend(baseTX, baseInputsAmount, backingUnspent)
 		return {'transaction id':txID}
+
+	def CheckAndSend_Funded(transactionType, outputs, outputPubKeys, details):
+		transactionBuildLayer.startTransactionConstruction()
+		swapBillUnspent = transactionBuildLayer.getAllOwned(state)
+		sourceAccounts = []
+		while True:
+			try:
+				canApply, errorText = state.checkTransaction(transactionType, outputs=outputs, transactionDetails=details, sourceAccounts=sourceAccounts)
+			except InsufficientFundsForTransaction:
+				pass
+			else:
+				if errorText != '':
+					raise TransactionNotSuccessfulAgainstCurrentState('Transaction would not complete successfully against current state:', errorText)
+				assert canApply
+				break
+			if not swapBillUnspent:
+				raise ExceptionReportedToUser('Insufficient swapbill for transaction.')
+			sourceAccounts.append(swapBillUnspent[0])
+			swapBillUnspent = swapBillUnspent[1:]
+		return CheckAndSend_Common(transactionType, sourceAccounts, outputs, outputPubKeys, details)
+
+	def CheckAndSend_UnFunded(transactionType, outputs, outputPubKeys, details):
+		transactionBuildLayer.startTransactionConstruction()
+		canApply, errorText = state.checkTransaction(transactionType, outputs=outputs, transactionDetails=details, sourceAccounts=None)
+		if errorText != '':
+			raise TransactionNotSuccessfulAgainstCurrentState('Transaction would not complete successfully against current state:', errorText)
+		assert canApply
+		return CheckAndSend_Common(transactionType, None, outputs, outputPubKeys, details)
 
 	def CheckAndReturnPubKeyHash(address):
 		try:
@@ -185,25 +211,20 @@ def Main(startBlockIndex, startBlockHash, useTestNet, commandLineArgs=sys.argv[1
 		outputs = ('destination',)
 		outputPubKeyHashes = (host.getNewSwapBillAddress(),)
 		details = {'amount':int(args.amount)}
-		transactionBuildLayer.startTransactionConstruction()
-		return CheckAndSend(transactionType, [], outputs, outputPubKeyHashes, details)
+		return CheckAndSend_Funded(transactionType, outputs, outputPubKeyHashes, details)
 
 	elif args.action == 'pay':
 		transactionType = 'Pay'
-		transactionBuildLayer.startTransactionConstruction()
-		sourceAccounts = [transactionBuildLayer.getActiveAccount(state)]
 		outputs = ('change', 'destination')
 		outputPubKeyHashes = (host.getNewSwapBillAddress(), CheckAndReturnPubKeyHash(args.toAddress))
 		details = {
 		    'amount':int(args.amount),
 		    'maxBlock':state._currentBlockIndex + args.blocksUntilExpiry
 		}
-		return CheckAndSend(transactionType, sourceAccounts, outputs, outputPubKeyHashes, details)
+		return CheckAndSend_Funded(transactionType, outputs, outputPubKeyHashes, details)
 
 	elif args.action == 'post_ltc_buy':
 		transactionType = 'LTCBuyOffer'
-		transactionBuildLayer.startTransactionConstruction()
-		sourceAccounts = [transactionBuildLayer.getActiveAccount(state)]
 		outputs = ('change', 'ltcBuy')
 		outputPubKeyHashes = (host.getNewSwapBillAddress(), host.getNewSwapBillAddress())
 		details = {
@@ -212,12 +233,10 @@ def Main(startBlockIndex, startBlockHash, useTestNet, commandLineArgs=sys.argv[1
 		    'receivingAddress':host.getNewNonSwapBillAddress(),
 		    'maxBlock':state._currentBlockIndex + args.blocksUntilExpiry
 		}
-		return CheckAndSend(transactionType, sourceAccounts, outputs, outputPubKeyHashes, details)
+		return CheckAndSend_Funded(transactionType, sourceAccounts, outputs, outputPubKeyHashes, details)
 
 	elif args.action == 'post_ltc_sell':
 		transactionType = 'LTCSellOffer'
-		transactionBuildLayer.startTransactionConstruction()
-		sourceAccounts = [transactionBuildLayer.getActiveAccount(state)]
 		outputs = ('change', 'ltcSell')
 		outputPubKeyHashes = (host.getNewSwapBillAddress(), host.getNewSwapBillAddress())
 		details = {
@@ -225,7 +244,7 @@ def Main(startBlockIndex, startBlockHash, useTestNet, commandLineArgs=sys.argv[1
 		    'exchangeRate':ExchangeRateFromArgs(args),
 		    'maxBlock':state._currentBlockIndex + args.blocksUntilExpiry
 		}
-		return CheckAndSend(transactionType, sourceAccounts, outputs, outputPubKeyHashes, details)
+		return CheckAndSend_Funded(transactionType, sourceAccounts, outputs, outputPubKeyHashes, details)
 
 	elif args.action == 'complete_ltc_sell':
 		transactionType = 'LTCExchangeCompletion'
@@ -238,35 +257,7 @@ def Main(startBlockIndex, startBlockHash, useTestNet, commandLineArgs=sys.argv[1
 		    'destinationAddress':exchange.ltcReceiveAddress,
 		    'destinationAmount':exchange.ltc
 		}
-		transactionBuildLayer.startTransactionConstruction()
-		return CheckAndSend(transactionType, None, (), (), details)
-
-	elif args.action == 'collect':
-		#transactionType = 'Collect'
-		#transactionBuildLayer.startTransactionConstruction()
-		#sourceAccounts = transactionBuildLayer.getAllOwnedAndSpendable(state)
-		#if len(sourceAccounts) < 2:
-			#raise ExceptionReportedToUser('There are currently less than two spendable swapbill outputs.')
-		#outputs = ('destination',)
-		#outputPubKeyHashes = (host.getNewSwapBillAddress(),)
-		#details = {}
-		#return CheckAndSend(transactionType, sourceAccounts, outputs, outputPubKeyHashes, details)
-		spendable = 0
-		for account in ownedAccounts.spendableAccounts:
-			spendable += state.getSpendableAmount(account)
-		transactionType = 'Pay'
-		transactionBuildLayer.startTransactionConstruction()
-		sourceAccounts = transactionBuildLayer.getAllOwnedAndSpendable(state)
-		if len(sourceAccounts) < 2:
-			raise ExceptionReportedToUser('There are currently less than two spendable swapbill outputs.')
-		outputs = ('change', 'destination')
-		collectAddress = host.getNewSwapBillAddress()
-		outputPubKeyHashes = (collectAddress, collectAddress)
-		details = {
-			'amount':spendable,
-			'maxBlock':0xffffffff
-		}
-		return CheckAndSend(transactionType, sourceAccounts, outputs, outputPubKeyHashes, details)
+		return CheckAndSend_UnFunded(transactionType, None, (), (), details)
 
 	elif args.action == 'get_receive_address':
 		pubKeyHash = host.getNewSwapBillAddress()
@@ -274,26 +265,19 @@ def Main(startBlockIndex, startBlockHash, useTestNet, commandLineArgs=sys.argv[1
 
 	elif args.action == 'get_balance':
 		total = 0
-		spendable = 0
-		activeAccountAmount = 0
-		for account in ownedAccounts.spendableAccounts:
+		for account in ownedAccounts.accounts:
 			amount = state._balances.balanceFor(account)
 			total += amount
-			spendable += state.getSpendableAmount(account)
-			if amount > activeAccountAmount:
-				activeAccountAmount = amount
-		for account in ownedAccounts.sellOffers:
-			amount = state._balances.balanceFor(account)
-			total += amount
-		for account in ownedAccounts.buyOffers:
-			amount = state._balances.balanceFor(account)
-			total += amount
-		return {'spendable':spendable, 'total':total, 'active':activeAccountAmount}
+		spendable = total
+		if transactionBuildLayer.checkIfThereIsAtLeastOneOutstandingTradeRef(state):
+			spendable -= Constraints.minimumSwapBillBalance
+			assert spendable >= 0
+		return {'spendable':spendable, 'total':total}
 
 	elif args.action == 'get_buy_offers':
 		result = []
 		for offer in state._LTCBuys.getSortedOffers():
-			mine = offer.refundAccount in ownedAccounts.buyOffers
+			mine = offer.refundAccount in ownedAccounts.tradeOfferChangeCounts
 			exchangeAmount = offer._swapBillOffered
 			rate_Double = float(offer.rate) / 0x100000000
 			ltc = int(exchangeAmount * rate_Double)
@@ -303,7 +287,7 @@ def Main(startBlockIndex, startBlockHash, useTestNet, commandLineArgs=sys.argv[1
 	elif args.action == 'get_sell_offers':
 		result = []
 		for offer in state._LTCSells.getSortedOffers():
-			mine = offer.receivingAccount in ownedAccounts.sellOffers
+			mine = offer.receivingAccount in ownedAccounts.tradeOfferChangeCounts
 			ltc = offer._ltcOffered
 			depositAmount = offer._swapBillDeposit
 			rate_Double = float(offer.rate) / 0x100000000
@@ -316,8 +300,8 @@ def Main(startBlockIndex, startBlockHash, useTestNet, commandLineArgs=sys.argv[1
 		for key in state._pendingExchanges:
 			d = {}
 			exchange = state._pendingExchanges[key]
-			d['I am seller (and need to complete)'] = exchange.sellerReceivingAccount in ownedAccounts.sellOffers
-			d['I am buyer (and waiting for payment)'] = exchange.buyerAddress in ownedAccounts.buyOffers
+			d['I am seller (and need to complete)'] = exchange.sellerReceivingAccount in ownedAccounts.tradeOfferChangeCounts
+			d['I am buyer (and waiting for payment)'] = exchange.buyerAddress in ownedAccounts.tradeOfferChangeCounts
 			d['deposit paid by seller'] = exchange.swapBillDeposit
 			d['swap bill paid by buyer'] = exchange.swapBillAmount
 			d['outstanding ltc payment amount'] = exchange.ltc

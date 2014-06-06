@@ -14,37 +14,35 @@ def _processTransactions(host, state, ownedAccounts, transactions, applyToState,
 		hostTX, scriptPubKeys = RawTransaction.Decode(hostTXBytes)
 		if RawTransaction.UnexpectedFormat_Fast(hostTXBytes, ControlAddressPrefix.prefix):
 			continue
-		report = ownedAccounts.updateForSpent(hostTX, state)
+		inputsReport = ownedAccounts.updateForSpent(hostTX, state)
 		try:
 			transactionType, sourceAccounts, outputs, transactionDetails = TransactionEncoding.ToStateTransaction(hostTX)
 			appliedSuccessfully = True
 		except (TransactionEncoding.NotValidSwapBillTransaction, TransactionEncoding.UnsupportedTransaction):
-			appliedSuccessfully = False
-			transactionType = 'InvalidTransaction'
-		if appliedSuccessfully:
-			insufficientFunds = False
-			try:
-				if not state.checkTransaction(transactionType, outputs, transactionDetails, sourceAccounts=sourceAccounts)[0]:
-					appliedSuccessfully = False
-			except State.InsufficientFundsForTransaction:
-				insufficientFunds = True
-		if not appliedSuccessfully:
-			if report != '':
-				print(reportPrefix + ': ' + transactionType + ' failed to decode or apply', file=out)
-				print(report, end="", file=out)
+			if inputsReport != '':
+				print(reportPrefix + ': <invalid transaction>', file=out)
+				print(inputsReport, end="", file=out)
 			continue
-		if applyToState:
-			#print(reportPrefix + ': ' + txID)
-			inBetweenReport = ownedAccounts.checkForTradeOfferChanges(state)
-			assert inBetweenReport == ''
-			state.applyTransaction(transactionType, txID, outputs, transactionDetails, sourceAccounts=sourceAccounts)
-			report += ownedAccounts.checkForTradeOfferChanges(state)
-			report += ownedAccounts.updateForNewOutputs(host, state, txID, hostTX, outputs, scriptPubKeys)
-		if report != '':
+		if inputsReport != '':
 			print(reportPrefix + ': ' + transactionType, file=out)
-			print(report, end="", file=out)
-			if insufficientFunds:
-				report += ' (failed due to insufficient swapbill, all funds directed to change output)\n'
+			print(inputsReport, end="", file=out)
+		if not applyToState:
+			continue
+		inBetweenReport = ownedAccounts.checkForTradeOfferChanges(state)
+		assert inBetweenReport == ''
+		appliedSuccessfully, modifiedState = state.applyTransaction(transactionType, txID, sourceAccounts=sourceAccounts, transactionDetails=transactionDetails, outputs=outputs)
+		outputsReport = ownedAccounts.checkForTradeOfferChanges(state)
+		outputsReport += ownedAccounts.updateForNewOutputs(host, state, txID, hostTX, outputs, scriptPubKeys)
+		if not appliedSuccessfully:
+			outputsReport += ' * did not apply successfully\n'
+		if not modifiedState:
+				assert outputsReport == ''
+				outputsReport += ' * did not modify state\n'
+		if outputsReport != '':
+			if inputsReport == '':
+				# didn't print this line yet
+				print(reportPrefix + ': ' + transactionType, file=out)
+			print(outputsReport, end="", file=out)
 
 def _processBlock(host, state, ownedAccounts, blockHash, reportPrefix, out):
 	transactions = host.getBlockTransactions(blockHash)

@@ -167,15 +167,15 @@ class Test(unittest.TestCase):
         payTargetAddress = host.formatAddressForEndUser(host.getNewSwapBillAddress())
         host._setOwner(host.defaultOwner)
         self.assertRaisesRegexp(TransactionNotSuccessfulAgainstCurrentState, 'amount is below minimum balance', RunClient, host, ['pay', '--amount', 1*e(7)-1, '--toAddress', payTargetAddress])
-        self.assertRaisesRegexp(TransactionNotSuccessfulAgainstCurrentState, 'transaction would generate change output with change amount below minimum balance', RunClient, host, ['pay', '--amount', 1*e(7)+1, '--toAddress', payTargetAddress])
+        self.assertRaisesRegexp(ExceptionReportedToUser, 'Insufficient swapbill for transaction', RunClient, host, ['pay', '--amount', 1*e(7)+1, '--toAddress', payTargetAddress])
         # but can split exactly
         RunClient(host, ['pay', '--amount', 1*e(7), '--toAddress', payTargetAddress])
         output, result = RunClient(host, ['get_balance'])
-        self.assertDictEqual(result, {'total': 1*e(7), 'spendable': 1*e(7), 'active': 1*e(7)})
+        self.assertDictEqual(result, {'total': 1*e(7), 'spendable': 1*e(7)})
         # or transfer full output amount
         RunClient(host, ['pay', '--amount', 1*e(7), '--toAddress', payTargetAddress])
         output, result = RunClient(host, ['get_balance'])
-        self.assertDictEqual(result, {'total': 0, 'spendable': 0, 'active': 0})
+        self.assertDictEqual(result, {'total': 0, 'spendable': 0})
 
     def test_ltc_sell_missing_unspent_regression(self):
         host = InitHost()
