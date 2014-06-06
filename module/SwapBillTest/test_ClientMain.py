@@ -107,10 +107,10 @@ class Test(unittest.TestCase):
         RunClient(host, ['pay', '--amount', 1*e(7), '--toAddress', payTargetAddress])
         self.assertTrue(info['syncOutput'].startswith('Loaded cached state data successfully\nState update starting from block 0\n'))
         info = GetStateInfo(host)
-        self.assertEqual(info['balances'], {'02:1': 2*e(7), '04:2': 1*e(7), '04:1': 25*e(6)})
+        self.assertEqual(info['balances'], {"03:1": 35*e(6), '04:2': 1*e(7), '04:1': 1*e(7)})
         self.assertEqual(info['syncOutput'].count('in memory: Burn'), 2)
         self.assertEqual(info['syncOutput'].count('in memory: Pay'), 1)
-        self.assertEqual(info['syncOutput'], 'Loaded cached state data successfully\nState update starting from block 0\nCommitted state updated to start of block 0\nin memory: Burn\n - 20000000 swapbill output added\nin memory: Burn\n - 35000000 swapbill output added\nin memory: Pay\n - 35000000 swapbill output consumed\n - 25000000 swapbill output added\nIn memory state updated to end of block 3\n')
+        self.assertEqual(info['syncOutput'], 'Loaded cached state data successfully\nState update starting from block 0\nCommitted state updated to start of block 0\nin memory: Burn\n - 20000000 swapbill output added\nin memory: Burn\n - 35000000 swapbill output added\nin memory: Pay\n - 20000000 swapbill output consumed\n - 10000000 swapbill output added\nIn memory state updated to end of block 3\n')
         host._setOwner('recipient')
         info = GetStateInfo(host)
         self.assertEqual(info['syncOutput'].count('in memory: Burn'), 0)
@@ -179,18 +179,18 @@ class Test(unittest.TestCase):
 
     def test_ltc_sell_missing_unspent_regression(self):
         host = InitHost()
-        host._addUnspent(500000000)
-        RunClient(host, ['burn', '--amount', '100000000'])
+        host._addUnspent(5*e(8))
+        RunClient(host, ['burn', '--amount', 1*e(8)])
         burnTarget = "02:1"
         info = GetStateInfo(host)
-        self.assertEqual(info['balances'], {burnTarget:100000000})
-        RunClient(host, ['post_ltc_sell', '--ltcOffered', 30000000//2, '--exchangeRate', '0.5'])
+        self.assertEqual(info['balances'], {burnTarget:1*e(8)})
+        RunClient(host, ['post_ltc_sell', '--ltcOffered', 3*e(7)//2, '--exchangeRate', '0.5'])
         info = GetStateInfo(host)
-        RunClient(host, ['post_ltc_buy', '--swapBillOffered', '30000000', '--exchangeRate', '0.5'])
+        RunClient(host, ['post_ltc_buy', '--swapBillOffered', 3*e(7), '--exchangeRate', '0.5'])
         info = GetStateInfo(host)
         RunClient(host, ['complete_ltc_sell', '--pendingExchangeID', '0'])
         info = GetStateInfo(host)
-        self.assertEqual(info['balances'], {'04:1': 48125000, '04:2': 1*e(7), '03:2': 41875000})
+        self.assertEqual(info['balances'], {'04:1': 1*e(8)})
 
     def test_refund_account_locked_during_trade(self):
         host = InitHost()
@@ -222,7 +222,7 @@ class Test(unittest.TestCase):
         output, result = RunClient(host, ['get_balance'])
         self.assertDictEqual(result, {'total': 1*e(7), 'spendable': 0})
         # but not the minimum balance amount seeded into refund account
-        self.assertRaisesRegexp(ExceptionReportedToUser, 'No active swapbill balance currently available', RunClient, host, ['pay', '--amount', 1*e(7), '--toAddress', payTargetAddress])
+        self.assertRaisesRegexp(ExceptionReportedToUser, 'Insufficient swapbill for transaction', RunClient, host, ['pay', '--amount', 1*e(7), '--toAddress', payTargetAddress])
     def test_receiving_account_locked_during_trade(self):
         host = InitHost()
         host._setOwner('1')
@@ -249,7 +249,7 @@ class Test(unittest.TestCase):
         output, result = RunClient(host, ['get_balance'])
         self.assertDictEqual(result, {'total': 10000000, 'spendable': 0})
         # but not the minimum balance amount seeded into receive account
-        self.assertRaisesRegexp(ExceptionReportedToUser, 'No active swapbill balance currently available', RunClient, host, ['pay', '--amount', '100000', '--toAddress', payTargetAddress])
+        self.assertRaisesRegexp(ExceptionReportedToUser, 'Insufficient swapbill for transaction', RunClient, host, ['pay', '--amount', '10000000', '--toAddress', payTargetAddress])
 
     def test_burn_less_than_dust_limit(self):
         host = InitHost()
@@ -422,13 +422,13 @@ class Test(unittest.TestCase):
         payChange = "0" + str(nextTX) + ":1"
         payTarget = "0" + str(nextTX) + ":2"
         nextTX += 1
-        info = GetStateInfo(host)
-        self.assertEqual(info['balances'], {firstBurnTarget:1*e(7), secondBurnTarget:15*e(6), payTarget:12*e(6), payChange:14*e(6)})
         output, info = RunClient(host, ['get_balance'])
         self.assertDictEqual(info, {'spendable': 39*e(6), 'total': 39*e(6)})
         host._setOwner('recipient')
         output, info = RunClient(host, ['get_balance'])
         self.assertDictEqual(info, {'spendable': 12*e(6), 'total': 12*e(6)})
+        info = GetStateInfo(host)
+        self.assertEqual(info['balances'], {thirdBurnTarget:26*e(6), payTarget:12*e(6), payChange:13*e(6)})
         host._setOwner(host.defaultOwner)
         # and this should now work, now we can use more than one input per transaction
         RunClient(host, ['pay', '--amount', 16*e(6), '--toAddress', payTargetAddress])
@@ -497,7 +497,7 @@ class Test(unittest.TestCase):
         host.holdNewTransactions = True
         info = GetStateInfo(host)
         self.assertEqual(info['balances'], {'02:1': 5*e(7)})
-        self.assertRaisesRegexp(ExceptionReportedToUser, 'No active swapbill balance currently available', RunClient, host, ['pay', '--amount', 1*e(7), '--toAddress', payTargetAddress])
+        self.assertRaisesRegexp(ExceptionReportedToUser, 'Insufficient swapbill for transaction', RunClient, host, ['pay', '--amount', 1*e(7), '--toAddress', payTargetAddress])
         host.holdNewTransactions = False
         info = GetStateInfo(host)
         self.assertEqual(info['balances'], {'03:1': 4*e(7), '03:2':1*e(7)})
@@ -643,18 +643,12 @@ class Test(unittest.TestCase):
                 'deposit paid by seller': 625000
             })]
         self.assertEqual(result, expectedResult)
-        # we now need enough to fund the offer, + minimum balance in refund account
-        activeAccountBalances = GetOwnerActiveAccountBalances(host, ownerList, info['balances'])
-        self.assertDictEqual(activeAccountBalances , {'bob': 1*e(7), 'clive': 5*e(7)-625000, 'dave': 7*e(7)})
-        self.assertRaisesRegexp(TransactionNotSuccessfulAgainstCurrentState, 'insufficient swapbill input', RunClient, host, ['post_ltc_buy', '--swapBillOffered', 1*e(7), '--exchangeRate', '0.25'])
-        # so burn some more
-        RunClient(host, ['burn', '--amount', 2*e(7)])
-        activeAccountBalances = GetOwnerActiveAccountBalances(host, ownerList, info['balances'])
-        self.assertDictEqual(activeAccountBalances , {'bob': 2*e(7), 'clive': 5*e(7)-625000, 'dave': 7*e(7)})
+        # we now need enough to fund the offer with minimum balance in refund account
+        # (which should now be possible without any new burns)
         RunClient(host, ['post_ltc_buy', '--swapBillOffered', 1*e(7), '--exchangeRate', '0.25'])
         info = GetStateInfo(host)
         ownerBalances = GetOwnerBalances(host, ownerList, info['balances'])
-        self.assertDictEqual(ownerBalances, {'alice': 1*e(7), 'bob': 3*e(7), 'clive': 5*e(7)-625000+1*e(7), 'dave': 7*e(7)})
+        self.assertDictEqual(ownerBalances, {'alice': 1*e(7), 'bob': 1*e(7), 'clive': 5*e(7)-625000+1*e(7), 'dave': 7*e(7)})
         self.assertEqual(info['numberOfLTCBuyOffers'], 2)
         self.assertEqual(info['numberOfLTCSellOffers'], 0)
         self.assertEqual(info['numberOfPendingExchanges'], 1)
@@ -663,7 +657,7 @@ class Test(unittest.TestCase):
         RunClient(host, ['post_ltc_sell', '--ltcOffered', 2*e(7) * exchangeRate // 0x100000000, '--exchangeRate_AsInteger', exchangeRate, '--blocksUntilExpiry', '100'])
         info = GetStateInfo(host)
         ownerBalances = GetOwnerBalances(host, ownerList, info['balances'])
-        self.assertDictEqual(ownerBalances, {'alice': 1*e(7), 'bob': 3*e(7), 'clive': 5*e(7)-625000+1*e(7), 'dave': 7*e(7) - 1250000})
+        self.assertDictEqual(ownerBalances, {'alice': 1*e(7), 'bob': 1*e(7), 'clive': 5*e(7)-625000+1*e(7), 'dave': 7*e(7) - 1250000})
         self.assertEqual(info['numberOfLTCBuyOffers'], 1)
         self.assertEqual(info['numberOfLTCSellOffers'], 1)
         self.assertEqual(info['numberOfPendingExchanges'], 2)
@@ -684,7 +678,7 @@ class Test(unittest.TestCase):
         # but the exchange doesn't expire until the end of that block
         info = GetStateInfo(host)
         ownerBalances = GetOwnerBalances(host, ownerList, info['balances'])
-        self.assertDictEqual(ownerBalances, {'alice': 1*e(7), 'bob': 3*e(7), 'clive': 6*e(7)-625000, 'dave': 7*e(7)-1250000})
+        self.assertDictEqual(ownerBalances, {'alice': 1*e(7), 'bob': 1*e(7), 'clive': 6*e(7)-625000, 'dave': 7*e(7)-1250000})
         self.assertEqual(info['numberOfLTCBuyOffers'], 1)
         self.assertEqual(info['numberOfLTCSellOffers'], 1)
         self.assertEqual(info['numberOfPendingExchanges'], 2)
@@ -697,16 +691,14 @@ class Test(unittest.TestCase):
         self.assertEqual(info['numberOfPendingExchanges'], 1)
         #bob is credited his offer amount (which was locked up for the exchange) + clive's deposit
         ownerBalances = GetOwnerBalances(host, ownerList, info['balances'])
-        self.assertDictEqual(ownerBalances, {'alice': 1*e(7), 'bob': 4*e(7)+625000, 'clive': 6*e(7)-625000, 'dave': 7*e(7)-1250000})
+        self.assertDictEqual(ownerBalances, {'alice': 1*e(7), 'bob': 2*e(7)+625000, 'clive': 6*e(7)-625000, 'dave': 7*e(7)-1250000})
         #dave is more on the ball, and makes his completion payment
         host._setOwner('dave')
         RunClient(host, ['complete_ltc_sell', '--pendingExchangeID', '1'])
         info = GetStateInfo(host)
         #dave gets credited bob's exchange funds, and is also refunded the matched part of his exchange deposit
         ownerBalances = GetOwnerBalances(host, ownerList, info['balances'])
-        self.assertDictEqual(ownerBalances, {'alice': 1*e(7), 'bob': 4*e(7)+625000, 'clive': 6*e(7)-625000, 'dave': 7*e(7)-1250000+1*e(7)+daveDepositMatched})
-        activeAccountBalances = GetOwnerActiveAccountBalances(host, ownerList, info['balances'])
-        self.assertDictEqual(activeAccountBalances , {'bob': 2*e(7)+625000, 'clive': 5*e(7)-625000, 'dave': 6*e(7)-1250000})
+        self.assertDictEqual(ownerBalances, {'alice': 1*e(7), 'bob': 2*e(7)+625000, 'clive': 6*e(7)-625000, 'dave': 7*e(7)-1250000+1*e(7)+daveDepositMatched})
         self.assertEqual(info['numberOfLTCBuyOffers'], 1)
         self.assertEqual(info['numberOfLTCSellOffers'], 1)
         self.assertEqual(info['numberOfPendingExchanges'], 0)
@@ -721,7 +713,7 @@ class Test(unittest.TestCase):
         self.assertEqual(info['syncOutput'].count('trade offer or pending exchange expired'), 0)
         host._setOwner('bob')
         info = GetStateInfo(host, includePending=False, forceRescan=True)
-        self.assertEqual(info['syncOutput'].count(': Burn'), 2)
+        self.assertEqual(info['syncOutput'].count(': Burn'), 1)
         self.assertEqual(info['syncOutput'].count(': LTCBuyOffer'), 2)
         self.assertEqual(info['syncOutput'].count(': LTCSellOffer'), 2)
         self.assertEqual(info['syncOutput'].count(': LTCExchangeCompletion'), 1)

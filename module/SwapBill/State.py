@@ -274,9 +274,9 @@ class State(object):
 		except TypeError as e:
 			raise InvalidTransactionParameters(e)
 		except BadlyFormedTransaction as e:
-			return False, e.message
+			return False, str(e)
 		except TransactionFailsAgainstCurrentState as e:
-			return True, e.message
+			return True, str(e)
 		return True, ''
 	def applyFundedTransaction(self, transactionType, txID, sourceAccounts, transactionDetails, outputs):
 		try:
@@ -322,9 +322,9 @@ class State(object):
 		except TypeError as e:
 			raise InvalidTransactionParameters(e)
 		except BadlyFormedTransaction as e:
-			return False, e.message
+			return False, str(e)
 		except TransactionFailsAgainstCurrentState as e:
-			return True, e.message
+			return True, str(e)
 		return True, ''
 	def applyUnfundedTransaction(self, transactionType, txID, transactionDetails, outputs):
 		try:

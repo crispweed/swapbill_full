@@ -29,6 +29,7 @@ class TransactionBuildLayer(object):
 		result = []
 		for account in self._ownedAccounts.accounts:
 			result.append(account)
+		result.sort()
 		return result
 
 	def swapBillUnspentUsed(self, account):
@@ -36,17 +37,7 @@ class TransactionBuildLayer(object):
 		self._privateKeys.append(self._ownedAccounts.accounts[account][1])
 
 	def checkIfThereIsAtLeastOneOutstandingTradeRef(self, state):
-		result = False
-		for account in self._ownedAccounts.accounts:
-			if account in state._balances.changeCounts:
-				result = True
-				break
-		result_Check = bool(self._ownedAccounts.tradeOfferChangeCounts)
-		#if result_Check != result:
-			#print('self._ownedAccounts.accounts:', self._ownedAccounts.accounts)
-			#print('state._balances.changeCounts:', state._balances.changeCounts)
-		assert result_Check == result
-		return result
+		return bool(self._ownedAccounts.tradeOfferChangeCounts)
 
 	def sendTransaction(self, tx):
 		# higher level transaction send interface

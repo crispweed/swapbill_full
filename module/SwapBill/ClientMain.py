@@ -226,26 +226,26 @@ def Main(startBlockIndex, startBlockHash, useTestNet, commandLineArgs=sys.argv[1
 
 	elif args.action == 'post_ltc_buy':
 		transactionType = 'LTCBuyOffer'
-		outputs = ('change', 'ltcBuy')
-		outputPubKeyHashes = (host.getNewSwapBillAddress(), host.getNewSwapBillAddress())
+		outputs = ('ltcBuy',)
+		outputPubKeyHashes = (host.getNewSwapBillAddress(),)
 		details = {
 		    'swapBillOffered':int(args.swapBillOffered),
 		    'exchangeRate':ExchangeRateFromArgs(args),
 		    'receivingAddress':host.getNewNonSwapBillAddress(),
 		    'maxBlock':state._currentBlockIndex + args.blocksUntilExpiry
 		}
-		return CheckAndSend_Funded(transactionType, sourceAccounts, outputs, outputPubKeyHashes, details)
+		return CheckAndSend_Funded(transactionType, outputs, outputPubKeyHashes, details)
 
 	elif args.action == 'post_ltc_sell':
 		transactionType = 'LTCSellOffer'
-		outputs = ('change', 'ltcSell')
-		outputPubKeyHashes = (host.getNewSwapBillAddress(), host.getNewSwapBillAddress())
+		outputs = ('ltcSell',)
+		outputPubKeyHashes = (host.getNewSwapBillAddress(),)
 		details = {
 		    'ltcOffered':int(args.ltcOffered),
 		    'exchangeRate':ExchangeRateFromArgs(args),
 		    'maxBlock':state._currentBlockIndex + args.blocksUntilExpiry
 		}
-		return CheckAndSend_Funded(transactionType, sourceAccounts, outputs, outputPubKeyHashes, details)
+		return CheckAndSend_Funded(transactionType, outputs, outputPubKeyHashes, details)
 
 	elif args.action == 'complete_ltc_sell':
 		transactionType = 'LTCExchangeCompletion'
@@ -258,7 +258,7 @@ def Main(startBlockIndex, startBlockHash, useTestNet, commandLineArgs=sys.argv[1
 		    'destinationAddress':exchange.ltcReceiveAddress,
 		    'destinationAmount':exchange.ltc
 		}
-		return CheckAndSend_UnFunded(transactionType, None, (), (), details)
+		return CheckAndSend_UnFunded(transactionType, (), (), details)
 
 	elif args.action == 'get_receive_address':
 		pubKeyHash = host.getNewSwapBillAddress()
