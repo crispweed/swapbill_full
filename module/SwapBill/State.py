@@ -293,12 +293,14 @@ class State(object):
 			consumeAndForward.append(sourceAccount)
 			if self._balances.isReferenced(sourceAccount):
 				changeRequired = True
+		wasSuccessful = True
 		try:
 			change = method(txID=txID, swapBillInput=swapBillInput, changeRequired=changeRequired, outputs=outputs, **transactionDetails)
 		except (TypeError, BadlyFormedTransaction):
-			return
+			return False, False
 		except (TransactionFailsAgainstCurrentState, InsufficientFundsForTransaction):
 			change = swapBillInput
+			wasSuccessful = False
 		if changeRequired:
 			assert change > 0
 		if change > 0:
@@ -308,6 +310,7 @@ class State(object):
 		else:
 			for account in consumeAndForward:
 				self._balances.consume(account)
+		return wasSuccessful, True
 
 	def checkUnfundedTransaction(self, transactionType, transactionDetails, outputs):
 		try:
@@ -331,8 +334,8 @@ class State(object):
 		try:
 			method(txID=txID, outputs=outputs, **transactionDetails)
 		except (TypeError, BadlyFormedTransaction, TransactionFailsAgainstCurrentState):
-			pass
-
+			return False, False
+		return True, True
 
 	def checkTransaction(self, transactionType, sourceAccounts, transactionDetails, outputs):
 		if sourceAccounts is None:
@@ -340,6 +343,5 @@ class State(object):
 		return self.checkFundedTransaction(transactionType, sourceAccounts, transactionDetails, outputs)
 	def applyTransaction(self, transactionType, txID, sourceAccounts, transactionDetails, outputs):
 		if sourceAccounts is None:
-			self.applyUnfundedTransaction(transactionType, txID, transactionDetails, outputs)
-			return
-		self.applyFundedTransaction(transactionType, txID, sourceAccounts, transactionDetails, outputs)
+			return self.applyUnfundedTransaction(transactionType, txID, transactionDetails, outputs)
+		return self.applyFundedTransaction(transactionType, txID, sourceAccounts, transactionDetails, outputs)

@@ -56,7 +56,12 @@ class Test(unittest.TestCase):
 		self.assertEqual(reason, expectedError)
 		self.assertEqual(canApply, True)
 		txID = self.TXID()
-		state.applyTransaction(transactionType, txID=txID, outputs=outputs, transactionDetails=details, sourceAccounts=sourceAccounts)
+		wasSuccessful, modifiedState = state.applyTransaction(transactionType, txID=txID, outputs=outputs, transactionDetails=details, sourceAccounts=sourceAccounts)
+		self.assertTrue(modifiedState)
+		if expectedError == '':
+			self.assertTrue(wasSuccessful)
+		else:
+			self.assertFalse(wasSuccessful)
 		self.assertEqual(totalAccountedFor(state), state._totalCreated)
 		txOutputs = {}
 		for i in range(len(outputs)):
@@ -70,7 +75,9 @@ class Test(unittest.TestCase):
 		exchangesBefore = len(state._pendingExchanges)
 		canApply, reason = state.checkTransaction(transactionType, outputs=outputs, transactionDetails=details, sourceAccounts=sourceAccounts)
 		self.assertEqual(canApply, False)
-		state.applyTransaction(transactionType, txID='AssertFails_TXID', outputs=outputs, transactionDetails=details, sourceAccounts=sourceAccounts)
+		wasSuccessful, modifiedState = state.applyTransaction(transactionType, txID='AssertFails_TXID', outputs=outputs, transactionDetails=details, sourceAccounts=sourceAccounts)
+		self.assertFalse(wasSuccessful)
+		self.assertFalse(modifiedState)
 		self.assertDictEqual(state._balances.balances, balancesBefore)
 		self.assertEqual(exchangesBefore, len(state._pendingExchanges))
 		self.assertEqual(totalAccountedFor(state), state._totalCreated)
@@ -80,7 +87,9 @@ class Test(unittest.TestCase):
 		outputs = self.outputsLookup[transactionType]
 		self.assertRaises(State.InsufficientFundsForTransaction, state.checkTransaction, transactionType, outputs=outputs, transactionDetails=details, sourceAccounts=sourceAccounts)
 		txID = self.TXID()
-		state.applyTransaction(transactionType, txID, outputs=outputs, transactionDetails=details, sourceAccounts=sourceAccounts)
+		wasSuccessful, modifiedState = state.applyTransaction(transactionType, txID, outputs=outputs, transactionDetails=details, sourceAccounts=sourceAccounts)
+		self.assertFalse(wasSuccessful)
+		self.assertTrue(modifiedState)
 		self.assertEqual(totalAccountedFor(state), state._totalCreated)
 		return (txID, 1)
 
