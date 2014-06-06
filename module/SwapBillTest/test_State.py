@@ -631,11 +631,11 @@ class Test(unittest.TestCase):
 		burnB = self.Burn(1*e(7))
 		receiveB = self.SellOffer(state, burnB, ltcOffered=1*e(7)//2, exchangeRate=0x80000000)
 		# deposit is 10000000 // 16 = 625000
-		self.assertEqual(state._balances.balances, {changeB: 1*e(7)-625000-1, receiveB:1})
+		self.assertEqual(state._balances.balances, {receiveB: 1*e(7)-625000})
 		burnA = self.Burn(1*e(7)+1)
 		refundA = self.BuyOffer(state, burnA, 'receiveLTC', swapBillOffered=1*e(7), exchangeRate=0x80000000)
 		# nothing refunded, no change to balances
-		self.assertEqual(state._balances.balances, {changeB:1*e(7)-625000-1, receiveB:1, refundA:1})
+		self.assertEqual(state._balances.balances, {receiveB:1*e(7)-625000, refundA:1})
 		self.assertEqual(len(state._pendingExchanges), 1)
 		for i in range(50):
 			state.advanceToNextBlock()
@@ -643,7 +643,7 @@ class Test(unittest.TestCase):
 		state.advanceToNextBlock()
 		self.assertEqual(len(state._pendingExchanges), 0)
 		self.assertRaisesRegexp(AssertionError, 'no pending exchange with the specified index', self.Completion, state, 0, 'receiveLTC', 1*e(7) // 2)
-		self.assertEqual(state._balances.balances, {changeB:1*e(7)-625000-1, receiveB:1, refundA:1*e(7)+625000+1})
+		self.assertEqual(state._balances.balances, {receiveB:1*e(7)-625000, refundA:1*e(7)+625000+1})
 		self.assertEqual(totalAccountedFor(state), state._totalCreated)
 
 	def test_offers_dont_meet(self):
@@ -653,11 +653,11 @@ class Test(unittest.TestCase):
 		burnB = self.Burn(1*e(7))
 		receiveB = self.SellOffer(state, burnB, ltcOffered=1*e(7)//4, exchangeRate=0x40000000)
 		# deposit is 10000000 // 16 = 625000
-		self.assertEqual(state._balances.balances, {changeB: 1*e(7)-625000-1, receiveB:1})
+		self.assertEqual(state._balances.balances, {receiveB: 1*e(7)-625000})
 		burnA = self.Burn(10000001)
 		refundA = self.BuyOffer(state, burnA, 'receiveLTC', swapBillOffered=1*e(7), exchangeRate=0x80000000)
 		# nothing refunded, no change to balances (except minimum balance seeded in a's refund accounts)
-		self.assertEqual(state._balances.balances, {changeB: 1*e(7)-625000-1, receiveB:1, refundA:1})
+		self.assertEqual(state._balances.balances, {receiveB: 1*e(7)-625000, refundA:1})
 		self.assertEqual(len(state._pendingExchanges), 0)
 		self.assertEqual(totalAccountedFor(state), state._totalCreated)
 
