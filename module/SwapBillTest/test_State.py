@@ -68,7 +68,7 @@ class Test(unittest.TestCase):
 		# TODO - implement a proper state copy and comparison!
 		balancesBefore = state._balances.balances.copy()
 		exchangesBefore = len(state._pendingExchanges)
-		canApply, reason = state.checkTransaction(transactionType, outputs, transactionDetails=details, sourceAccounts=sourceAccounts)
+		canApply, reason = state.checkTransaction(transactionType, outputs=outputs, transactionDetails=details, sourceAccounts=sourceAccounts)
 		self.assertEqual(canApply, False)
 		self.assertRaises(AssertionError, state.applyTransaction, transactionType, txID='AssertFails_TXID', outputs=outputs, transactionDetails=details, sourceAccounts=sourceAccounts)
 		self.assertDictEqual(state._balances.balances, balancesBefore)
@@ -546,46 +546,37 @@ class Test(unittest.TestCase):
 		receiveB = self.SellOffer(state, burnB, ltcOffered=1*e(7)//2, exchangeRate=0x80000000)
 		# deposit is 1*e(7) // 16
 		depositB = 625000
-		self.assertEqual(state._balances.balances, {receiveB:1*e(7)-depositB})
+		expectedBalances = {receiveB:1*e(7)-depositB}
+		self.assertEqual(state._balances.balances, expectedBalances)
 		burnA = self.Burn(10100001)
 		refundA = self.BuyOffer(state, burnA, 'receiveLTC', swapBillOffered=10100000, exchangeRate=0x80000000)
 		# the offers can't match, because of small (buy) remainder
-		self.assertEqual(state._balances.balances, {receiveB:1*e(7)-depositB, refundA:1})
+		expectedBalances[refundA] = 1
+		self.assertEqual(state._balances.balances, expectedBalances)
 		self.assertEqual(len(state._pendingExchanges), 0)
 		self.assertEqual(state._LTCBuys.size(), 1)
 		self.assertEqual(state._LTCSells.size(), 1)
-		# refund account can't be spent yet as this is locked until exchange completed
-		# (bunch of tests for stuff not being able to use this follow)
-		reason = self.Apply_AssertFails(state, 'Pay', sourceAccounts=[refundA], amount=1, maxBlock=200)
-		self.assertEqual(reason, 'insufficient swapbill input')
-		self.assertEqual(state.getSpendableAmount(refundA), 0)
-		# TODO - get these tests for buy and sell offers failing if account locked back in place somewhere
-		#details = {
-		#'sourceAccount':refundA,
-		#'swapBillOffered':100000, 'exchangeRate':0x80000000,
-		#'maxBlock':100,
-		#'receivingAddress':'madeUpAddressButNotUsed'
-		#}
-		#reason = self.Apply_AssertFails(state, 'LTCBuyOffer', **details)
-		#self.assertEqual(reason, "source account is not currently spendable (e.g. this may be locked until a trade completes)")
-		#details = {
-		#'sourceAccount':refundA,
-		#'ltcOffered':100000//2, 'exchangeRate':0x80000000,
-		#'maxBlock':100
-		#}
-		#reason = self.Apply_AssertFails(state, 'LTCSellOffer', **details)
-		#self.assertEqual(reason, "source account is not currently spendable (e.g. this may be locked until a trade completes)")
+		# refund account can't be spent completely as this is still referenced by the trade offer
+		# (different tests for not being able to spend completely follow)
+		self.assertTrue(state._balances.accountHasBalance(refundA))
+		self.assertTrue(state._balances.isReferenced(refundA))
+		changeA = self.Apply_AssertInsufficientFunds(state, 'Pay', sourceAccounts=[refundA], amount=1, maxBlock=200)
+		expectedBalances.pop(refundA)
+		expectedBalances[changeA] = 1
+		self.assertEqual(state._balances.balances, expectedBalances)
 		details = {'amount':1, 'maxBlock':200}
-		reason = self.Apply_AssertFails(state, 'ForwardToFutureNetworkVersion', sourceAccounts=[refundA], **details)
-		self.assertEqual(reason, 'insufficient swapbill input')
+		changeA2 = self.Apply_AssertInsufficientFunds(state, 'ForwardToFutureNetworkVersion', sourceAccounts=[changeA], **details)
+		expectedBalances.pop(changeA)
+		expectedBalances[changeA2] = 1
+		self.assertEqual(state._balances.balances, expectedBalances)
 		# (end of bunch of tests for stuff not being able to use refund account)
-		self.assertEqual(state._balances.balances, {changeB:1*e(7)-depositB-1, receiveB:1, refundA:1})
 		# but buy should be matched by this larger offer
 		burnC = self.Burn(4*e(8))
-		changeC, receiveC = self.SellOffer(state, burnC, ltcOffered=2*e(8), exchangeRate=0x80000000)
+		receiveC = self.SellOffer(state, burnC, ltcOffered=2*e(8), exchangeRate=0x80000000)
 		# deposit is 4*e(8) // 16
 		depositC = 25000000
-		self.assertEqual(state._balances.balances, {changeB:1*e(7)-depositB-1, receiveB:1, refundA:1, changeC:4*e(8)-depositC-1, receiveC:1})
+		expectedBalances[receiveC] = 4*e(8)-depositC
+		self.assertEqual(state._balances.balances, expectedBalances)
 		self.assertEqual(len(state._pendingExchanges), 1)
 		self.assertEqual(state._LTCBuys.size(), 0)
 		self.assertEqual(state._LTCSells.size(), 2)
@@ -593,14 +584,17 @@ class Test(unittest.TestCase):
 		self.Completion(state, 0, 'receiveLTC', 10100000 // 2)
 		self.assertEqual(len(state._pendingExchanges), 0)
 		depositPart = depositC * 10100000 // (4*e(8))
-		self.assertEqual(state._balances.balances, {changeB:1*e(7)-depositB-1, receiveB:1, refundA:1, changeC:4*e(8)-depositC-1, receiveC:10100000+depositPart+1})
+		expectedBalances[receiveC] += 10100000+depositPart
+		self.assertEqual(state._balances.balances, expectedBalances)
 		# and the refund account *can* now be used
-		self.assertEqual(state.getSpendableAmount(refundA), 1)
-		outputs = self.Apply_AssertSucceeds(state, 'Pay', sourceAccounts=[refundA], amount=1, maxBlock=200)
+		self.assertTrue(state._balances.accountHasBalance(changeA2))
+		self.assertFalse(state._balances.isReferenced(changeA2))
+		outputs = self.Apply_AssertSucceeds(state, 'Pay', sourceAccounts=[changeA2], amount=1, maxBlock=200)
 		payDestination = outputs['destination']
 		payChange = outputs['change']
-		self.assertEqual(state._balances.balances, {changeB:1*e(7)-depositB-1, receiveB:1, payDestination:1, changeC:4*e(8)-depositC-1, receiveC:10100000+depositPart+1})
-		self.assertEqual(totalAccountedFor(state), state._totalCreated)
+		expectedBalances.pop(changeA2)
+		expectedBalances[payDestination] = 1
+		self.assertEqual(state._balances.balances, expectedBalances)
 
 	def test_exact_match(self):
 		Constraints.minimumSwapBillBalance = 1
