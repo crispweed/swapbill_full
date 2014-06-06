@@ -236,12 +236,12 @@ class State(object):
 	def _unfundedTransaction_LTCExchangeCompletion(self, txID, pendingExchangeIndex, destinationAddress, destinationAmount, outputs):
 		assert outputs == ()
 		if not pendingExchangeIndex in self._pendingExchanges:
-			raise TransactionFailsAgainstCurrentState('no pending exchange with the specified index')
+			raise BadlyFormedTransaction('no pending exchange with the specified index')
 		exchange = self._pendingExchanges[pendingExchangeIndex]
 		if destinationAddress != exchange.ltcReceiveAddress:
-			raise TransactionFailsAgainstCurrentState('destination account does not match destination for pending exchange with the specified index')
+			raise BadlyFormedTransaction('destination account does not match destination for pending exchange with the specified index')
 		if destinationAmount < exchange.ltc:
-			raise TransactionFailsAgainstCurrentState('amount is less than required payment amount')
+			raise BadlyFormedTransaction('amount is less than required payment amount')
 		if txID is None:
 			if destinationAmount > exchange.ltc:
 				raise TransactionFailsAgainstCurrentState('amount is greater than required payment amount')
