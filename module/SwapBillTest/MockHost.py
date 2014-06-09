@@ -203,7 +203,7 @@ class MockHost(object):
 		if transactionFee >= feeRequired + TransactionFee.dustLimit:
 			print('transactionFee:', transactionFee)
 			print('feeRequired:', feeRequired)
-		assert transactionFee < feeRequired + TransactionFee.dustLimit ## can potentially overspend, in theory, but will be nice to see the actual test case info that causes this
+		assert transactionFee < feeRequired + TransactionFee.dustLimit # can potentially overspend, in theory, but will be nice to see the actual test case info that causes this
 		self._addTransaction(txid, unsignedTransactionHex)
 
 	def formatAddressForEndUser(self,  pubKeyHash):
