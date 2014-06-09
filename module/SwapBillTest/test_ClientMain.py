@@ -23,32 +23,15 @@ def GetOwnerBalances(host, ownerList, balances):
             result[owner] = info['total']
     host._setOwner(ownerAtStart)
     return result
-#def GetOwnerActiveAccountBalances(host, ownerList, balances):
-    #result = {}
-    #ownerAtStart = host._getOwner()
-    #for owner in ownerList:
-        #host._setOwner(owner)
-        #output, info = RunClient(host, ['get_balance'])
-        #if info['active'] != 0:
-            #result[owner] = info['active']
-    #host._setOwner(ownerAtStart)
-    #return result
 
-def GetOwnerBackingAmounts(host, ownerList, balances):
-    result = {}
-    ownerAtStart = host._getOwner()
-    for owner in ownerList:
-        host._setOwner(owner)
-        unspent = host.getUnspent()
-        ownerTotal = 0
-        for entry in unspent:
-            account = (entry['txid'], entry['vout'])
-            key = host.formatAccountForEndUser(account)
-            if not key in balances:
-                ownerTotal += entry['amount']
-        if ownerTotal > 0:
-            result[owner] = ownerTotal
-    host._setOwner(ownerAtStart)
+def GetBackingAmount(host, balances):
+    result = 0
+    unspent = host.getUnspent()
+    for entry in unspent:
+        account = (entry['txid'], entry['vout'])
+        key = host.formatAccountForEndUser(account)
+        if not key in balances:
+            result += entry['amount']
     return result
 
 dataDirectory = 'dataDirectoryForTests'
@@ -557,8 +540,8 @@ class Test(unittest.TestCase):
         info = GetStateInfo(host)
         ownerBalances = GetOwnerBalances(host, ownerList, info['balances'])
         self.assertDictEqual(ownerBalances, {'bob': 2*e(7), 'clive': 5*e(7), 'alice': 3*e(7), 'dave': 6*e(7)})
-        backingAmounts = GetOwnerBackingAmounts(host, ownerList, info['balances'])
-        self.assertDictEqual(backingAmounts, {'dave': 100000})
+        backingAmount = GetBackingAmount(host, info['balances'])
+        self.assertEqual(backingAmount, 100000)
 
     def test_ltc_trading(self):
         host = InitHost()

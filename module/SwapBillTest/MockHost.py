@@ -3,6 +3,7 @@ from SwapBill import RawTransaction, TransactionFee
 from SwapBill import Host ## just for insufficient fee exception
 from SwapBill import Address ## just for bad address exception
 from SwapBill.ExceptionReportedToUser import ExceptionReportedToUser
+from SwapBillTest import PregeneratedKeys
 
 addressPrefix = 'adr_'
 privateKeyPrefix = 'privateKey_'
@@ -58,8 +59,8 @@ class MockHost(object):
 		self._nextTXID = 0
 		self._nextSuppliedOutput = 0
 		self._unspent = []
+		self._keyPairs = []
 		self.holdNewTransactions = False
-		#self.hideMemPool = False
 
 	def _setOwner(self, id):
 		assert not '_' in id
@@ -72,8 +73,7 @@ class MockHost(object):
 		txid = MakeTXID(self._nextTXID)
 		vout = 7
 		toAdd = {'txid':txid, 'vout':vout}
-		self._nextSuppliedOutput += 1
-		pubKeyHash = TextAsPubKeyHash(addressPrefix + self._id + '_host_supplied' + str(self._nextSuppliedOutput))
+		pubKeyHash = self.getNewNonSwapBillAddress()
 		scriptPubKey = RawTransaction.ScriptPubKeyForPubKeyHash(pubKeyHash)
 		toAdd['scriptPubKey'] = scriptPubKey
 		toAdd['address'] = pubKeyHash
@@ -108,8 +108,6 @@ class MockHost(object):
 		return self._transactionsByBlock.get(i, [])
 
 	def getMemPoolTransactions(self):
-		#if self.hideMemPool:
-			#return []
 		return self._memPool
 
 	def _advance(self, numberOfBlocks):
@@ -123,20 +121,21 @@ class MockHost(object):
 		return result
 
 	def getNewNonSwapBillAddress(self):
-		self._nextChange += 1
-		#print('new non swap bill address', self._id, self._nextSwapBill)
-		return TextAsPubKeyHash(addressPrefix + self._id + '_host_getnew' + str(self._nextChange))
+		#privateKey = KeyPair.generatePrivateKey()
+		#publicKey = KeyPair.privateKeyToPublicKey(privateKey)
+		#pubKeyHash = KeyPair.publicKeyToPubKeyHash(publicKey)
+		privateKey, pubKeyHash = PregeneratedKeys.GetKeyPair(len(self._keyPairs))
+		self._keyPairs.append((privateKey, pubKeyHash))
+		return pubKeyHash
 	def getNewSwapBillAddress(self):
 		self._nextSwapBill += 1
 		#print('new swap bill address', self._id, self._nextSwapBill)
 		return TextAsPubKeyHash(addressPrefix + self._id + '_swapbill' + str(self._nextSwapBill))
 	def _addressIsMine(self, pubKeyHash):
-		try:
-			asText = PubKeyHashAsText(pubKeyHash)
-		except UnicodeDecodeError:
-			# control address
-			return False
-		return asText.startswith(addressPrefix + self._id + '_host_')
+		for privateKey, storedPubKeyHash in self._keyPairs:
+			if pubKeyHash == storedPubKeyHash:
+				return True
+		return False
 
 	def _consumeUnspent(self, txID, vOut):
 		unspentAfter = []
@@ -208,8 +207,13 @@ class MockHost(object):
 		self._addTransaction(txid, unsignedTransactionHex)
 
 	def formatAddressForEndUser(self,  pubKeyHash):
+		for i in range(len(self._keyPairs)):
+			privateKey, storedPubKeyHash = self._keyPairs[i]
+			if pubKeyHash == storedPubKeyHash:
+				return 'host_address_' + str(i)
 		return PubKeyHashAsText(pubKeyHash)
 	def addressFromEndUserFormat(self,  address):
+		assert not address.startswith('host_address_')
 		return TextAsPubKeyHash(address)
 
 	def formatAccountForEndUser(self, account):

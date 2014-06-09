@@ -1,5 +1,5 @@
 from __future__ import print_function
-import unittest, binascii
+import unittest, binascii, struct
 from SwapBill import KeyPair
 from SwapBill import Address
 
