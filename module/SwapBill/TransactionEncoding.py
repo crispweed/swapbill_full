@@ -1,6 +1,7 @@
 from __future__ import print_function
 import struct, binascii
 from SwapBill import Address, HostTransaction, ControlAddressPrefix
+from SwapBill.ExceptionReportedToUser import ExceptionReportedToUser
 
 class UnsupportedTransaction(Exception):
 	pass
@@ -65,12 +66,17 @@ def _decodeInt(data):
 	return result
 
 def _encodeInt(value, numberOfBytes):
+	if value < 0:
+		raise ExceptionReportedToUser('Negative transaction parameter not supported')
+	#print('value:', value)
+	#print('numberOfBytes:', numberOfBytes)
 	result = b''
 	for i in range(numberOfBytes):
 		byteValue = value & 255
 		value = value // 256
 		result += struct.pack('<B', byteValue)
-	assert value == 0
+	if value > 0:
+		raise ExceptionReportedToUser('Transaction parameter value too big')
 	return result
 
 def ToStateTransaction(tx):

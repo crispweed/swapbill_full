@@ -542,8 +542,7 @@ class Test(unittest.TestCase):
 		info = GetStateInfo(host)
 		self.assertEqual(info['balances'], {'02:1':10000000, '04:1':20000000})
 		output, info = RunClient(host, ['get_balance'])
-		self.assertDictEqual(info, {
-			'total': 20000000, 'spendable': 20000000})
+		self.assertDictEqual(info, {'total': 20000000, 'spendable': 20000000})
 		host._setOwner('1')
 		output, info = RunClient(host, ['get_balance'])
 		self.assertDictEqual(info, {'total': 10000000, 'spendable': 10000000})
@@ -743,3 +742,33 @@ class Test(unittest.TestCase):
 		self.assertEqual(info['syncOutput'].count(': LTCExchangeCompletion'), 1)
 		self.assertEqual(info['syncOutput'].count(': Pay'), 0)
 		self.assertEqual(info['syncOutput'].count('trade offer or pending exchange expired'), 0)
+
+	def test_transaction_parameter_ranges(self):
+		# following requires a long in python 2.7
+		host = InitHost()
+		host._addUnspent(2*e(19))
+		RunClient(host, ['burn', '--amount', 1*e(19)])
+		output, info = RunClient(host, ['get_balance'])
+		self.assertDictEqual(info, {'total': 1*e(19), 'spendable': 1*e(19)})
+		# greater than 8 bytes
+		host = InitHost()
+		host._addUnspent(2*e(20))
+		self.assertRaises(Exception, RunClient, host, ['burn', '--amount', 1*e(20)])
+		host = InitHost()
+		host._addUnspent(2*e(15))
+		# note that we don't get an error from the point of encoding, because transactions are checked against state first
+		self.assertRaisesRegexp(ExceptionReportedToUser, 'Burn amount is below dust limit', RunClient, host, ['burn', '--amount', -1*e(7)])
+		self.assertRaisesRegexp(ValueError, 'invalid literal', RunClient, host, ['burn', '--amount', 'lots'])
+		# can burn amounts above 6 byte range, because this is not encoded in control address
+		RunClient(host, ['burn', '--amount', 1*e(15)])
+		output, info = RunClient(host, ['get_balance'])
+		self.assertDictEqual(info, {'total': 1*e(15), 'spendable': 1*e(15)})
+		# but amounts for pay transaction (for example) *are* restricted
+		host._setOwner('recipient')
+		output, result = RunClient(host, ['get_receive_address'])
+		payTargetAddress = result['receive_address']
+		host._setOwner(host.defaultOwner)
+		# this error comes from transaction encoding
+		self.assertRaisesRegexp(ExceptionReportedToUser, 'Transaction parameter value too big', RunClient, host, ['pay', '--amount', 1*e(15), '--toAddress', payTargetAddress])
+		# but this error comes from state check transaction
+		self.assertRaisesRegexp(ExceptionReportedToUser, 'amount is below minimum balance', RunClient, host, ['pay', '--amount', -1*e(7), '--toAddress', payTargetAddress])

@@ -178,8 +178,8 @@ def Main(startBlockIndex, startBlockHash, useTestNet, commandLineArgs=sys.argv[1
 	def CheckAndSend_Common(transactionType, sourceAccounts, outputs, outputPubKeys, details):
 		change = host.getNewNonSwapBillAddress()
 		print('attempting to send ' + FormatTransactionForUserDisplay.Format(host, transactionType, outputs, outputPubKeys, details), file=out)
-		backingUnspent = transactionBuildLayer.getUnspent()
 		baseTX = TransactionEncoding.FromStateTransaction(transactionType, sourceAccounts, outputs, outputPubKeys, details)
+		backingUnspent = transactionBuildLayer.getUnspent()
 		baseInputsAmount = 0
 		for i in range(baseTX.numberOfInputs()):
 			txID = baseTX.inputTXID(i)
