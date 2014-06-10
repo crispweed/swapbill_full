@@ -115,6 +115,14 @@ class Test(unittest.TestCase):
 		)
 		self.assertDictEqual(tx.__dict__, {'_inputs': [], '_outputs': [(b'SB\x80 \x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00', 0), ('destinationPKH', 999)]} )
 		self.checkIgnoredBytes(tx, 11)
+		tx = TransactionEncoding.FromStateTransaction(
+		    'BackLTCSells',
+		    [('sourceTXID',7)],
+		    ('ltcSellBacker',), ('ltcSellBackerPKH',),
+		    {'backingAmount':32, 'transactionsBacked':4, 'ltcReceiveAddress':'receivePKH', 'maxBlock':123, 'commission':0xfffffff}
+		)
+		self.assertDictEqual(tx.__dict__, {'_inputs': [('sourceTXID', 7)], '_outputs': [(b'SB\x04 \x00\x00\x00\x00\x00\x04\x00\x00{\x00\x00\x00\xff\xff\xff\x0f', 0), ('ltcSellBackerPKH', 0), ('receivePKH', 0)]})
+		self.checkIgnoredBytes(tx, 0)
 
 	def test_forwarding(self):
 		# cannot encode forward to future network version transactions explicitly from state transactions

@@ -22,8 +22,8 @@ _fundedMappingByTypeCode = (
      ()
 	),
     ('BackLTCSells',
-     (('backingAmount', 6, 'transactionsBacked', 3, 'maxBlock', 4, 'commision', 4), None),
-     ('ltcBacker',),
+     (('backingAmount', 6, 'transactionsBacked', 3, 'maxBlock', 4, 'commission', 4), None),
+     ('ltcSellBacker',),
      (('ltcReceiveAddress', None),)
 	),
 	)
