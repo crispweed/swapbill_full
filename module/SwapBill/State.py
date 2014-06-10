@@ -43,7 +43,6 @@ class State(object):
 			self._balances.addStateChange(buyOffer.refundAccount)
 			self._balances.addTo_Forwarded(buyOffer.refundAccount, buyOffer._swapBillOffered)
 			self._balances.removeRef(buyOffer.refundAccount)
-
 		expired = self._LTCSells.advanceToNextBlock()
 		for sellOffer in expired:
 			self._balances.addStateChange(sellOffer.receivingAccount)
@@ -64,6 +63,19 @@ class State(object):
 				toDelete.append(key)
 		for key in toDelete:
 			self._pendingExchanges.pop(key)
+		# ** currently iterates through all entries each block added
+		# are there scaling issues with this?
+		toDelete = []
+		for key in self._ltcSellBackers:
+			backer = self._ltcSellBackers[key]
+			if backer.expiry == self._currentBlockIndex:
+				# refund remaining amount
+				self._balances.addTo_Forwarded(backer.refundAccount, backer.backingAmount)
+				self._balances.addStateChange(backer.refundAccount)
+				self._balances.removeRef(backer.refundAccount)
+				toDelete.append(key)
+		for key in toDelete:
+				self._ltcSellBackers.pop(key)
 		self._currentBlockIndex += 1
 
 	def _matchOffersAndAddExchange(self, buy, sell):
