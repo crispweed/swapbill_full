@@ -8,30 +8,30 @@ class NotValidSwapBillTransaction(Exception):
 	pass
 
 _fundedMappingByTypeCode = (
-    ('Burn', ((0, 16), 'amount'), ('destination',), ()),
-    ('Pay', (('amount', 6, 'maxBlock', 4, None, 6), None), ('change','destination'), ()),
+    ('Burn', ((0, 17), 'amount'), ('destination',), ()),
+    ('Pay', (('amount', 6, 'maxBlock', 4, None, 7), None), ('change','destination'), ()),
     ('LTCBuyOffer',
-     (('swapBillOffered', 6, 'maxBlock', 4, 'exchangeRate', 4, None, 2), None),
+     (('swapBillOffered', 6, 'maxBlock', 4, 'exchangeRate', 4, None, 3), None),
      ('ltcBuy',),
      (('receivingAddress', None),)
 	),
     ('LTCSellOffer',
-     (('ltcOffered', 6, 'maxBlock', 4, 'exchangeRate', 4, None, 2), None),
+     (('ltcOffered', 6, 'maxBlock', 4, 'exchangeRate', 4, None, 3), None),
      ('ltcSell',),
      ()
 	),
-    #('BackLTCSells',
-     #(('backingAmount', 6, 'maxBlock', 4, None, 6), None),
-     #('change', 'refund'),
-     #(('receivingAddress', None),),
-	#),
+    ('BackLTCSells',
+     (('backingAmount', 6, 'transactionsBacked', 3, 'maxBlock', 4, 'commision', 4), None),
+     ('ltcBacker',),
+     (('ltcReceiveAddress', None),)
+	),
 	)
 
-_forwardCompatibilityMapping = ('ForwardToFutureNetworkVersion', (('amount', 6, 'maxBlock', 4, None, 6), None), ('change',), ())
+_forwardCompatibilityMapping = ('ForwardToFutureNetworkVersion', (('amount', 6, 'maxBlock', 4, None, 7), None), ('change',), ())
 
 _unfundedMappingByTypeCode = (
     ('LTCExchangeCompletion',
-     (('pendingExchangeIndex', 6, None, 10), None),
+     (('pendingExchangeIndex', 6, None, 11), None),
      (),
      (('destinationAddress', 'destinationAmount'),)
     ),
@@ -76,14 +76,14 @@ def _encodeInt(value, numberOfBytes):
 def ToStateTransaction(tx):
 	controlAddressData = tx.outputPubKeyHash(0)
 	assert controlAddressData.startswith(ControlAddressPrefix.prefix)
-	assert len(ControlAddressPrefix.prefix) == 3
-	typeCode = _decodeInt(controlAddressData[3:4])
+	pos = len(ControlAddressPrefix.prefix)
+	typeCode = _decodeInt(controlAddressData[pos:pos+1])
 	mapping = _mappingFromTypeCode(typeCode)
 	funded = (len(mapping[2]) > 0)
 	transactionType = mapping[0]
 	details = {}
 	controlAddressMapping, amountMapping = mapping[1]
-	pos = 4
+	pos += 1
 	for i in range(len(controlAddressMapping) // 2):
 		valueMapping = controlAddressMapping[i * 2]
 		numberOfBytes = controlAddressMapping[i * 2 + 1]

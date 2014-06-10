@@ -140,9 +140,8 @@ class Test(unittest.TestCase):
 		RunClient(host, ['pay', '--amount', 2*e(7), '--toAddress', payTargetAddress])
 		corruptedMemPool = []
 		for txID, txHex in host._memPool:
-
-			assert txHex.count('535750') == 1
-			corruptedTXHex = txHex.replace('535750', '545750')
+			assert txHex.count('5342') == 1
+			corruptedTXHex = txHex.replace('5342', '5343')
 			corruptedMemPool.append((txID, corruptedTXHex))
 		host._memPool = corruptedMemPool
 		host.holdNewTransactions = False

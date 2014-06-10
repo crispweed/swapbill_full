@@ -58,18 +58,25 @@ sp.add_argument('--blocksUntilExpiry', type=int, default=8, help='if the transac
 
 sp = subparsers.add_parser('post_ltc_buy', help='make an offer to buy litecoin with swapbill')
 sp.add_argument('--swapBillOffered', required=True, help='amount of swapbill offered')
-sp.add_argument('--blocksUntilExpiry', type=int, default=8, help='after this block the offer expires (and swapbill remaining in any unmatched part of the offer is returned)')
+sp.add_argument('--blocksUntilExpiry', type=int, default=8, help='after this number of blocks the offer expires (and swapbill remaining in any unmatched part of the offer is returned)')
 sp.add_argument('--exchangeRate', help='the exchange rate SWP/LTC, in floating point representation (must be greater than 0 and less than 1)')
 sp.add_argument('--exchangeRate_AsInteger', help='the exchange rate SWP/LTC, in integer representation (must be greater than 0 and less than 4294967296)')
 
 sp = subparsers.add_parser('post_ltc_sell', help='make an offer to sell litecoin for swapbill')
 sp.add_argument('--ltcOffered', required=True, help='amount of ltc offered')
-sp.add_argument('--blocksUntilExpiry', type=int, default=2, help='after this block the offer expires (and swapbill remaining in any unmatched part of the offer is returned)')
+sp.add_argument('--blocksUntilExpiry', type=int, default=2, help='after this number of blocks the offer expires (and swapbill remaining in any unmatched part of the offer is returned)')
 sp.add_argument('--exchangeRate', help='the exchange rate SWP/LTC, in floating point representation (must be greater than 0 and less than 1)')
 sp.add_argument('--exchangeRate_AsInteger', help='the exchange rate SWP/LTC, in integer representation (must be greater than 0 and less than 4294967296)')
 
 sp = subparsers.add_parser('complete_ltc_sell', help='complete an ltc exchange by fulfilling a pending exchange payment')
 sp.add_argument('--pendingExchangeID', required=True, help='the id of the pending exchange payment to fulfill')
+
+sp = subparsers.add_parser('back_ltc_sells', help='commit swapbill to back ltc exchanges')
+sp.add_argument('--backingSwapBill', required=True, help='amount of swapbill to commit')
+sp.add_argument('--transactionsBacked', required=True, help='the number of transactions you want to back, which then implies a maximum backing amount per transaction')
+sp.add_argument('--blocksUntilExpiry', type=int, default=200, help='number of blocks for which the backing amount should remain committed')
+sp.add_argument('--commision', help='the rate of commission for backed transactions, in floating point representation (must be greater than 0 and less than 1)')
+sp.add_argument('--commision_AsInteger', help='the rate of commission for backed transactions, in integer representation (must be greater than 0 and less than 4294967296)')
 
 subparsers.add_parser('collect', help='combine all current owned swapbill outputs into active account')
 
@@ -98,6 +105,14 @@ def ExchangeRateFromArgs(args):
 	if args.exchangeRate_AsInteger is None:
 		raise ExceptionReportedToUser("One of exchangeRate or exchangeRate_AsInteger must be specified.")
 	return int(args.exchangeRate_AsInteger)
+def CommissionFromArgs(args):
+	if args.commision is not None:
+		if args.commision_AsInteger is not None:
+			raise ExceptionReportedToUser("Either commision or commision_AsInteger should be specified, not both.")
+		return int(float(args.commision) * 0x100000000)
+	if args.commision_AsInteger is None:
+		raise ExceptionReportedToUser("One of commision or commision_AsInteger must be specified.")
+	return int(args.commision_AsInteger)
 
 def Main(startBlockIndex, startBlockHash, useTestNet, commandLineArgs=sys.argv[1:], host=None, keyGenerator=None, out=sys.stdout):
 	args = parser.parse_args(commandLineArgs)
@@ -264,6 +279,19 @@ def Main(startBlockIndex, startBlockHash, useTestNet, commandLineArgs=sys.argv[1
 		}
 		return CheckAndSend_UnFunded(transactionType, (), (), details)
 
+	elif args.action == 'back_ltc_sells':
+		transactionType = 'BackLTCSells'
+		outputs = ('ltcSellBacker',)
+		outputPubKeyHashes = (wallet.addKeyPairAndReturnPubKeyHash(),)
+		details = {
+		    'backingAmount':int(args.backingSwapBill),
+		    'transactionsBacked':int(args.transactionsBacked),
+		    'ltcReceiveAddress':host.getNewNonSwapBillAddress(),
+		    'commision':CommisionFromArgs(args),
+		    'maxBlock':state._currentBlockIndex + args.blocksUntilExpiry
+		}
+		return CheckAndSend_Funded(transactionType, outputs, outputPubKeyHashes, details)
+
 	elif args.action == 'get_receive_address':
 		pubKeyHash = wallet.addKeyPairAndReturnPubKeyHash()
 		return {'receive_address': host.formatAddressForEndUser(pubKeyHash)}
@@ -312,6 +340,18 @@ def Main(startBlockIndex, startBlockHash, useTestNet, commandLineArgs=sys.argv[1
 			d['outstanding ltc payment amount'] = exchange.ltc
 			d['expires on block'] = exchange.expiry
 			result.append(('pending exchange index', key, d))
+		return result
+
+	elif args.action == 'get_ltc_sell_backers':
+		result = []
+		for key in state._ltcSellBackers:
+			d = {}
+			backer = state._pendingExchanges[key]
+			d['I am backer'] = backer.refundAccount in ownedAccounts.tradeOfferChangeCounts
+			d['backing amount'] = backer.backingAmount
+			d['maximum per transaction'] = backer.transactionMax
+			d['expires on block'] = backer.expiry
+			result.append(('ltc sell backer index', key, d))
 		return result
 
 	else:

@@ -17,10 +17,7 @@ class InsufficientFundsForTransaction(Exception):
 	pass
 
 class LTCSellBacker(object):
-	def __init__(self, amount, maximumTransactionAmount, ltcReceiveAddress):
-		self.amount = amount
-		self.maximumTransactionAmount = maximumTransactionAmount
-		self.ltcReceiveAddress = ltcReceiveAddress
+	pass
 
 class State(object):
 	def __init__(self, startBlockIndex, startBlockHash):
@@ -34,13 +31,8 @@ class State(object):
 		self._LTCSells = TradeOfferHeap.Heap(startBlockIndex, True) # higher exchange rate is better offer
 		self._nextExchangeIndex = 0
 		self._pendingExchanges = {}
-		#self._nextBackerIndex = 0
-		#self._ltcSellBackers = {}
-
-	#def getSpendableAmount(self, account):
-		#if self._balances.isReferenced(account):
-			#return 0
-		#return self._balances.balanceFor(account)
+		self._nextBackerIndex = 0
+		self._ltcSellBackers = {}
 
 	def startBlockMatches(self, startBlockHash):
 		return self._startBlockHash == startBlockHash
@@ -213,6 +205,31 @@ class State(object):
 			break
 		for entry in toReAdd:
 			self._LTCBuys.addOffer(entry)
+		return change
+
+	def _fundedTransaction_BackLTCSells(self, txID, swapBillInput, changeRequired, backingAmount, transactionsBacked, ltcReceiveAddress, maxBlock, outputs):
+		assert outputs == ('ltcBacker',)
+		if maxBlock < self._currentBlockIndex:
+			raise TransactionFailsAgainstCurrentState('max block for transaction has been exceeded')
+		change = swapBillInput - backingAmount
+		# change is always required here, since we will add a ref
+		if change < Constraints.minimumSwapBillBalance:
+			raise InsufficientFundsForTransaction()
+		if txID is None:
+			return
+		refundAccount = (txID, 1) # (now same as change account)
+		self._balances.add(refundAccount, 0) # temporarily empty, but change will be paid in to this after return
+		self._balances.addFirstRef(refundAccount)
+		backer = LTCSellBacker()
+		backer.backingAmount = backingAmount
+		backer.transactionMax = backingAmount // transactionsBacked
+		backer.commision = commision
+		backer.ltcReceiveAddress = ltcReceiveAddress
+		backer.refundAccount = refundAccount
+		backer.expiry = maxBlock
+		key = self._nextBackerIndex
+		self._nextBackerIndex += 1
+		self._ltcSellBackers[key] = backer
 		return change
 
 	def _fundedTransaction_ForwardToFutureNetworkVersion(self, txID, swapBillInput, changeRequired, amount, maxBlock, outputs):
