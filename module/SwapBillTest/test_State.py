@@ -17,6 +17,9 @@ def totalAccountedFor(state):
 		exchange = state._pendingExchanges[key]
 		result += exchange.swapBillAmount
 		result += exchange.swapBillDeposit
+	for key in state._ltcSellBackers:
+		backer = state._ltcSellBackers[key]
+		result += backer.backingAmount
 	result += state._totalForwarded
 	return result
 
@@ -26,6 +29,7 @@ class Test(unittest.TestCase):
 	    'Pay':('change','destination'),
 	    'LTCBuyOffer':('ltcBuy',),
 	    'LTCSellOffer':('ltcSell',),
+	    'BackLTCSells':('ltcSellBacker',),
 	    'LTCExchangeCompletion':(),
 	    'ForwardToFutureNetworkVersion':('change',)
 	    }
@@ -878,5 +882,47 @@ class Test(unittest.TestCase):
 		payDestination = outputs['destination']
 		expectedBalances[payDestination] = expectedBalances.pop(change)
 		self.assertEqual(state._balances.balances, expectedBalances)
+
+	def test_bad_back_ltc_sells(self):
+		state = State.State(100, 'mockhash')
+		self.state = state
+		active = self.Burn(1*e(10)+Constraints.minimumSwapBillBalance)
+		details = {'backingAmount':1*e(10), 'transactionsBacked':100, 'commission':0x8000000, 'ltcReceiveAddress':'madeUpAddress', 'maxBlock':100}
+		# bad outputs specs
+		self.assertRaises(AssertionError, state.checkTransaction, 'BackLTCSells', outputs=(), transactionDetails=details, sourceAccounts=[active])
+		self.assertRaises(AssertionError, state.checkTransaction, 'BackLTCSells', outputs=('madeUpOutput',), transactionDetails=details, sourceAccounts=[active])
+		self.assertRaises(AssertionError, state.checkTransaction, 'BackLTCSells', outputs=('ltcSellBacker','extraOutput'), transactionDetails=details, sourceAccounts=[active])
+		# attempt to commit more than available
+		details['backingAmount'] = 2*e(10)
+		active = self.Apply_AssertInsufficientFunds(state, 'BackLTCSells', sourceAccounts=[active], **details)
+		# trade ref is added on output, so can't spend all
+		details['backingAmount'] = 1*e(10)+Constraints.minimumSwapBillBalance
+		active = self.Apply_AssertInsufficientFunds(state, 'BackLTCSells', sourceAccounts=[active], **details)
+		# change amount below minimum balance
+		details['backingAmount'] = 1*e(10)+Constraints.minimumSwapBillBalance-1
+		active = self.Apply_AssertInsufficientFunds(state, 'BackLTCSells', sourceAccounts=[active], **details)
+		details['backingAmount'] = 1*e(10)
+		# can't pay from nonexistant account
+		self.Apply_AssertInsufficientFunds(state, 'BackLTCSells', sourceAccounts=['madeUpOutput'], **details)
+		self.assertDictEqual(state._balances.balances, {active:1*e(10)+Constraints.minimumSwapBillBalance})
+		self.assertFalse(state._balances.isReferenced(active))
+		# transaction with maxBlock before current block
+		details['maxBlock'] = 99
+		outputs = self.Apply_AssertSucceeds(state, 'BackLTCSells', sourceAccounts=[active], expectedError='max block for transaction has been exceeded', **details)
+		details['maxBlock'] = 100
+		active = outputs['ltcSellBacker']
+		self.assertDictEqual(state._balances.balances, {active:1*e(10)+Constraints.minimumSwapBillBalance})
+		self.assertFalse(state._balances.isReferenced(active))
+		# control transaction which succeeds
+		outputs = self.Apply_AssertSucceeds(state, 'BackLTCSells', sourceAccounts=[active], **details)
+		active = outputs['ltcSellBacker']
+		self.assertDictEqual(state._balances.balances, {active:Constraints.minimumSwapBillBalance})
+		self.assertTrue(state._balances.isReferenced(active))
+
+
+
+		#succeeds, reason = state.checkTransaction('BackLTCSells', outputs=('ltcSellBacker',), transactionDetails=details, sourceAccounts=sourceAccounts)
+		#self.assertEqual(succeeds, True)
+		#self.assertEqual(reason, '')
 
 

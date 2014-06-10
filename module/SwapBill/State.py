@@ -207,8 +207,8 @@ class State(object):
 			self._LTCBuys.addOffer(entry)
 		return change
 
-	def _fundedTransaction_BackLTCSells(self, txID, swapBillInput, changeRequired, backingAmount, transactionsBacked, ltcReceiveAddress, maxBlock, outputs):
-		assert outputs == ('ltcBacker',)
+	def _fundedTransaction_BackLTCSells(self, txID, swapBillInput, changeRequired, backingAmount, transactionsBacked, commission, ltcReceiveAddress, maxBlock, outputs):
+		assert outputs == ('ltcSellBacker',)
 		if maxBlock < self._currentBlockIndex:
 			raise TransactionFailsAgainstCurrentState('max block for transaction has been exceeded')
 		change = swapBillInput - backingAmount
@@ -223,7 +223,7 @@ class State(object):
 		backer = LTCSellBacker()
 		backer.backingAmount = backingAmount
 		backer.transactionMax = backingAmount // transactionsBacked
-		backer.commision = commision
+		backer.commission = commission
 		backer.ltcReceiveAddress = ltcReceiveAddress
 		backer.refundAccount = refundAccount
 		backer.expiry = maxBlock
