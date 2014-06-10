@@ -1,39 +1,8 @@
 import binascii
-from SwapBill import RawTransaction, TransactionFee
+from SwapBill import RawTransaction, TransactionFee, KeyPair
 from SwapBill import Host ## just for insufficient fee exception
 from SwapBill import Address ## just for bad address exception
 from SwapBill.ExceptionReportedToUser import ExceptionReportedToUser
-from SwapBillTest import PregeneratedKeys
-
-addressPrefix = 'adr_'
-privateKeyPrefix = 'privateKey_'
-
-def TextAsPaddedData(s, size):
-	assert len(s) <= size
-	assert not '-' in s
-	padded = s + '-' * (size - len(s))
-	result = padded.encode('ascii')
-	assert len(result) == size
-	return result
-def PaddedDataAsText(data, size):
-	assert type(data) is type(b'')
-	assert len(data) == size
-	padded = data.decode('ascii')
-	return padded.strip('-')
-
-def TextAsPubKeyHash(s):
-	if not s.startswith(addressPrefix):
-		raise Address.BadAddress()
-	return TextAsPaddedData(s[len(addressPrefix):], 20)
-def PubKeyHashAsText(data):
-	return addressPrefix + PaddedDataAsText(data, 20)
-
-def TextAsPrivateKey(s):
-	if not s.startswith(privateKeyPrefix):
-		raise Exception('bad private key')
-	return TextAsPaddedData(s[len(privateKeyPrefix):], 32)
-def PrivateKeyAsText(data):
-	return privateKeyPrefix + PaddedDataAsText(data, 32)
 
 def MakeTXID(i):
 	txid = '00' * 31 + '{:02X}'.format(i)
@@ -41,13 +10,26 @@ def MakeTXID(i):
 	txid = binascii.hexlify(binascii.unhexlify(txid.encode('ascii'))).decode('ascii')
 	return txid
 
+def MatchPubKeyHashAndRemovePrivateKey(keyGenerator, pubKeyHash, privateKeys):
+	remainingPrivateKeys = []
+	while True:
+		if not privateKeys:
+			raise Exception('Failed to sign input.')
+		privateKeyWIF = privateKeys[0]
+		privateKey = KeyPair.privateKeyFromWIF(b'\xef', privateKeyWIF) # litecoin testnet private key address version
+		generatedPubKeyHash = keyGenerator.privateKeyToPubKeyHash(privateKey)
+		privateKeys = privateKeys[1:]
+		if generatedPubKeyHash == pubKeyHash:
+			return remainingPrivateKeys + privateKeys
+		remainingPrivateKeys.append(privateKey)
 
 class MockHost(object):
 	defaultOwner = '0'
 
-	def __init__(self, ownerID=None):
+	def __init__(self, keyGenerator, ownerID=None):
 		if ownerID is None:
 			ownerID = self.defaultOwner
+		self._keyGenerator = keyGenerator
 		self._id = ownerID
 		self._nextChange = 0
 		self._nextSwapBill = 0
@@ -116,22 +98,16 @@ class MockHost(object):
 	def getUnspent(self):
 		result = []
 		for entry in self._unspent:
-			if self._addressIsMine(entry['address']):
+			if self._isHostAddress(entry['address']):
 				result.append(entry)
 		return result
 
 	def getNewNonSwapBillAddress(self):
-		#privateKey = KeyPair.generatePrivateKey()
-		#publicKey = KeyPair.privateKeyToPublicKey(privateKey)
-		#pubKeyHash = KeyPair.publicKeyToPubKeyHash(publicKey)
-		privateKey, pubKeyHash = PregeneratedKeys.GetKeyPair(len(self._keyPairs))
+		privateKey = self._keyGenerator.generatePrivateKey()
+		pubKeyHash = self._keyGenerator.privateKeyToPubKeyHash(privateKey)
 		self._keyPairs.append((privateKey, pubKeyHash))
 		return pubKeyHash
-	def getNewSwapBillAddress(self):
-		self._nextSwapBill += 1
-		#print('new swap bill address', self._id, self._nextSwapBill)
-		return TextAsPubKeyHash(addressPrefix + self._id + '_swapbill' + str(self._nextSwapBill))
-	def _addressIsMine(self, pubKeyHash):
+	def _isHostAddress(self, pubKeyHash):
 		for privateKey, storedPubKeyHash in self._keyPairs:
 			if pubKeyHash == storedPubKeyHash:
 				return True
@@ -149,38 +125,28 @@ class MockHost(object):
 		if found is None:
 			raise ExceptionReportedToUser('RPC error sending signed transaction: (from Mock Host, no unspent found for input, maybe already spent?)')
 		pubKeyHash = found['address']
-		if self._addressIsMine(pubKeyHash):
-			requiredPrivateKey = None
+		if self._isHostAddress(pubKeyHash):
+			pubKeyHashToBeSigned = None
 		else:
-			requiredPrivateKey = self.privateKeyForPubKeyHash(pubKeyHash)
-			assert requiredPrivateKey is not None
-		if hasattr(self, '_logConsumeUnspent') and self._logConsumeUnspent:
-			print('consuming unspent:')
-			print(found)
+			pubKeyHashToBeSigned = pubKeyHash
+			assert pubKeyHashToBeSigned is not None
 		self._unspent = unspentAfter
-		return found['amount'], requiredPrivateKey
-
-	def privateKeyForPubKeyHash(self, pubKeyHash):
-		#print('self._id in privateKeyForPubKeyHash is:', self._id)
-		asText = PubKeyHashAsText(pubKeyHash)
-		beforeCount = addressPrefix + self._id + '_swapbill'
-		if asText.startswith(beforeCount):
-			count = str(asText[len(beforeCount):])
-			return TextAsPrivateKey(privateKeyPrefix + self._id + '_' + count)
-		return None
+		return found['amount'], pubKeyHashToBeSigned
 
 	def signAndSend(self, unsignedTransactionHex, privateKeys=[]):
 		unsignedTransactionBytes = RawTransaction.FromHex(unsignedTransactionHex)
 		decoded, scriptPubKeys = RawTransaction.Decode(unsignedTransactionBytes)
 		sumOfInputs = 0
-		requiredPrivateKeys = []
+		pubKeyHashesToBeSigned = []
 		for i in range(decoded.numberOfInputs()):
-			amount, privateKeyRequired = self._consumeUnspent(decoded.inputTXID(i), decoded.inputVOut(i))
+			amount, pubKeyHashToBeSigned = self._consumeUnspent(decoded.inputTXID(i), decoded.inputVOut(i))
 			sumOfInputs += amount
-			if privateKeyRequired is not None:
-				requiredPrivateKeys.append(privateKeyRequired)
-		if sorted(privateKeys) != sorted(requiredPrivateKeys):
-			raise Exception('supplied private keys do not match required private keys')
+			if pubKeyHashToBeSigned is not None:
+				pubKeyHashesToBeSigned.append(pubKeyHashToBeSigned)
+		if len(pubKeyHashesToBeSigned) != len(privateKeys):
+			raise Exception('number of supplied private keys does not match number of required private keys')
+		for pubKeyHash in pubKeyHashesToBeSigned:
+			privateKeys = MatchPubKeyHashAndRemovePrivateKey(self._keyGenerator, pubKeyHash, privateKeys)
 		self._nextTXID += 1
 		txid = MakeTXID(self._nextTXID)
 		outputAmounts = []
@@ -207,14 +173,15 @@ class MockHost(object):
 		self._addTransaction(txid, unsignedTransactionHex)
 
 	def formatAddressForEndUser(self,  pubKeyHash):
-		for i in range(len(self._keyPairs)):
-			privateKey, storedPubKeyHash = self._keyPairs[i]
-			if pubKeyHash == storedPubKeyHash:
-				return 'host_address_' + str(i)
-		return PubKeyHashAsText(pubKeyHash)
+		return Address.FromPubKeyHash(b'\x6f', pubKeyHash) # litecoin testnet address version
+		#for i in range(len(self._keyPairs)):
+			#privateKey, storedPubKeyHash = self._keyPairs[i]
+			#if pubKeyHash == storedPubKeyHash:
+				#return 'host_address_' + str(i)
+		#startInHex = binascii.hexlify(pubKeyHash[:5]).decode('ascii')
+		#return 'SwapBill address starting with ' + startInHex
 	def addressFromEndUserFormat(self,  address):
-		assert not address.startswith('host_address_')
-		return TextAsPubKeyHash(address)
+		return Address.ToPubKeyHash(b'\x6f', address) # litecoin testnet address version
 
 	def formatAccountForEndUser(self, account):
 		txID, vOut = account

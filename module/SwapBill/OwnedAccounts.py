@@ -32,13 +32,13 @@ class OwnedAccounts(object):
 			self.tradeOfferChangeCounts.pop(accountToRemove)
 		return report
 
-	def updateForNewOutputs(self, host, state, txID, hostTX, outputs, scriptPubKeys):
+	def updateForNewOutputs(self, wallet, state, txID, hostTX, outputs, scriptPubKeys):
 		report = ''
 		for i in range(len(outputs)):
 			newOwnedAccount = (txID, i + 1)
 			if not state._balances.accountHasBalance(newOwnedAccount):
 				continue # output not created by transaction
-			privateKey = host.privateKeyForPubKeyHash(hostTX.outputPubKeyHash(i + 1))
+			privateKey = wallet.privateKeyForPubKeyHash(hostTX.outputPubKeyHash(i + 1))
 			if privateKey is None:
 				continue # output not ours (e.g. pay destination)
 			if newOwnedAccount in state._balances.changeCounts:

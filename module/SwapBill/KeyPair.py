@@ -19,12 +19,19 @@ def privateKeyToWIF(data, addressVersion):
 	assert len(data) == 32
 	return Base58Check.Encode(addressVersion + data)
 
-def privateKeyToPublicKey(privateKey):
+#def privateKeyToPublicKey(privateKey):
+	#sk = ecdsa.SigningKey.from_string(privateKey, curve=ecdsa.SECP256k1)
+	#vk = sk.verifying_key
+	#return sk.verifying_key.to_string()
+#def publicKeyToPubKeyHash(publicKey):
+	#ripemd160 = hashlib.new('ripemd160')
+	#ripemd160.update(hashlib.sha256(b'\x04' + publicKey).digest())
+	#return ripemd160.digest()
+
+def privateKeyToPubKeyHash(privateKey):
 	sk = ecdsa.SigningKey.from_string(privateKey, curve=ecdsa.SECP256k1)
 	vk = sk.verifying_key
-	return sk.verifying_key.to_string()
-
-def publicKeyToPubKeyHash(publicKey):
+	publicKey = sk.verifying_key.to_string()
 	ripemd160 = hashlib.new('ripemd160')
 	ripemd160.update(hashlib.sha256(b'\x04' + publicKey).digest())
 	return ripemd160.digest()

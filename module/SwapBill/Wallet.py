@@ -2,8 +2,17 @@ from __future__ import print_function
 import os
 from SwapBill import KeyPair
 
+class DefaultKeyGenerator(object):
+	def generatePrivateKey(self):
+		return KeyPair.generatePrivateKey()
+	def privateKeyToPubKeyHash(self, privateKey):
+		return KeyPair.privateKeyToPubKeyHash(privateKey)
+
 class Wallet(object):
-	def __init__(self, fileName):
+	def __init__(self, fileName, keyGenerator=None):
+		if keyGenerator is None:
+			keyGenerator = DefaultKeyGenerator()
+		self._keyGenerator = keyGenerator
 		self._fileName = fileName
 		self._privateKeys = []
 		self._pubKeyHashes = []
@@ -14,15 +23,13 @@ class Wallet(object):
 					readWIF = line.strip()
 					privateKey = KeyPair.privateKeyFromWIF(b'\xef', readWIF) # litecoin testnet private key address version
 					self._privateKeys.append(readWIF)
-					publicKey = KeyPair.privateKeyToPublicKey(privateKey)
-					pubKeyHash = KeyPair.publicKeyToPubKeyHash(publicKey)
+					pubKeyHash = self._keyGenerator.privateKeyToPubKeyHash(privateKey)
 					self._pubKeyHashes.append(pubKeyHash)
 
 	def addKeyPairAndReturnPubKeyHash(self):
-		privateKey = KeyPair.generatePrivateKey()
+		privateKey = self._keyGenerator.generatePrivateKey()
 		testNetWIF = KeyPair.privateKeyToWIF(privateKey, b'\xef') # litecoin testnet private key address version
-		publicKey = KeyPair.privateKeyToPublicKey(privateKey)
-		pubKeyHash = KeyPair.publicKeyToPubKeyHash(publicKey)
+		pubKeyHash = self._keyGenerator.privateKeyToPubKeyHash(privateKey)
 		self._privateKeys.append(testNetWIF)
 		self._pubKeyHashes.append(pubKeyHash)
 		with open(self._fileName, mode='a') as f:

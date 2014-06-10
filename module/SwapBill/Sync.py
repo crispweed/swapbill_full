@@ -8,7 +8,7 @@ from SwapBill.ExceptionReportedToUser import ExceptionReportedToUser
 stateVersion = 0.8
 ownedAccountsVersion = 0.2
 
-def _processTransactions(host, state, ownedAccounts, transactions, applyToState, reportPrefix, out):
+def _processTransactions(state, wallet, ownedAccounts, transactions, applyToState, reportPrefix, out):
 	for txID, hostTXHex in transactions:
 		hostTXBytes = RawTransaction.FromHex(hostTXHex)
 		hostTX, scriptPubKeys = RawTransaction.Decode(hostTXBytes)
@@ -32,7 +32,7 @@ def _processTransactions(host, state, ownedAccounts, transactions, applyToState,
 		assert inBetweenReport == ''
 		appliedSuccessfully, modifiedState = state.applyTransaction(transactionType, txID, sourceAccounts=sourceAccounts, transactionDetails=transactionDetails, outputs=outputs)
 		outputsReport = ownedAccounts.checkForTradeOfferChanges(state)
-		outputsReport += ownedAccounts.updateForNewOutputs(host, state, txID, hostTX, outputs, scriptPubKeys)
+		outputsReport += ownedAccounts.updateForNewOutputs(wallet, state, txID, hostTX, outputs, scriptPubKeys)
 		if not appliedSuccessfully:
 			outputsReport += ' * did not apply successfully\n'
 		if not modifiedState:
@@ -44,9 +44,9 @@ def _processTransactions(host, state, ownedAccounts, transactions, applyToState,
 				print(reportPrefix + ': ' + transactionType, file=out)
 			print(outputsReport, end="", file=out)
 
-def _processBlock(host, state, ownedAccounts, blockHash, reportPrefix, out):
+def _processBlock(host, state, wallet, ownedAccounts, blockHash, reportPrefix, out):
 	transactions = host.getBlockTransactions(blockHash)
-	_processTransactions(host, state, ownedAccounts, transactions, True, reportPrefix, out)
+	_processTransactions(state, wallet, ownedAccounts, transactions, True, reportPrefix, out)
 	inBetweenReport = ownedAccounts.checkForTradeOfferChanges(state)
 	assert inBetweenReport == ''
 	state.advanceToNextBlock()
@@ -54,7 +54,7 @@ def _processBlock(host, state, ownedAccounts, blockHash, reportPrefix, out):
 	if tradeOffersChanged:
 		print('trade offer or pending exchange expired', file=out)
 
-def SyncAndReturnStateAndOwnedAccounts(cacheDirectory, startBlockIndex, startBlockHash, host, includePending, forceRescan, out):
+def SyncAndReturnStateAndOwnedAccounts(cacheDirectory, startBlockIndex, startBlockHash, wallet, host, includePending, forceRescan, out):
 	loaded = False
 	if not forceRescan:
 		try:
@@ -92,7 +92,7 @@ def SyncAndReturnStateAndOwnedAccounts(cacheDirectory, startBlockIndex, startBlo
 		## hard coded value used here for number of blocks to lag behind with persistent state
 		if len(toProcess) == 20:
 			## advance cached state
-			_processBlock(host, state, ownedAccounts, blockHash, 'committed', out=out)
+			_processBlock(host, state, wallet, ownedAccounts, blockHash, 'committed', out=out)
 			popped = toProcess.popleft()
 			blockIndex += 1
 			blockHash = popped
@@ -106,11 +106,11 @@ def SyncAndReturnStateAndOwnedAccounts(cacheDirectory, startBlockIndex, startBlo
 
 	while len(toProcess) > 0:
 		## advance in memory state
-		_processBlock(host, state, ownedAccounts, blockHash, 'in memory', out=out)
+		_processBlock(host, state, wallet, ownedAccounts, blockHash, 'in memory', out=out)
 		popped = toProcess.popleft()
 		blockIndex += 1
 		blockHash = popped
-	_processBlock(host, state, ownedAccounts, blockHash, 'in memory', out=out)
+	_processBlock(host, state, wallet, ownedAccounts, blockHash, 'in memory', out=out)
 	blockIndex += 1
 
 	assert state._currentBlockIndex == blockIndex
@@ -124,7 +124,7 @@ def SyncAndReturnStateAndOwnedAccounts(cacheDirectory, startBlockIndex, startBlo
 	# but we can potentially be more careful about this by checking best block chain after getting memory pool transactions
 	# and restarting the block chain traversal if this does not match up
 	memPoolTransactions = host.getMemPoolTransactions()
-	_processTransactions(host, state, ownedAccounts, memPoolTransactions, includePending, 'in memory pool', out)
+	_processTransactions(state, wallet, ownedAccounts, memPoolTransactions, includePending, 'in memory pool', out)
 
 	return state, ownedAccounts
 

@@ -13,7 +13,7 @@ else:
 from os import path
 try:
 	from SwapBill import RawTransaction, Address, TransactionFee
-	from SwapBill import TransactionEncoding, BuildHostedTransaction, Sync, Host, TransactionBuildLayer
+	from SwapBill import TransactionEncoding, BuildHostedTransaction, Sync, Host, TransactionBuildLayer, Wallet
 	from SwapBill import FormatTransactionForUserDisplay
 	from SwapBill.Sync import SyncAndReturnStateAndOwnedAccounts
 	from SwapBill.ExceptionReportedToUser import ExceptionReportedToUser
@@ -99,7 +99,7 @@ def ExchangeRateFromArgs(args):
 		raise ExceptionReportedToUser("One of exchangeRate or exchangeRate_AsInteger must be specified.")
 	return int(args.exchangeRate_AsInteger)
 
-def Main(startBlockIndex, startBlockHash, useTestNet, commandLineArgs=sys.argv[1:], host=None, out=sys.stdout):
+def Main(startBlockIndex, startBlockHash, useTestNet, commandLineArgs=sys.argv[1:], host=None, keyGenerator=None, out=sys.stdout):
 	args = parser.parse_args(commandLineArgs)
 
 	if not path.isdir(args.dataDir):
@@ -112,6 +112,8 @@ def Main(startBlockIndex, startBlockHash, useTestNet, commandLineArgs=sys.argv[1
 		except Exception as e:
 			raise ExceptionReportedToUser("Failed to create directory " + dataDir + ":", e)
 
+	wallet = Wallet.Wallet(path.join(dataDir, 'wallet.txt'), keyGenerator=keyGenerator)
+
 	if host is None:
 		host = Host.Host(useTestNet=useTestNet, dataDirectory=dataDir, configFile=args.configFile)
 
@@ -120,7 +122,7 @@ def Main(startBlockIndex, startBlockHash, useTestNet, commandLineArgs=sys.argv[1
 	if args.action == 'get_state_info':
 		syncOut = io.StringIO()
 		startTime = time.clock()
-		state, ownedAccounts = SyncAndReturnStateAndOwnedAccounts(dataDir, startBlockIndex, startBlockHash, host, includePending=includePending, forceRescan=args.forceRescan, out=syncOut)
+		state, ownedAccounts = SyncAndReturnStateAndOwnedAccounts(dataDir, startBlockIndex, startBlockHash, wallet, host, includePending=includePending, forceRescan=args.forceRescan, out=syncOut)
 		elapsedTime = time.clock() - startTime
 		formattedBalances = {}
 		for account in state._balances.balances:
@@ -137,7 +139,7 @@ def Main(startBlockIndex, startBlockHash, useTestNet, commandLineArgs=sys.argv[1
 		}
 		return info
 
-	state, ownedAccounts = SyncAndReturnStateAndOwnedAccounts(dataDir, startBlockIndex, startBlockHash, host, includePending=includePending, forceRescan=args.forceRescan, out=out)
+	state, ownedAccounts = SyncAndReturnStateAndOwnedAccounts(dataDir, startBlockIndex, startBlockHash, wallet, host, includePending=includePending, forceRescan=args.forceRescan, out=out)
 
 	transactionBuildLayer = TransactionBuildLayer.TransactionBuildLayer(host, ownedAccounts)
 
@@ -210,14 +212,14 @@ def Main(startBlockIndex, startBlockHash, useTestNet, commandLineArgs=sys.argv[1
 			raise ExceptionReportedToUser('Burn amount is below dust limit.')
 		transactionType = 'Burn'
 		outputs = ('destination',)
-		outputPubKeyHashes = (host.getNewSwapBillAddress(),)
+		outputPubKeyHashes = (wallet.addKeyPairAndReturnPubKeyHash(),)
 		details = {'amount':int(args.amount)}
 		return CheckAndSend_Funded(transactionType, outputs, outputPubKeyHashes, details)
 
 	elif args.action == 'pay':
 		transactionType = 'Pay'
 		outputs = ('change', 'destination')
-		outputPubKeyHashes = (host.getNewSwapBillAddress(), CheckAndReturnPubKeyHash(args.toAddress))
+		outputPubKeyHashes = (wallet.addKeyPairAndReturnPubKeyHash(), CheckAndReturnPubKeyHash(args.toAddress))
 		details = {
 		    'amount':int(args.amount),
 		    'maxBlock':state._currentBlockIndex + args.blocksUntilExpiry
@@ -227,7 +229,7 @@ def Main(startBlockIndex, startBlockHash, useTestNet, commandLineArgs=sys.argv[1
 	elif args.action == 'post_ltc_buy':
 		transactionType = 'LTCBuyOffer'
 		outputs = ('ltcBuy',)
-		outputPubKeyHashes = (host.getNewSwapBillAddress(),)
+		outputPubKeyHashes = (wallet.addKeyPairAndReturnPubKeyHash(),)
 		details = {
 		    'swapBillOffered':int(args.swapBillOffered),
 		    'exchangeRate':ExchangeRateFromArgs(args),
@@ -239,7 +241,7 @@ def Main(startBlockIndex, startBlockHash, useTestNet, commandLineArgs=sys.argv[1
 	elif args.action == 'post_ltc_sell':
 		transactionType = 'LTCSellOffer'
 		outputs = ('ltcSell',)
-		outputPubKeyHashes = (host.getNewSwapBillAddress(),)
+		outputPubKeyHashes = (wallet.addKeyPairAndReturnPubKeyHash(),)
 		details = {
 		    'ltcOffered':int(args.ltcOffered),
 		    'exchangeRate':ExchangeRateFromArgs(args),
@@ -261,7 +263,7 @@ def Main(startBlockIndex, startBlockHash, useTestNet, commandLineArgs=sys.argv[1
 		return CheckAndSend_UnFunded(transactionType, (), (), details)
 
 	elif args.action == 'get_receive_address':
-		pubKeyHash = host.getNewSwapBillAddress()
+		pubKeyHash = wallet.addKeyPairAndReturnPubKeyHash()
 		return {'receive_address': host.formatAddressForEndUser(pubKeyHash)}
 
 	elif args.action == 'get_balance':

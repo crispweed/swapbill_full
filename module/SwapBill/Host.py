@@ -47,8 +47,8 @@ class Host(object):
 
 		self._rpcHost = RPC.Host('http://' + RPC_USER + ':' + RPC_PASSWORD + '@' + RPC_HOST + ':' + str(RPC_PORT))
 		self._cachedBlockHash = None
-		assert path.isdir(dataDirectory)
-		self._wallet = Wallet.Wallet(path.join(dataDirectory, 'wallet.txt'))
+		#assert path.isdir(dataDirectory)
+		#self._wallet = Wallet.Wallet(path.join(dataDirectory, 'wallet.txt'))
 
 		blockHashForBlockZero = self._rpcHost.call('getblockhash', 0)
 		self._hasExtendTransactionsInBlockQuery = True
@@ -79,12 +79,6 @@ class Host(object):
 
 	def getNewNonSwapBillAddress(self):
 		return Address.ToPubKeyHash(self._addressVersion, self._rpcHost.call('getnewaddress'))
-	def getNewSwapBillAddress(self):
-		#return Address.ToPubKeyHash(self._addressVersion, self._rpcHost.call('getnewaddress', 'SwapBill'))
-		return self._wallet.addKeyPairAndReturnPubKeyHash()
-
-	def privateKeyForPubKeyHash(self, pubKeyHash):
-		return self._wallet.privateKeyForPubKeyHash(pubKeyHash)
 
 	def signAndSend(self, unsignedTransactionHex, privateKeys):
 		## lowest level transaction send interface
