@@ -1,5 +1,5 @@
 import binascii
-from SwapBill import RawTransaction, TransactionFee, KeyPair
+from SwapBill import RawTransaction, TransactionFee
 from SwapBill import Host ## just for insufficient fee exception
 from SwapBill import Address ## just for bad address exception
 from SwapBill.ExceptionReportedToUser import ExceptionReportedToUser
@@ -15,8 +15,7 @@ def MatchPubKeyHashAndRemovePrivateKey(keyGenerator, pubKeyHash, privateKeys):
 	while True:
 		if not privateKeys:
 			raise Exception('Failed to sign input.')
-		privateKeyWIF = privateKeys[0]
-		privateKey = KeyPair.privateKeyFromWIF(b'\xef', privateKeyWIF) # litecoin testnet private key address version
+		privateKey = privateKeys[0]
 		generatedPubKeyHash = keyGenerator.privateKeyToPubKeyHash(privateKey)
 		privateKeys = privateKeys[1:]
 		if generatedPubKeyHash == pubKeyHash:

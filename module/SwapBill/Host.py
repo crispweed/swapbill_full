@@ -23,8 +23,10 @@ class Host(object):
 
 		if useTestNet:
 			self._addressVersion = b'\x6f'
+			self._privateKeyAddressVersion = b'\xef'
 		else:
 			self._addressVersion = b'\x30'
+			self._privateKeyAddressVersion = b'\xbf'
 
 		RPC_HOST = clientConfig.get('externalip', 'localhost')
 
@@ -84,7 +86,10 @@ class Host(object):
 		## lowest level transaction send interface
 		signingResult = self._rpcHost.call('signrawtransaction', unsignedTransactionHex)
 		if signingResult['complete'] != True:
-			signingResult = self._rpcHost.call('signrawtransaction', signingResult['hex'], None, privateKeys)
+			privateKeysWif = []
+			for privateKey in privateKeys:
+				privateKeys_WIF.append(Address.PrivateKeyToWIF(privateKey, self._privateKeyAddressVersion))
+			signingResult = self._rpcHost.call('signrawtransaction', signingResult['hex'], None, privateKeys_WIF)
 		if signingResult['complete'] != True:
 			raise SigningFailed("RPC call to signrawtransaction did not set 'complete' to True")
 		signedHex = signingResult['hex']

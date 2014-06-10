@@ -52,3 +52,9 @@ class Test(unittest.TestCase):
 		self.CheckRoundTrip(b'\x01' * 20, version=b'\xff')
 		self.CheckRoundTrip(b'\x80' * 20, version=b'\xff')
 		self.CheckRoundTrip(b'\xff' * 20, version=b'\xff')
+
+	def test_private_keys(self):
+		privateKey = Address.PrivateKeyFromWIF(b'\x80', '5HueCGU8rMjxEXxiPuD5BDku4MkFqeZyd4dZ1jvhTVqvbTLvyTJ') # has bitcoin main net address version!
+		self.assertEqual(privateKey,  b"\x0c\x28\xfc\xa3\x86\xc7\xa2'`\x0b/\xe5\x0b|\xae\x11\xec\x86\xd3\xbf\x1f\xbeG\x1b\xe8\x98'\xe1\x9dr\xaa\x1d")
+		testNetWIF = Address.PrivateKeyToWIF(privateKey, b'\xef') # litecoin testnet private key address version
+		self.assertEqual(testNetWIF, '91gGn1HgSap6CbU12F6z3pJri26xzp7Ay1VW6NHCoEayNXwRpu2')

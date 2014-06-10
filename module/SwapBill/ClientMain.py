@@ -112,7 +112,7 @@ def Main(startBlockIndex, startBlockHash, useTestNet, commandLineArgs=sys.argv[1
 		except Exception as e:
 			raise ExceptionReportedToUser("Failed to create directory " + dataDir + ":", e)
 
-	wallet = Wallet.Wallet(path.join(dataDir, 'wallet.txt'), keyGenerator=keyGenerator)
+	wallet = Wallet.Wallet(path.join(dataDir, 'wallet.txt'), privateKeyAddressVersion=b'\xef', keyGenerator=keyGenerator) # litecoin testnet private key address version
 
 	if host is None:
 		host = Host.Host(useTestNet=useTestNet, dataDirectory=dataDir, configFile=args.configFile)
