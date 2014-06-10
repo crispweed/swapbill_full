@@ -12,6 +12,7 @@ from SwapBill.Amounts import e
 from SwapBill.BuildHostedTransaction import InsufficientFunds
 from SwapBill.ClientMain import TransactionNotSuccessfulAgainstCurrentState
 from SwapBill.ExceptionReportedToUser import ExceptionReportedToUser
+from SwapBill.HardCodedProtocolConstraints import Constraints
 
 class MockKeyGenerator(object):
 	def __init__(self):
@@ -772,3 +773,14 @@ class Test(unittest.TestCase):
 		self.assertRaisesRegexp(ExceptionReportedToUser, 'Transaction parameter value too big', RunClient, host, ['pay', '--amount', 1*e(15), '--toAddress', payTargetAddress])
 		# but this error comes from state check transaction
 		self.assertRaisesRegexp(ExceptionReportedToUser, 'amount is below minimum balance', RunClient, host, ['pay', '--amount', -1*e(7), '--toAddress', payTargetAddress])
+
+	def test_back_ltc_sells(self):
+		host = InitHost()
+		host._addUnspent(2*e(12))
+		RunClient(host, ['burn', '--amount', 1*e(12)+Constraints.minimumSwapBillBalance])
+		RunClient(host, ['back_ltc_sells', '--backingSwapBill', 1*e(12), '--transactionsBacked', 1000, '--blocksUntilExpiry', 20, '--commission_AsInteger', 0x10000000])
+		output, info = RunClient(host, ['get_balance'])
+		self.assertDictEqual(info, {'total': Constraints.minimumSwapBillBalance, 'spendable': 0})
+		output, result = RunClient(host, ['get_ltc_sell_backers'])
+		self.assertListEqual(result, [('ltc sell backer index', 0, {'backing amount': 1*e(12), 'I am backer': True, 'expires on block': 22, 'maximum per transaction': 1*e(9)})])
+

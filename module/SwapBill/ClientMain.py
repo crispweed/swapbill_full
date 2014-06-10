@@ -75,8 +75,8 @@ sp = subparsers.add_parser('back_ltc_sells', help='commit swapbill to back ltc e
 sp.add_argument('--backingSwapBill', required=True, help='amount of swapbill to commit')
 sp.add_argument('--transactionsBacked', required=True, help='the number of transactions you want to back, which then implies a maximum backing amount per transaction')
 sp.add_argument('--blocksUntilExpiry', type=int, default=200, help='number of blocks for which the backing amount should remain committed')
-sp.add_argument('--commision', help='the rate of commission for backed transactions, in floating point representation (must be greater than 0 and less than 1)')
-sp.add_argument('--commision_AsInteger', help='the rate of commission for backed transactions, in integer representation (must be greater than 0 and less than 4294967296)')
+sp.add_argument('--commission', help='the rate of commission for backed transactions, in floating point representation (must be greater than 0 and less than 1)')
+sp.add_argument('--commission_AsInteger', help='the rate of commission for backed transactions, in integer representation (must be greater than 0 and less than 4294967296)')
 
 subparsers.add_parser('collect', help='combine all current owned swapbill outputs into active account')
 
@@ -94,6 +94,9 @@ sp.add_argument('-i', '--includepending', help='include transactions that have b
 sp = subparsers.add_parser('get_pending_exchanges', help='get current SwapBill pending exchange payments')
 sp.add_argument('-i', '--includepending', help='include transactions that have been submitted but not yet confirmed (based on host memory pool)', action='store_true')
 
+sp = subparsers.add_parser('get_ltc_sell_backers', help='get information about funds currently commited to backing ltc sell operations')
+sp.add_argument('-i', '--includepending', help='include transactions that have been submitted but not yet confirmed (based on host memory pool)', action='store_true')
+
 sp = subparsers.add_parser('get_state_info', help='get some general state information')
 sp.add_argument('-i', '--includepending', help='include transactions that have been submitted but not yet confirmed (based on host memory pool)', action='store_true')
 
@@ -106,13 +109,13 @@ def ExchangeRateFromArgs(args):
 		raise ExceptionReportedToUser("One of exchangeRate or exchangeRate_AsInteger must be specified.")
 	return int(args.exchangeRate_AsInteger)
 def CommissionFromArgs(args):
-	if args.commision is not None:
-		if args.commision_AsInteger is not None:
-			raise ExceptionReportedToUser("Either commision or commision_AsInteger should be specified, not both.")
-		return int(float(args.commision) * 0x100000000)
-	if args.commision_AsInteger is None:
-		raise ExceptionReportedToUser("One of commision or commision_AsInteger must be specified.")
-	return int(args.commision_AsInteger)
+	if args.commission is not None:
+		if args.commission_AsInteger is not None:
+			raise ExceptionReportedToUser("Either commision or commission_AsInteger should be specified, not both.")
+		return int(float(args.commission) * 0x100000000)
+	if args.commission_AsInteger is None:
+		raise ExceptionReportedToUser("One of commission or commission_AsInteger must be specified.")
+	return int(args.commission_AsInteger)
 
 def Main(startBlockIndex, startBlockHash, useTestNet, commandLineArgs=sys.argv[1:], host=None, keyGenerator=None, out=sys.stdout):
 	args = parser.parse_args(commandLineArgs)
@@ -287,7 +290,7 @@ def Main(startBlockIndex, startBlockHash, useTestNet, commandLineArgs=sys.argv[1
 		    'backingAmount':int(args.backingSwapBill),
 		    'transactionsBacked':int(args.transactionsBacked),
 		    'ltcReceiveAddress':host.getNewNonSwapBillAddress(),
-		    'commision':CommisionFromArgs(args),
+		    'commission':CommissionFromArgs(args),
 		    'maxBlock':state._currentBlockIndex + args.blocksUntilExpiry
 		}
 		return CheckAndSend_Funded(transactionType, outputs, outputPubKeyHashes, details)
@@ -346,7 +349,7 @@ def Main(startBlockIndex, startBlockHash, useTestNet, commandLineArgs=sys.argv[1
 		result = []
 		for key in state._ltcSellBackers:
 			d = {}
-			backer = state._pendingExchanges[key]
+			backer = state._ltcSellBackers[key]
 			d['I am backer'] = backer.refundAccount in ownedAccounts.tradeOfferChangeCounts
 			d['backing amount'] = backer.backingAmount
 			d['maximum per transaction'] = backer.transactionMax
