@@ -1,12 +1,12 @@
 from __future__ import print_function
 import os
 from os import path
-from SwapBill import ParseConfig, RPC, RawTransaction, Address, TransactionFee, Amounts, Wallet
+from SwapBill import ParseConfig, RPC, RawTransaction, Address, Amounts
 from SwapBill.ExceptionReportedToUser import ExceptionReportedToUser
 
 class SigningFailed(ExceptionReportedToUser):
 	pass
-class InsufficientTransactionFees(Exception):
+class MaximumSignedSizeExceeded(Exception):
 	pass
 
 class Host(object):
@@ -82,7 +82,7 @@ class Host(object):
 	def getNewNonSwapBillAddress(self):
 		return Address.ToPubKeyHash(self._addressVersion, self._rpcHost.call('getnewaddress'))
 
-	def signAndSend(self, unsignedTransactionHex, privateKeys):
+	def signAndSend(self, unsignedTransactionHex, privateKeys, maximumSignedSize):
 		## lowest level transaction send interface
 		signingResult = self._rpcHost.call('signrawtransaction', unsignedTransactionHex)
 		if signingResult['complete'] != True:
@@ -93,10 +93,9 @@ class Host(object):
 		if signingResult['complete'] != True:
 			raise SigningFailed("RPC call to signrawtransaction did not set 'complete' to True")
 		signedHex = signingResult['hex']
-		# move out of lowest level send interface?
-		# (or repeat in higher level code?)
-		if not TransactionFee.TransactionFeeIsSufficient(self._rpcHost, signedHex):
-			raise InsufficientTransactionFees()
+		byteSize = len(signedHex) / 2
+		if byteSize > maximumSignedSize:
+			raise MaximumSignedSizeExceeded()
 		try:
 			txID = self._rpcHost.call('sendrawtransaction', signedHex)
 		except RPC.RPCFailureException as e:

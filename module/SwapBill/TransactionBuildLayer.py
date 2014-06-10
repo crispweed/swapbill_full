@@ -39,8 +39,8 @@ class TransactionBuildLayer(object):
 	def checkIfThereIsAtLeastOneOutstandingTradeRef(self, state):
 		return bool(self._ownedAccounts.tradeOfferChangeCounts)
 
-	def sendTransaction(self, tx):
+	def sendTransaction(self, tx, maximumSignedSize):
 		# higher level transaction send interface
 		unsignedData = RawTransaction.Create(tx, self._scriptPubKeyLookup)
 		unsignedHex = RawTransaction.ToHex(unsignedData)
-		return self._host.signAndSend(unsignedHex, self._privateKeys)
+		return self._host.signAndSend(unsignedHex, self._privateKeys, maximumSignedSize)

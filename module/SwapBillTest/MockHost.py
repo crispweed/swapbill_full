@@ -1,7 +1,6 @@
 import binascii
 from SwapBill import RawTransaction, TransactionFee
-from SwapBill import Host ## just for insufficient fee exception
-from SwapBill import Address ## just for bad address exception
+from SwapBill import Host, Address # these just for exceptions, at time of writing
 from SwapBill.ExceptionReportedToUser import ExceptionReportedToUser
 
 def MakeTXID(i):
@@ -14,7 +13,7 @@ def MatchPubKeyHashAndRemovePrivateKey(keyGenerator, pubKeyHash, privateKeys):
 	remainingPrivateKeys = []
 	while True:
 		if not privateKeys:
-			raise Exception('Failed to sign input.')
+			raise Host.SigningFailed("Failed to find matching private key.")
 		privateKey = privateKeys[0]
 		generatedPubKeyHash = keyGenerator.privateKeyToPubKeyHash(privateKey)
 		privateKeys = privateKeys[1:]
@@ -132,7 +131,7 @@ class MockHost(object):
 		self._unspent = unspentAfter
 		return found['amount'], pubKeyHashToBeSigned
 
-	def signAndSend(self, unsignedTransactionHex, privateKeys=[]):
+	def signAndSend(self, unsignedTransactionHex, privateKeys, maximumSignedSize):
 		unsignedTransactionBytes = RawTransaction.FromHex(unsignedTransactionHex)
 		decoded, scriptPubKeys = RawTransaction.Decode(unsignedTransactionBytes)
 		sumOfInputs = 0
@@ -157,28 +156,22 @@ class MockHost(object):
 			toAdd['scriptPubKey'] = scriptPubKey
 			toAdd['address'] = pubKeyHash
 			toAdd['amount'] = decoded.outputAmount(vout)
+			assert decoded.outputAmount(vout) >= TransactionFee.dustLimit
 			self._unspent.append(toAdd)
 			outputAmounts.append(decoded.outputAmount(vout))
-		transactionFee = sumOfInputs - sum(outputAmounts)
-		byteSize = len(unsignedTransactionHex) / 2
-		feeRequired = TransactionFee.CalculateRequired_FromSizeAndOutputs(byteSize, outputAmounts)
-		if transactionFee < feeRequired:
-			raise Host.InsufficientTransactionFees
-		assert transactionFee >= feeRequired
-		if transactionFee >= feeRequired + TransactionFee.dustLimit:
-			print('transactionFee:', transactionFee)
-			print('feeRequired:', feeRequired)
-		assert transactionFee < feeRequired + TransactionFee.dustLimit # can potentially overspend, in theory, but will be nice to see the actual test case info that causes this
+		unsignedSize = len(unsignedTransactionHex) / 2
+		signedSize = unsignedSize * 30 // 25 # arbitrary increase here to simulate an increase in size when signing transactions
+		if signedSize > maximumSignedSize:
+			raise Host.MaximumSignedSizeExceeded()
+		requiredFee = TransactionFee.CalculateRequired_FromSizeAndOutputs(signedSize, outputAmounts)
+		paidFee = sumOfInputs - sum(outputAmounts)
+		assert paidFee >= requiredFee
+		assert paidFee == requiredFee # can overspend, in theory, but would like to then see the actual repeat case for this
 		self._addTransaction(txid, unsignedTransactionHex)
+		return txid
 
 	def formatAddressForEndUser(self,  pubKeyHash):
 		return Address.FromPubKeyHash(b'\x6f', pubKeyHash) # litecoin testnet address version
-		#for i in range(len(self._keyPairs)):
-			#privateKey, storedPubKeyHash = self._keyPairs[i]
-			#if pubKeyHash == storedPubKeyHash:
-				#return 'host_address_' + str(i)
-		#startInHex = binascii.hexlify(pubKeyHash[:5]).decode('ascii')
-		#return 'SwapBill address starting with ' + startInHex
 	def addressFromEndUserFormat(self,  address):
 		return Address.ToPubKeyHash(b'\x6f', address) # litecoin testnet address version
 
