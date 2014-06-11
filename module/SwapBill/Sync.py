@@ -30,19 +30,16 @@ def _processTransactions(state, wallet, ownedAccounts, transactions, applyToStat
 			continue
 		inBetweenReport = ownedAccounts.checkForTradeOfferChanges(state)
 		assert inBetweenReport == ''
-		appliedSuccessfully, modifiedState = state.applyTransaction(transactionType, txID, sourceAccounts=sourceAccounts, transactionDetails=transactionDetails, outputs=outputs)
+		error = state.applyTransaction(transactionType, txID, sourceAccounts=sourceAccounts, transactionDetails=transactionDetails, outputs=outputs)
 		outputsReport = ownedAccounts.checkForTradeOfferChanges(state)
 		outputsReport += ownedAccounts.updateForNewOutputs(wallet, state, txID, hostTX, outputs, scriptPubKeys)
-		if not appliedSuccessfully:
-			outputsReport += ' * did not apply successfully\n'
-		if not modifiedState:
-				assert outputsReport == ''
-				outputsReport += ' * did not modify state\n'
-		if outputsReport != '':
+		if outputsReport:
 			if inputsReport == '':
 				# didn't print this line yet
 				print(reportPrefix + ': ' + transactionType, file=out)
 			print(outputsReport, end="", file=out)
+		if (outputsReport or inputsReport) and error is not None:
+			print(' * failed:', error, file=out)
 
 def _processBlock(host, state, wallet, ownedAccounts, blockHash, reportPrefix, out):
 	transactions = host.getBlockTransactions(blockHash)

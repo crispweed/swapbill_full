@@ -17,7 +17,7 @@ try:
 	from SwapBill import FormatTransactionForUserDisplay
 	from SwapBill.Sync import SyncAndReturnStateAndOwnedAccounts
 	from SwapBill.ExceptionReportedToUser import ExceptionReportedToUser
-	from SwapBill.State import InsufficientFundsForTransaction
+	from SwapBill.State import InsufficientFundsForTransaction, BadlyFormedTransaction, TransactionFailsAgainstCurrentState
 	from SwapBill.HardCodedProtocolConstraints import Constraints
 except ImportError as e:
 	message = str(e)
@@ -198,13 +198,12 @@ def Main(startBlockIndex, startBlockHash, useTestNet, commandLineArgs=sys.argv[1
 		sourceAccounts = []
 		while True:
 			try:
-				canApply, errorText = state.checkTransaction(transactionType, outputs=outputs, transactionDetails=details, sourceAccounts=sourceAccounts)
+				state.checkTransaction(transactionType, outputs=outputs, transactionDetails=details, sourceAccounts=sourceAccounts)
 			except InsufficientFundsForTransaction:
 				pass
+			except (BadlyFormedTransaction, TransactionFailsAgainstCurrentState) as e:
+				raise TransactionNotSuccessfulAgainstCurrentState('Transaction would not complete successfully against current state: ' + str(e))
 			else:
-				if errorText != '':
-					raise TransactionNotSuccessfulAgainstCurrentState('Transaction would not complete successfully against current state:', errorText)
-				assert canApply
 				break
 			if not swapBillUnspent:
 				raise ExceptionReportedToUser('Insufficient swapbill for transaction.')
@@ -216,10 +215,10 @@ def Main(startBlockIndex, startBlockHash, useTestNet, commandLineArgs=sys.argv[1
 	def CheckAndSend_UnFunded(transactionType, outputs, outputPubKeys, details):
 		TransactionEncoding.FromStateTransaction(transactionType, None, outputs, outputPubKeys, details) # for initial parameter checking
 		transactionBuildLayer.startTransactionConstruction()
-		canApply, errorText = state.checkTransaction(transactionType, outputs=outputs, transactionDetails=details, sourceAccounts=None)
-		if errorText != '':
-			raise TransactionNotSuccessfulAgainstCurrentState('Transaction would not complete successfully against current state:', errorText)
-		assert canApply
+		try:
+			state.checkTransaction(transactionType, outputs=outputs, transactionDetails=details, sourceAccounts=None)
+		except (BadlyFormedTransaction, TransactionFailsAgainstCurrentState) as e:
+			raise TransactionNotSuccessfulAgainstCurrentState('Transaction would not complete successfully against current state: ' + str(e))
 		return CheckAndSend_Common(transactionType, None, outputs, outputPubKeys, details)
 
 	def CheckAndReturnPubKeyHash(address):

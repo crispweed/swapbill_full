@@ -4,16 +4,20 @@ from SwapBill import TradeOfferHeap, TradeOffer, Balances
 from SwapBill.HardCodedProtocolConstraints import Constraints
 from SwapBill.Amounts import e
 
-class InvalidTransactionParameters(Exception):
-	pass
-class InvalidTransactionType(Exception):
-	pass
-
+# these assertions are used to communicate whether or not a transaction is possible to the user
 class BadlyFormedTransaction(Exception):
 	pass
 class TransactionFailsAgainstCurrentState(Exception):
 	pass
 class InsufficientFundsForTransaction(Exception):
+	pass
+
+# these should normally indicate some internal error
+# e.g. transaction mappings don't correspond the state transaction methods
+# or client main transaction setup code is incorrect
+class InvalidTransactionParameters(Exception):
+	pass
+class InvalidTransactionType(Exception):
 	pass
 
 class LTCSellBacker(object):
@@ -286,12 +290,12 @@ class State(object):
 	def _unfundedTransaction_LTCExchangeCompletion(self, txID, pendingExchangeIndex, destinationAddress, destinationAmount, outputs):
 		assert outputs == ()
 		if not pendingExchangeIndex in self._pendingExchanges:
-			raise BadlyFormedTransaction('no pending exchange with the specified index')
+			raise TransactionFailsAgainstCurrentState('no pending exchange with the specified index')
 		exchange = self._pendingExchanges[pendingExchangeIndex]
 		if destinationAddress != exchange.ltcReceiveAddress:
-			raise BadlyFormedTransaction('destination account does not match destination for pending exchange with the specified index')
+			raise TransactionFailsAgainstCurrentState('destination account does not match destination for pending exchange with the specified index')
 		if destinationAmount < exchange.ltc:
-			raise BadlyFormedTransaction('amount is less than required payment amount')
+			raise TransactionFailsAgainstCurrentState('amount is less than required payment amount')
 		if txID is None:
 			if destinationAmount > exchange.ltc:
 				raise TransactionFailsAgainstCurrentState('amount is greater than required payment amount')
@@ -323,16 +327,11 @@ class State(object):
 			method(swapBillInput=swapBillInput, changeRequired=changeRequired, txID=None, outputs=outputs, **transactionDetails)
 		except TypeError as e:
 			raise InvalidTransactionParameters(e)
-		except BadlyFormedTransaction as e:
-			return False, str(e)
-		except TransactionFailsAgainstCurrentState as e:
-			return True, str(e)
-		return True, ''
 	def applyFundedTransaction(self, transactionType, txID, sourceAccounts, transactionDetails, outputs):
 		try:
 			method = getattr(self, '_fundedTransaction_' + transactionType)
 		except AttributeError as e:
-			return
+			return 'bad transaction type'
 		swapBillInput = 0
 		consumeAndForward = []
 		changeRequired = False
@@ -343,14 +342,16 @@ class State(object):
 			consumeAndForward.append(sourceAccount)
 			if self._balances.isReferenced(sourceAccount):
 				changeRequired = True
-		wasSuccessful = True
+		errorReport = None
+		change = swapBillInput
 		try:
 			change = method(txID=txID, swapBillInput=swapBillInput, changeRequired=changeRequired, outputs=outputs, **transactionDetails)
-		except (TypeError, BadlyFormedTransaction):
-			return False, False
-		except (TransactionFailsAgainstCurrentState, InsufficientFundsForTransaction):
-			change = swapBillInput
-			wasSuccessful = False
+		except TypeError:
+			errorReport = 'bad transaction parameters'
+		except (BadlyFormedTransaction, TransactionFailsAgainstCurrentState) as e:
+			errorReport = str(e)
+		except InsufficientFundsForTransaction:
+			errorReport = 'insufficient funds'
 		if changeRequired:
 			assert change > 0
 		if change > 0:
@@ -360,7 +361,7 @@ class State(object):
 		else:
 			for account in consumeAndForward:
 				self._balances.consume(account)
-		return wasSuccessful, True
+		return errorReport
 
 	def checkUnfundedTransaction(self, transactionType, transactionDetails, outputs):
 		try:
@@ -371,26 +372,26 @@ class State(object):
 			method(txID=None, outputs=outputs, **transactionDetails)
 		except TypeError as e:
 			raise InvalidTransactionParameters(e)
-		except BadlyFormedTransaction as e:
-			return False, str(e)
-		except TransactionFailsAgainstCurrentState as e:
-			return True, str(e)
-		return True, ''
 	def applyUnfundedTransaction(self, transactionType, txID, transactionDetails, outputs):
 		try:
 			method = getattr(self, '_unfundedTransaction_' + transactionType)
 		except AttributeError as e:
-			return
+			return 'bad transaction type'
 		try:
 			method(txID=txID, outputs=outputs, **transactionDetails)
-		except (TypeError, BadlyFormedTransaction, TransactionFailsAgainstCurrentState):
-			return False, False
-		return True, True
+		except TypeError:
+			return 'bad transaction parameters'
+		except (BadlyFormedTransaction, TransactionFailsAgainstCurrentState) as e:
+			return str(e)
+		except InsufficientFundsForTransaction:
+			return 'insufficient funds'
+		return None
 
 	def checkTransaction(self, transactionType, sourceAccounts, transactionDetails, outputs):
 		if sourceAccounts is None:
-			return self.checkUnfundedTransaction(transactionType, transactionDetails, outputs)
-		return self.checkFundedTransaction(transactionType, sourceAccounts, transactionDetails, outputs)
+			self.checkUnfundedTransaction(transactionType, transactionDetails, outputs)
+		else:
+			self.checkFundedTransaction(transactionType, sourceAccounts, transactionDetails, outputs)
 	def applyTransaction(self, transactionType, txID, sourceAccounts, transactionDetails, outputs):
 		if sourceAccounts is None:
 			return self.applyUnfundedTransaction(transactionType, txID, transactionDetails, outputs)
