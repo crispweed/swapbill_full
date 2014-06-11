@@ -9,9 +9,9 @@ def totalAccountedFor(state):
 	result = 0
 	for key in state._balances.balances:
 		result += state._balances.balances[key]
-	for offer in state._LTCBuys.getSortedOffers():
+	for offer in state._ltcBuys.getSortedOffers():
 		result += offer._swapBillOffered
-	for offer in state._LTCSells.getSortedOffers():
+	for offer in state._ltcSells.getSortedOffers():
 		result += offer._swapBillDeposit
 	for key in state._pendingExchanges:
 		exchange = state._pendingExchanges[key]
@@ -345,7 +345,7 @@ class Test(unittest.TestCase):
 		expiredBuyOfferChange = outputs['ltcBuy']
 		expectedBalances[expiredBuyOfferChange] = expectedBalances.pop(burnA)
 		self.assertEqual(state._balances.balances, expectedBalances)
-		self.assertEqual(state._LTCBuys.size(), 0)
+		self.assertEqual(state._ltcBuys.size(), 0)
 
 		# try offering more than available
 		details['swapBillOffered'] = 3000000000
@@ -359,7 +359,7 @@ class Test(unittest.TestCase):
 		self.assertEqual(reason, 'does not satisfy minimum exchange amount')
 		self.assertEqual(state._balances.balances, expectedBalances)
 
-		self.assertEqual(state._LTCBuys.size(), 0)
+		self.assertEqual(state._ltcBuys.size(), 0)
 
 		# reasonable buy offer that should go through
 		details['swapBillOffered'] = 30000000
@@ -368,7 +368,7 @@ class Test(unittest.TestCase):
 		expectedBalances.pop(failedBuyChange)
 		expectedBalances[refundA]=70000000
 		self.assertEqual(state._balances.balances, expectedBalances)
-		self.assertEqual(state._LTCBuys.size(), 1)
+		self.assertEqual(state._ltcBuys.size(), 1)
 
 		# refund account can't be completely spent yet as it is referenced by the trade
 		changeA = self.Apply_AssertInsufficientFunds(state, 'Pay', sourceAccounts=[refundA], amount=expectedBalances[refundA], maxBlock=200)
@@ -400,7 +400,7 @@ class Test(unittest.TestCase):
 		expiredSellOfferChange = outputs['ltcSell']
 		expectedBalances[expiredSellOfferChange] = expectedBalances.pop(burnB)
 		self.assertEqual(state._balances.balances, expectedBalances)
-		self.assertEqual(state._LTCSells.size(), 0)
+		self.assertEqual(state._ltcSells.size(), 0)
 
 		#details['maxBlock'] = 99
 		#reason = self.Apply_AssertFails(state, 'LTCSellOffer', **details)
@@ -419,8 +419,8 @@ class Test(unittest.TestCase):
 		self.assertEqual(reason, 'does not satisfy minimum exchange amount')
 		self.assertEqual(state._balances.balances, expectedBalances)
 
-		self.assertEqual(state._LTCBuys.size(), 1)
-		self.assertEqual(state._LTCSells.size(), 0)
+		self.assertEqual(state._ltcBuys.size(), 1)
+		self.assertEqual(state._ltcSells.size(), 0)
 
 		# reasonable sell offer that should go through (and match)
 		details['ltcOffered'] = 40000000//2
@@ -428,8 +428,8 @@ class Test(unittest.TestCase):
 		receivingB = outputs['ltcSell']
 		expectedBalances[receivingB] = expectedBalances.pop(offerTooHighChange) - 2500000
 		self.assertEqual(state._balances.balances, expectedBalances)
-		self.assertEqual(state._LTCBuys.size(), 0)
-		self.assertEqual(state._LTCSells.size(), 1)
+		self.assertEqual(state._ltcBuys.size(), 0)
+		self.assertEqual(state._ltcSells.size(), 1)
 		self.assertEqual(len(state._pendingExchanges), 1)
 		self.assertTrue(0 in state._pendingExchanges)
 
@@ -445,8 +445,8 @@ class Test(unittest.TestCase):
 		self.assertEqual(reason, 'no pending exchange with the specified index')
 		# no state change
 		self.assertEqual(state._balances.balances, expectedBalances)
-		self.assertEqual(state._LTCBuys.size(), 0)
-		self.assertEqual(state._LTCSells.size(), 1)
+		self.assertEqual(state._ltcBuys.size(), 0)
+		self.assertEqual(state._ltcSells.size(), 1)
 		self.assertEqual(len(state._pendingExchanges), 1)
 		self.assertTrue(0 in state._pendingExchanges)
 
@@ -455,8 +455,8 @@ class Test(unittest.TestCase):
 		self.assertEqual(reason, 'destination account does not match destination for pending exchange with the specified index')
 		# no state change
 		self.assertEqual(state._balances.balances, expectedBalances)
-		self.assertEqual(state._LTCBuys.size(), 0)
-		self.assertEqual(state._LTCSells.size(), 1)
+		self.assertEqual(state._ltcBuys.size(), 0)
+		self.assertEqual(state._ltcSells.size(), 1)
 		self.assertEqual(len(state._pendingExchanges), 1)
 		self.assertTrue(0 in state._pendingExchanges)
 
@@ -465,8 +465,8 @@ class Test(unittest.TestCase):
 		self.assertEqual(reason, 'amount is less than required payment amount')
 		# no state change (b just loses these ltc)
 		self.assertEqual(state._balances.balances, expectedBalances)
-		self.assertEqual(state._LTCBuys.size(), 0)
-		self.assertEqual(state._LTCSells.size(), 1)
+		self.assertEqual(state._ltcBuys.size(), 0)
+		self.assertEqual(state._ltcSells.size(), 1)
 		self.assertEqual(len(state._pendingExchanges), 1)
 		self.assertTrue(0 in state._pendingExchanges)
 
@@ -488,8 +488,8 @@ class Test(unittest.TestCase):
 		self.assertEqual(state._balances.balances, expectedBalances)
 		#self.assertEqual(state._balances.balances, {changeA:70000000-1, changeB:197500000-1, burnC:200000000, refundA:1, receivingB:1})
 		#self.assertEqual(state._balances.balances, {changeA:70000000-1, changeB:197500000-1, burnC:200000000, refundA:1, receivingB:31875000+1})
-		self.assertEqual(state._LTCBuys.size(), 0)
-		self.assertEqual(state._LTCSells.size(), 1)
+		self.assertEqual(state._ltcBuys.size(), 0)
+		self.assertEqual(state._ltcSells.size(), 1)
 		self.assertEqual(len(state._pendingExchanges), 0)
 
 	def test_ltc_buy_change_added_to_refund(self):
@@ -523,8 +523,8 @@ class Test(unittest.TestCase):
 		# the offers can't match, because of small (sell) remainder
 		self.assertEqual(state._balances.balances, {receiveB:1*e(7)-deposit, refundA:1})
 		self.assertEqual(len(state._pendingExchanges), 0)
-		self.assertEqual(state._LTCBuys.size(), 1)
-		self.assertEqual(state._LTCSells.size(), 1)
+		self.assertEqual(state._ltcBuys.size(), 1)
+		self.assertEqual(state._ltcSells.size(), 1)
 		# cannot spend whole balance, because this is referenced by the sell offer
 		self.assertTrue(state._balances.accountHasBalance(receiveB))
 		self.assertTrue(state._balances.isReferenced(receiveB))
@@ -545,8 +545,8 @@ class Test(unittest.TestCase):
 		refundC = self.BuyOffer(state, burnC, 'receiveLTC2', swapBillOffered=1*e(8), exchangeRate=0x80000000)
 		self.assertEqual(state._balances.balances, {changeB2:1, payOutput:1*e(7)-deposit-1, changeA:1, refundC:3*e(8)})
 		self.assertEqual(len(state._pendingExchanges), 1)
-		self.assertEqual(state._LTCBuys.size(), 2)
-		self.assertEqual(state._LTCSells.size(), 0)
+		self.assertEqual(state._ltcBuys.size(), 2)
+		self.assertEqual(state._ltcSells.size(), 0)
 		# completion
 		self.Completion(state, 0, 'receiveLTC2', 1*e(7)//2)
 		self.assertEqual(len(state._pendingExchanges), 0)
@@ -576,8 +576,8 @@ class Test(unittest.TestCase):
 		expectedBalances[refundA] = 1
 		self.assertEqual(state._balances.balances, expectedBalances)
 		self.assertEqual(len(state._pendingExchanges), 0)
-		self.assertEqual(state._LTCBuys.size(), 1)
-		self.assertEqual(state._LTCSells.size(), 1)
+		self.assertEqual(state._ltcBuys.size(), 1)
+		self.assertEqual(state._ltcSells.size(), 1)
 		# refund account can't be spent completely as this is still referenced by the trade offer
 		# (different tests for not being able to spend completely follow)
 		self.assertTrue(state._balances.accountHasBalance(refundA))
@@ -600,8 +600,8 @@ class Test(unittest.TestCase):
 		expectedBalances[receiveC] = 4*e(8)-depositC
 		self.assertEqual(state._balances.balances, expectedBalances)
 		self.assertEqual(len(state._pendingExchanges), 1)
-		self.assertEqual(state._LTCBuys.size(), 0)
-		self.assertEqual(state._LTCSells.size(), 2)
+		self.assertEqual(state._ltcBuys.size(), 0)
+		self.assertEqual(state._ltcSells.size(), 2)
 		# completion
 		self.Completion(state, 0, 'receiveLTC', 10100000 // 2)
 		self.assertEqual(len(state._pendingExchanges), 0)
@@ -689,8 +689,8 @@ class Test(unittest.TestCase):
 		expectedBalances[refundA] = 1
 		self.assertEqual(state._balances.balances, expectedBalances)
 		self.assertEqual(len(state._pendingExchanges), 1)
-		self.assertEqual(state._LTCBuys.size(), 0)
-		self.assertEqual(state._LTCSells.size(), 1) ## half of sell offer is left outstanding
+		self.assertEqual(state._ltcBuys.size(), 0)
+		self.assertEqual(state._ltcSells.size(), 1) ## half of sell offer is left outstanding
 		self.Completion(state, 0, 'receiveLTC', 1*e(7) // 2)
 		self.assertEqual(len(state._pendingExchanges), 0)
 		# b should be refunded half his deposit = 625000, plus payment of 10000000
@@ -736,8 +736,8 @@ class Test(unittest.TestCase):
 		# nothing refunded, no change to balances
 		self.assertEqual(state._balances.balances, {receiveB:18750000, refundA:1})
 		self.assertEqual(len(state._pendingExchanges), 1)
-		self.assertEqual(state._LTCBuys.size(), 1) # half of buy offer is left outstanding
-		self.assertEqual(state._LTCSells.size(), 0)
+		self.assertEqual(state._ltcBuys.size(), 1) # half of buy offer is left outstanding
+		self.assertEqual(state._ltcSells.size(), 0)
 		self.Completion(state, 0, 'receiveLTC', 20000000 // 2)
 		self.assertEqual(len(state._pendingExchanges), 0)
 		# b should be refunded all his deposit, and receives payment in swapbill
@@ -764,9 +764,9 @@ class Test(unittest.TestCase):
 		self.assertEqual(state._balances.balances, {receiveB: 1*e(7)-625000})
 		state.advanceToNextBlock()
 		self.assertEqual(state._balances.balances, {receiveB: 1*e(7)-625000})
-		self.assertEqual(state._LTCSells.size(), 1)
+		self.assertEqual(state._ltcSells.size(), 1)
 		state.advanceToNextBlock()
-		self.assertEqual(state._LTCSells.size(), 0)
+		self.assertEqual(state._ltcSells.size(), 0)
 		self.assertEqual(state._balances.balances, {receiveB: 1*e(7)})
 		burnA = self.Burn(1*e(7)+1)
 		refundA = self.BuyOffer(state, burnA, 'receiveLTC', swapBillOffered=1*e(7), exchangeRate=0x80000000, maxBlock=105)
@@ -775,10 +775,10 @@ class Test(unittest.TestCase):
 		state.advanceToNextBlock()
 		state.advanceToNextBlock()
 		self.assertEqual(state._balances.balances, {receiveB: 1*e(7), refundA:1})
-		self.assertEqual(state._LTCBuys.size(), 1)
+		self.assertEqual(state._ltcBuys.size(), 1)
 		state.advanceToNextBlock()
 		self.assertEqual(state._balances.balances, {receiveB: 1*e(7), refundA:1*e(7)+1})
-		self.assertEqual(state._LTCBuys.size(), 0)
+		self.assertEqual(state._ltcBuys.size(), 0)
 		self.assertEqual(totalAccountedFor(state), state._totalCreated)
 
 	def test_buy_matches_multiple_sells(self):
@@ -795,14 +795,14 @@ class Test(unittest.TestCase):
 			expectedBalances[receiveOutput] = 1*e(7)-625000
 		self.assertEqual(state._balances.balances, expectedBalances)
 		burn = self.Burn(3*e(7))
-		self.assertEqual(state._LTCSells.size(), 4)
-		self.assertEqual(state._LTCBuys.size(), 0)
+		self.assertEqual(state._ltcSells.size(), 4)
+		self.assertEqual(state._ltcBuys.size(), 0)
 		refund = self.BuyOffer(state, burn, 'receiveLTC', swapBillOffered=25*e(6), exchangeRate=0x80000000)
 		# 2 sellers matched completely
 		# 1 seller partially matched
 		expectedBalances[refund] = 5*e(6)
-		self.assertEqual(state._LTCSells.size(), 2)
-		self.assertEqual(state._LTCBuys.size(), 0)
+		self.assertEqual(state._ltcSells.size(), 2)
+		self.assertEqual(state._ltcBuys.size(), 0)
 		self.assertEqual(len(state._pendingExchanges), 3)
 		self.assertEqual(state._balances.balances, expectedBalances)
 		self.Completion(state, 0, 'receiveLTC', 5*e(6))
@@ -843,15 +843,15 @@ class Test(unittest.TestCase):
 			expectedBalances[refundOutput] = 1
 		self.assertEqual(state._balances.balances, expectedBalances)
 		burn = self.Burn(25*e(6)//16 + 1)
-		self.assertEqual(state._LTCBuys.size(), 4)
-		self.assertEqual(state._LTCSells.size(), 0)
+		self.assertEqual(state._ltcBuys.size(), 4)
+		self.assertEqual(state._ltcSells.size(), 0)
 		receive = self.SellOffer(state, burn, ltcOffered=25*e(6)//2, exchangeRate=0x80000000)
 		# deposit is 25*e(6) // 16
 		# 2 buyers matched completely
 		# 1 buyer partially matched
 		expectedBalances[receive] = 1
-		self.assertEqual(state._LTCBuys.size(), 2)
-		self.assertEqual(state._LTCSells.size(), 0)
+		self.assertEqual(state._ltcBuys.size(), 2)
+		self.assertEqual(state._ltcSells.size(), 0)
 		self.assertEqual(len(state._pendingExchanges), 3)
 		self.assertEqual(state._balances.balances, expectedBalances)
 		self.Completion(state, 0, 'receiveLTC', 5*e(6))

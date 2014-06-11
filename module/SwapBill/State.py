@@ -27,8 +27,8 @@ class State(object):
 		self._balances = Balances.Balances()
 		self._totalCreated = 0
 		self._totalForwarded = 0
-		self._LTCBuys = TradeOfferHeap.Heap(startBlockIndex, False) # lower exchange rate is better offer
-		self._LTCSells = TradeOfferHeap.Heap(startBlockIndex, True) # higher exchange rate is better offer
+		self._ltcBuys = TradeOfferHeap.Heap(startBlockIndex, False) # lower exchange rate is better offer
+		self._ltcSells = TradeOfferHeap.Heap(startBlockIndex, True) # higher exchange rate is better offer
 		self._nextExchangeIndex = 0
 		self._pendingExchanges = {}
 		self._nextBackerIndex = 0
@@ -38,12 +38,12 @@ class State(object):
 		return self._startBlockHash == startBlockHash
 
 	def advanceToNextBlock(self):
-		expired = self._LTCBuys.advanceToNextBlock()
+		expired = self._ltcBuys.advanceToNextBlock()
 		for buyOffer in expired:
 			self._balances.addStateChange(buyOffer.refundAccount)
 			self._balances.addTo_Forwarded(buyOffer.refundAccount, buyOffer._swapBillOffered)
 			self._balances.removeRef(buyOffer.refundAccount)
-		expired = self._LTCSells.advanceToNextBlock()
+		expired = self._ltcSells.advanceToNextBlock()
 		for sellOffer in expired:
 			self._balances.addStateChange(sellOffer.receivingAccount)
 			self._balances.addTo_Forwarded(sellOffer.receivingAccount, sellOffer._swapBillDeposit)
@@ -154,11 +154,11 @@ class State(object):
 		buy.expiry = maxBlock
 		toReAdd = []
 		while True:
-			if self._LTCSells.empty() or not TradeOffer.OffersMeetOrOverlap(buy=buy, sell=self._LTCSells.peekCurrentBest()):
+			if self._ltcSells.empty() or not TradeOffer.OffersMeetOrOverlap(buy=buy, sell=self._ltcSells.peekCurrentBest()):
 				# no more matchable sell offers
-				self._LTCBuys.addOffer(buy)
+				self._ltcBuys.addOffer(buy)
 				break
-			sell = self._LTCSells.popCurrentBest()
+			sell = self._ltcSells.popCurrentBest()
 			try:
 				buyRemainder, sellRemainder = self._matchOffersAndAddExchange(buy=buy, sell=sell)
 			except TradeOffer.OfferIsBelowMinimumExchange:
@@ -172,7 +172,7 @@ class State(object):
 				toReAdd.append(sellRemainder)
 			break
 		for entry in toReAdd:
-			self._LTCSells.addOffer(entry)
+			self._ltcSells.addOffer(entry)
 		return change
 
 	def _fundedTransaction_LTCSellOffer(self, txID, swapBillInput, changeRequired, ltcOffered, exchangeRate, maxBlock, outputs):
@@ -198,11 +198,11 @@ class State(object):
 		sell.expiry = maxBlock
 		toReAdd = []
 		while True:
-			if self._LTCBuys.empty() or not TradeOffer.OffersMeetOrOverlap(buy=self._LTCBuys.peekCurrentBest(), sell=sell):
+			if self._ltcBuys.empty() or not TradeOffer.OffersMeetOrOverlap(buy=self._ltcBuys.peekCurrentBest(), sell=sell):
 				# no more matchable buy offers
-				self._LTCSells.addOffer(sell)
+				self._ltcSells.addOffer(sell)
 				break
-			buy = self._LTCBuys.popCurrentBest()
+			buy = self._ltcBuys.popCurrentBest()
 			try:
 				buyRemainder, sellRemainder = self._matchOffersAndAddExchange(buy=buy, sell=sell)
 			except TradeOffer.OfferIsBelowMinimumExchange:
@@ -216,7 +216,7 @@ class State(object):
 				toReAdd.append(buyRemainder)
 			break
 		for entry in toReAdd:
-			self._LTCBuys.addOffer(entry)
+			self._ltcBuys.addOffer(entry)
 		return change
 
 	def _fundedTransaction_BackLTCSells(self, txID, swapBillInput, changeRequired, backingAmount, transactionsBacked, commission, ltcReceiveAddress, maxBlock, outputs):

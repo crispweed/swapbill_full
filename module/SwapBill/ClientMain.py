@@ -150,8 +150,8 @@ def Main(startBlockIndex, startBlockHash, useTestNet, commandLineArgs=sys.argv[1
 		    'totalCreated':state._totalCreated,
 		    'atEndOfBlock':state._currentBlockIndex - 1, 'balances':formattedBalances, 'syncOutput':syncOut.getvalue(),
 		    'syncTime':elapsedTime,
-		    'numberOfLTCBuyOffers':state._LTCBuys.size(),
-		    'numberOfLTCSellOffers':state._LTCSells.size(),
+		    'numberOfLTCBuyOffers':state._ltcBuys.size(),
+		    'numberOfLTCSellOffers':state._ltcSells.size(),
 		    'numberOfPendingExchanges':len(state._pendingExchanges),
 		    'numberOfOutputs':len(ownedAccounts.accounts)
 		}
@@ -312,7 +312,7 @@ def Main(startBlockIndex, startBlockHash, useTestNet, commandLineArgs=sys.argv[1
 
 	elif args.action == 'get_buy_offers':
 		result = []
-		for offer in state._LTCBuys.getSortedOffers():
+		for offer in state._ltcBuys.getSortedOffers():
 			mine = offer.refundAccount in ownedAccounts.tradeOfferChangeCounts
 			exchangeAmount = offer._swapBillOffered
 			rate_Double = float(offer.rate) / 0x100000000
@@ -322,7 +322,7 @@ def Main(startBlockIndex, startBlockHash, useTestNet, commandLineArgs=sys.argv[1
 
 	elif args.action == 'get_sell_offers':
 		result = []
-		for offer in state._LTCSells.getSortedOffers():
+		for offer in state._ltcSells.getSortedOffers():
 			mine = offer.receivingAccount in ownedAccounts.tradeOfferChangeCounts
 			ltc = offer._ltcOffered
 			depositAmount = offer._swapBillDeposit
