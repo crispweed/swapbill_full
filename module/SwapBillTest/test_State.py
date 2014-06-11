@@ -902,7 +902,7 @@ class Test(unittest.TestCase):
 		self.assertDictEqual(state._balances.balances, {active:Constraints.minimumSwapBillBalance})
 		self.assertTrue(state._balances.isReferenced(active))
 		self.assertEqual(len(state._ltcSellBackers), 1)
-		self.assertDictEqual(state._ltcSellBackers[0].__dict__, {'backingAmount': 10000000000, 'commission': 134217728, 'expiry': 100, 'ltcReceiveAddress': 'madeUpAddress', 'refundAccount': ('tx7', 1), 'transactionMax': 100000000})
+		self.assertDictEqual(state._ltcSellBackers[0].__dict__, {'backingAmount': 10000000000, 'commission': 134217728, 'expiry': 100, 'ltcReceiveAddress': 'madeUpAddress', 'refundAccount': ('tx7', 1), 'transactionMax': 99900000})
 		# but then expires (and is refunded)
 		state.advanceToNextBlock()
 		self.assertFalse(state._balances.isReferenced(active))
