@@ -75,8 +75,8 @@ sp = subparsers.add_parser('back_ltc_sells', help='commit swapbill to back ltc e
 sp.add_argument('--backingSwapBill', required=True, help='amount of swapbill to commit')
 sp.add_argument('--transactionsBacked', required=True, help='the number of transactions you want to back, which then implies a maximum backing amount per transaction')
 sp.add_argument('--blocksUntilExpiry', type=int, default=200, help='number of blocks for which the backing amount should remain committed')
-sp.add_argument('--commission', help='the rate of commission for backed transactions, in floating point representation (must be greater than 0 and less than 1)')
-sp.add_argument('--commission_AsInteger', help='the rate of commission for backed transactions, in integer representation (must be greater than 0 and less than 4294967296)')
+sp.add_argument('--commission', help='the rate of commission for backed transactions, in floating point representation (must be greater than or equal to 0 and less than 1)')
+sp.add_argument('--commission_AsInteger', help='the rate of commission for backed transactions, in integer representation (must be greater than or equal to 0 and less than 4294967296)')
 
 subparsers.add_parser('collect', help='combine all current owned swapbill outputs into active account')
 
@@ -192,6 +192,7 @@ def Main(startBlockIndex, startBlockHash, useTestNet, commandLineArgs=sys.argv[1
 		return {'transaction id':txID}
 
 	def CheckAndSend_Funded(transactionType, outputs, outputPubKeys, details):
+		TransactionEncoding.FromStateTransaction(transactionType, [], outputs, outputPubKeys, details) # for initial parameter checking
 		transactionBuildLayer.startTransactionConstruction()
 		swapBillUnspent = transactionBuildLayer.getSwapBillUnspent(state)
 		sourceAccounts = []
@@ -213,6 +214,7 @@ def Main(startBlockIndex, startBlockHash, useTestNet, commandLineArgs=sys.argv[1
 		return CheckAndSend_Common(transactionType, sourceAccounts, outputs, outputPubKeys, details)
 
 	def CheckAndSend_UnFunded(transactionType, outputs, outputPubKeys, details):
+		TransactionEncoding.FromStateTransaction(transactionType, None, outputs, outputPubKeys, details) # for initial parameter checking
 		transactionBuildLayer.startTransactionConstruction()
 		canApply, errorText = state.checkTransaction(transactionType, outputs=outputs, transactionDetails=details, sourceAccounts=None)
 		if errorText != '':

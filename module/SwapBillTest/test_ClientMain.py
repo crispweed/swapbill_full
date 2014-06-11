@@ -309,11 +309,8 @@ class Test(unittest.TestCase):
 		RunClient(host, ['burn', '--amount', 4*e(7)])
 		RunClient(host, ['post_ltc_buy', '--swapBillOffered', 3*e(7), '--exchangeRate', '0.5', '--blocksUntilExpiry', '4'])
 		host.holdNewTransactions = True
-
-
 		output, result = RunClient(host, ['get_buy_offers', '-i'])
 		self.assertEqual(result, [('exchange rate as float (approximation)', 0.5, {'exchange rate as integer': 2147483648, 'ltc equivalent': 15*e(6), 'mine': True, 'swapbill offered': 3*e(7)})])
-
 		# two blocks advanced so far, one for burn, one for sell offer
 		host._advance(4)
 		self.assertEqual(host._nextBlock, 6)
@@ -744,7 +741,7 @@ class Test(unittest.TestCase):
 		self.assertEqual(info['syncOutput'].count(': Pay'), 0)
 		self.assertEqual(info['syncOutput'].count('trade offer or pending exchange expired'), 0)
 
-	def test_transaction_parameter_ranges(self):
+	def test_burn_and_pay_parameter_ranges(self):
 		# following requires a long in python 2.7
 		host = InitHost()
 		host._addUnspent(2*e(19))
@@ -770,9 +767,11 @@ class Test(unittest.TestCase):
 		payTargetAddress = result['receive_address']
 		host._setOwner(host.defaultOwner)
 		# this error comes from transaction encoding
-		self.assertRaisesRegexp(ExceptionReportedToUser, 'Transaction parameter value too big', RunClient, host, ['pay', '--amount', 1*e(15), '--toAddress', payTargetAddress])
+		self.assertRaisesRegexp(ExceptionReportedToUser, 'transaction parameter value too big', RunClient, host, ['pay', '--amount', 1*e(15), '--toAddress', payTargetAddress])
 		# but this error comes from state check transaction
-		self.assertRaisesRegexp(ExceptionReportedToUser, 'amount is below minimum balance', RunClient, host, ['pay', '--amount', -1*e(7), '--toAddress', payTargetAddress])
+		#self.assertRaisesRegexp(ExceptionReportedToUser, 'amount is below minimum balance', RunClient, host, ['pay', '--amount', -1*e(7), '--toAddress', payTargetAddress])
+		# (..added initial check against encoding)
+		self.assertRaisesRegexp(ExceptionReportedToUser, 'negative transaction parameter not supported', RunClient, host, ['pay', '--amount', -1*e(7), '--toAddress', payTargetAddress])
 
 	def test_back_ltc_sells(self):
 		host = InitHost()
@@ -798,3 +797,11 @@ class Test(unittest.TestCase):
 		self.assertEqual(host._nextBlock, 23)
 		output, result = RunClient(host, ['get_ltc_sell_backers'])
 		self.assertListEqual(result, [])
+
+	def test_bad_exchange_rate(self):
+		host = InitHost()
+		host._addUnspent(5*e(8))
+		burn = RunClient(host, ['burn', '--amount', 1*e(8)])
+		self.assertRaisesRegexp(TransactionNotSuccessfulAgainstCurrentState, 'zero exchange rate not permitted', RunClient, host, ['post_ltc_sell', '--ltcOffered', 3*e(7)//2, '--exchangeRate', '0.0'])
+		#info = GetStateInfo(host)
+		#RunClient(host, ['post_ltc_buy', '--swapBillOffered', 3*e(7), '--exchangeRate', '0.5'])

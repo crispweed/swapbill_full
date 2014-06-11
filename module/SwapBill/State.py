@@ -133,7 +133,8 @@ class State(object):
 
 	def _fundedTransaction_LTCBuyOffer(self, txID, swapBillInput, changeRequired, swapBillOffered, exchangeRate, receivingAddress, maxBlock, outputs):
 		assert outputs == ('ltcBuy',)
-		assert exchangeRate < 0x100000000
+		if exchangeRate == 0:
+			raise BadlyFormedTransaction('zero exchange rate not permitted')
 		try:
 			buy = TradeOffer.BuyOffer(swapBillOffered=swapBillOffered, rate=exchangeRate)
 		except TradeOffer.OfferIsBelowMinimumExchange:
@@ -177,7 +178,8 @@ class State(object):
 
 	def _fundedTransaction_LTCSellOffer(self, txID, swapBillInput, changeRequired, ltcOffered, exchangeRate, maxBlock, outputs):
 		assert outputs == ('ltcSell',)
-		assert exchangeRate < 0x100000000
+		if exchangeRate == 0:
+			raise BadlyFormedTransaction('zero exchange rate not permitted')
 		swapBillDeposit = TradeOffer.DepositRequiredForLTCSell(exchangeRate=exchangeRate, ltcOffered=ltcOffered)
 		try:
 			sell = TradeOffer.SellOffer(swapBillDeposit=swapBillDeposit, ltcOffered=ltcOffered, rate=exchangeRate)

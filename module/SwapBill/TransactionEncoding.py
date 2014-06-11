@@ -67,7 +67,7 @@ def _decodeInt(data):
 
 def _encodeInt(value, numberOfBytes):
 	if value < 0:
-		raise ExceptionReportedToUser('Negative transaction parameter not supported')
+		raise ExceptionReportedToUser('negative transaction parameter not supported')
 	#print('value:', value)
 	#print('numberOfBytes:', numberOfBytes)
 	result = b''
@@ -76,7 +76,7 @@ def _encodeInt(value, numberOfBytes):
 		value = value // 256
 		result += struct.pack('<B', byteValue)
 	if value > 0:
-		raise ExceptionReportedToUser('Transaction parameter value too big')
+		raise ExceptionReportedToUser('transaction parameter value too big')
 	return result
 
 def ToStateTransaction(tx):
