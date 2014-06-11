@@ -280,27 +280,27 @@ class State(object):
 		backer = self._ltcSellBackers[backerIndex]
 		if backerLTCReceiveAddress != backer.ltcReceiveAddress:
 			raise TransactionFailsAgainstCurrentState('destination address does not match backer receive address for pending exchange with the specified index')
-		if backer.backingAmount < swapBillDeposit + Constraints.minimumSwapBillBalance:
-			raise TransactionFailsAgainstCurrentState('backer does not have sufficient funds')
+		backingSwapBill = TradeOffer.GetSwapBillAmountRequiredToBackSell(exchangeRate=exchangeRate, ltcOffered=ltcOffered)
+		assert backingSwapBill >= Constraints.minimumSwapBillBalance # should be guaranteed by trade offer constraints
+		if backer.backingAmount < backingSwapBill + swapBillDeposit + Constraints.minimumSwapBillBalance:
+			raise TransactionFailsAgainstCurrentState('insufficient backing funds')
 		if swapBillDeposit > backer.transactionMax:
 			raise TransactionFailsAgainstCurrentState('deposit is larger than maximum backing amount per transaction')
 		if txID is None:
 			return
-
+		self._balances.subtractFrom(backer.refundAccount, backingSwapBill + swapBillDeposit)
 		receivingAccount = (txID, 1) # (now same as change account)
+		# **** how to seed receiving account, in fact, since there is no change??
+		# **** (looks like we'll need to support refs which guarantee to pay minimum balance, in fact, for this..)
 		self._balances.add(receivingAccount, 0) # only temporarily empty, change will be paid in to this after return
 		self._balances.addFirstRef(receivingAccount)
-
 		self._balances.addRef(backer.refundAccount)
-
 		sell.isBacked = True
 		sell.backerAccount = backer.refundAccount
 		sell.sellerAccount = receivingAccount
-
+		sell.backingSwapBill = backingSwapBill
 		sell.expiry = maxBlock
-
 		self._newSellOffer(sell)
-
 		return swapBillInput
 
 	def _fundedTransaction_ForwardToFutureNetworkVersion(self, txID, swapBillInput, changeRequired, amount, maxBlock, outputs):
