@@ -67,7 +67,7 @@ def _decodeInt(data):
 
 def _encodeInt(value, numberOfBytes):
 	if value < 0:
-		raise ExceptionReportedToUser('negative transaction parameter not supported')
+		raise ExceptionReportedToUser('Negative values are not allowed for transaction parameters.')
 	#print('value:', value)
 	#print('numberOfBytes:', numberOfBytes)
 	result = b''
@@ -76,7 +76,7 @@ def _encodeInt(value, numberOfBytes):
 		value = value // 256
 		result += struct.pack('<B', byteValue)
 	if value > 0:
-		raise ExceptionReportedToUser('transaction parameter value too big')
+		raise ExceptionReportedToUser('Transaction parameter value exceeds supported range.')
 	return result
 
 def ToStateTransaction(tx):
@@ -120,6 +120,13 @@ def ToStateTransaction(tx):
 			details[amountMapping] = tx.outputAmount(1 + len(outputs) + i)
 	return transactionType, sourceAccounts, outputs, details
 
+def _checkedAddOutputWithValue(tx, pubKeyHash, amount):
+	if amount < 0:
+		raise ExceptionReportedToUser('Negative output amounts are not permitted.')
+	if amount >= 0x10000000000000000:
+		raise ExceptionReportedToUser('Control address output amount exceeds supported range.')
+	tx.addOutput(pubKeyHash, amount)
+
 def FromStateTransaction(transactionType, sourceAccounts, outputs, outputPubKeyHashes, details):
 	assert len(outputs) == len(outputPubKeyHashes)
 	typeCode, mapping = _mappingFromTypeString(transactionType)
@@ -140,7 +147,7 @@ def FromStateTransaction(transactionType, sourceAccounts, outputs, outputPubKeyH
 		numberOfBytes = controlAddressMapping[i * 2 + 1]
 		controlAddressData += _encodeInt(details[valueMapping], numberOfBytes)
 	assert len(controlAddressData) == 20
-	tx.addOutput(controlAddressData, details[amountMapping])
+	_checkedAddOutputWithValue(tx, controlAddressData, details[amountMapping])
 	expectedOutputs = mapping[2]
 	assert expectedOutputs == outputs
 	for pubKeyHash in outputPubKeyHashes:
@@ -148,5 +155,5 @@ def FromStateTransaction(transactionType, sourceAccounts, outputs, outputPubKeyH
 	destinations = mapping[3]
 	for addressMapping, amountMapping in destinations:
 		assert addressMapping is not None
-		tx.addOutput(details[addressMapping], details[amountMapping])
+		_checkedAddOutputWithValue(tx, details[addressMapping], details[amountMapping])
 	return tx

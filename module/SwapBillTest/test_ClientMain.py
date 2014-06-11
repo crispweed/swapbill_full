@@ -751,13 +751,12 @@ class Test(unittest.TestCase):
 		# greater than 8 bytes
 		host = InitHost()
 		host._addUnspent(2*e(20))
-		self.assertRaises(Exception, RunClient, host, ['burn', '--amount', 1*e(20)])
+		self.assertRaisesRegexp(ExceptionReportedToUser, 'Control address output amount exceeds supported range.', RunClient, host, ['burn', '--amount', 1*e(20)])
 		host = InitHost()
 		host._addUnspent(2*e(15))
-		# note that we don't get an error from the point of encoding, because transactions are checked against state first
-		self.assertRaisesRegexp(ExceptionReportedToUser, 'Burn amount is below dust limit', RunClient, host, ['burn', '--amount', -1*e(7)])
+		self.assertRaisesRegexp(ExceptionReportedToUser, 'Burn amount is below dust limit.', RunClient, host, ['burn', '--amount', -1*e(7)])
 		self.assertRaisesRegexp(ValueError, 'invalid literal', RunClient, host, ['burn', '--amount', 'lots'])
-		# can burn amounts above 6 byte range, because this is not encoded in control address
+		# can burn amounts above 6 byte range, because this is a litecoin output amount, not encoded in control address
 		RunClient(host, ['burn', '--amount', 1*e(15)])
 		output, info = RunClient(host, ['get_balance'])
 		self.assertDictEqual(info, {'total': 1*e(15), 'spendable': 1*e(15)})
@@ -766,12 +765,8 @@ class Test(unittest.TestCase):
 		output, result = RunClient(host, ['get_receive_address'])
 		payTargetAddress = result['receive_address']
 		host._setOwner(host.defaultOwner)
-		# this error comes from transaction encoding
-		self.assertRaisesRegexp(ExceptionReportedToUser, 'transaction parameter value too big', RunClient, host, ['pay', '--amount', 1*e(15), '--toAddress', payTargetAddress])
-		# but this error comes from state check transaction
-		#self.assertRaisesRegexp(ExceptionReportedToUser, 'amount is below minimum balance', RunClient, host, ['pay', '--amount', -1*e(7), '--toAddress', payTargetAddress])
-		# (..added initial check against encoding)
-		self.assertRaisesRegexp(ExceptionReportedToUser, 'negative transaction parameter not supported', RunClient, host, ['pay', '--amount', -1*e(7), '--toAddress', payTargetAddress])
+		self.assertRaisesRegexp(ExceptionReportedToUser, 'Transaction parameter value exceeds supported range.', RunClient, host, ['pay', '--amount', 1*e(15), '--toAddress', payTargetAddress])
+		self.assertRaisesRegexp(ExceptionReportedToUser, 'Negative values are not allowed for transaction parameters.', RunClient, host, ['pay', '--amount', -1*e(7), '--toAddress', payTargetAddress])
 
 	def test_back_ltc_sells(self):
 		host = InitHost()
@@ -802,10 +797,10 @@ class Test(unittest.TestCase):
 		host = InitHost()
 		host._addUnspent(5*e(12))
 		burn = RunClient(host, ['burn', '--amount', 1*e(12) + Constraints.minimumSwapBillBalance])
-		self.assertRaisesRegexp(ExceptionReportedToUser, 'negative transaction parameter not supported', RunClient, host, ['back_ltc_sells', '--backingSwapBill', 1*e(12), '--transactionsBacked', 1000, '--blocksUntilExpiry', 20, '--commission_AsInteger', '-1'])
-		self.assertRaisesRegexp(ExceptionReportedToUser, 'negative transaction parameter not supported', RunClient, host, ['back_ltc_sells', '--backingSwapBill', 1*e(12), '--transactionsBacked', 1000, '--blocksUntilExpiry', 20, '--commission', '-0.1'])
-		self.assertRaisesRegexp(ExceptionReportedToUser, 'transaction parameter value too big', RunClient, host, ['back_ltc_sells', '--backingSwapBill', 1*e(12), '--transactionsBacked', 1000, '--blocksUntilExpiry', 20, '--commission', '1.0'])
-		self.assertRaisesRegexp(ExceptionReportedToUser, 'transaction parameter value too big', RunClient, host, ['back_ltc_sells', '--backingSwapBill', 1*e(12), '--transactionsBacked', 1000, '--blocksUntilExpiry', 20, '--commission', 0x100000000])
+		self.assertRaisesRegexp(ExceptionReportedToUser, 'Negative values are not allowed for transaction parameters.', RunClient, host, ['back_ltc_sells', '--backingSwapBill', 1*e(12), '--transactionsBacked', 1000, '--blocksUntilExpiry', 20, '--commission_AsInteger', '-1'])
+		self.assertRaisesRegexp(ExceptionReportedToUser, 'Negative values are not allowed for transaction parameters.', RunClient, host, ['back_ltc_sells', '--backingSwapBill', 1*e(12), '--transactionsBacked', 1000, '--blocksUntilExpiry', 20, '--commission', '-0.1'])
+		self.assertRaisesRegexp(ExceptionReportedToUser, 'Transaction parameter value exceeds supported range.', RunClient, host, ['back_ltc_sells', '--backingSwapBill', 1*e(12), '--transactionsBacked', 1000, '--blocksUntilExpiry', 20, '--commission', '1.0'])
+		self.assertRaisesRegexp(ExceptionReportedToUser, 'Transaction parameter value exceeds supported range.', RunClient, host, ['back_ltc_sells', '--backingSwapBill', 1*e(12), '--transactionsBacked', 1000, '--blocksUntilExpiry', 20, '--commission', 0x100000000])
 		# but zero commission *is* permitted
 		RunClient(host, ['back_ltc_sells', '--backingSwapBill', 1*e(12), '--transactionsBacked', 1000, '--blocksUntilExpiry', 20, '--commission_AsInteger', 0])
 		output, info = RunClient(host, ['get_balance'])
@@ -822,13 +817,13 @@ class Test(unittest.TestCase):
 		burn = RunClient(host, ['burn', '--amount', 1*e(8)])
 		self.assertRaisesRegexp(TransactionNotSuccessfulAgainstCurrentState, 'zero exchange rate not permitted', RunClient, host, ['post_ltc_sell', '--ltcOffered', 3*e(7)//2, '--exchangeRate', '0.0'])
 		self.assertRaisesRegexp(TransactionNotSuccessfulAgainstCurrentState, 'zero exchange rate not permitted', RunClient, host, ['post_ltc_sell', '--ltcOffered', 3*e(7)//2, '--exchangeRate_AsInteger', '0'])
-		self.assertRaisesRegexp(ExceptionReportedToUser, 'negative transaction parameter not supported', RunClient, host, ['post_ltc_sell', '--ltcOffered', 3*e(7)//2, '--exchangeRate', '-0.5'])
-		self.assertRaisesRegexp(ExceptionReportedToUser, 'negative transaction parameter not supported', RunClient, host, ['post_ltc_sell', '--ltcOffered', 3*e(7)//2, '--exchangeRate_AsInteger', '-1'])
-		self.assertRaisesRegexp(ExceptionReportedToUser, 'transaction parameter value too big', RunClient, host, ['post_ltc_sell', '--ltcOffered', 3*e(7)//2, '--exchangeRate', '1.0'])
-		self.assertRaisesRegexp(ExceptionReportedToUser, 'transaction parameter value too big', RunClient, host, ['post_ltc_sell', '--ltcOffered', 3*e(7)//2, '--exchangeRate_AsInteger', 0x100000000])
+		self.assertRaisesRegexp(ExceptionReportedToUser, 'Negative values are not allowed for transaction parameters.', RunClient, host, ['post_ltc_sell', '--ltcOffered', 3*e(7)//2, '--exchangeRate', '-0.5'])
+		self.assertRaisesRegexp(ExceptionReportedToUser, 'Negative values are not allowed for transaction parameters.', RunClient, host, ['post_ltc_sell', '--ltcOffered', 3*e(7)//2, '--exchangeRate_AsInteger', '-1'])
+		self.assertRaisesRegexp(ExceptionReportedToUser, 'Transaction parameter value exceeds supported range.', RunClient, host, ['post_ltc_sell', '--ltcOffered', 3*e(7)//2, '--exchangeRate', '1.0'])
+		self.assertRaisesRegexp(ExceptionReportedToUser, 'Transaction parameter value exceeds supported range.', RunClient, host, ['post_ltc_sell', '--ltcOffered', 3*e(7)//2, '--exchangeRate_AsInteger', 0x100000000])
 		self.assertRaisesRegexp(TransactionNotSuccessfulAgainstCurrentState, 'zero exchange rate not permitted', RunClient, host, ['post_ltc_buy', '--swapBillOffered', 3*e(7), '--exchangeRate', '0.0'])
 		self.assertRaisesRegexp(TransactionNotSuccessfulAgainstCurrentState, 'zero exchange rate not permitted', RunClient, host, ['post_ltc_buy', '--swapBillOffered', 3*e(7), '--exchangeRate_AsInteger', '0'])
-		self.assertRaisesRegexp(ExceptionReportedToUser, 'negative transaction parameter not supported', RunClient, host, ['post_ltc_buy', '--swapBillOffered', 3*e(7), '--exchangeRate', '-0.5'])
-		self.assertRaisesRegexp(ExceptionReportedToUser, 'negative transaction parameter not supported', RunClient, host, ['post_ltc_buy', '--swapBillOffered', 3*e(7), '--exchangeRate_AsInteger', '-1'])
-		self.assertRaisesRegexp(ExceptionReportedToUser, 'transaction parameter value too big', RunClient, host, ['post_ltc_buy', '--swapBillOffered', 3*e(7), '--exchangeRate', '1.0'])
-		self.assertRaisesRegexp(ExceptionReportedToUser, 'transaction parameter value too big', RunClient, host, ['post_ltc_buy', '--swapBillOffered', 3*e(7), '--exchangeRate_AsInteger', 0x100000000])
+		self.assertRaisesRegexp(ExceptionReportedToUser, 'Negative values are not allowed for transaction parameters.', RunClient, host, ['post_ltc_buy', '--swapBillOffered', 3*e(7), '--exchangeRate', '-0.5'])
+		self.assertRaisesRegexp(ExceptionReportedToUser, 'Negative values are not allowed for transaction parameters.', RunClient, host, ['post_ltc_buy', '--swapBillOffered', 3*e(7), '--exchangeRate_AsInteger', '-1'])
+		self.assertRaisesRegexp(ExceptionReportedToUser, 'Transaction parameter value exceeds supported range.', RunClient, host, ['post_ltc_buy', '--swapBillOffered', 3*e(7), '--exchangeRate', '1.0'])
+		self.assertRaisesRegexp(ExceptionReportedToUser, 'Transaction parameter value exceeds supported range.', RunClient, host, ['post_ltc_buy', '--swapBillOffered', 3*e(7), '--exchangeRate_AsInteger', 0x100000000])

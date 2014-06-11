@@ -1,6 +1,7 @@
 from __future__ import print_function
 import unittest, binascii
 from SwapBill import TransactionEncoding
+from SwapBill.ExceptionReportedToUser import ExceptionReportedToUser
 
 def FromStateTransactionWrapper(originalFunction):
 	def Wrapper(transactionType, sourceAccounts, outputs, outputPubKeyHashes, originalDetails):
@@ -153,3 +154,15 @@ class Test(unittest.TestCase):
 		# and ditto up to end of typecode byte range
 		tx._outputs[0] = (b'SB\xff\x14\x00\x00\x00\x00\x00d\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00', 0)
 		self.assertRaises(TransactionEncoding.UnsupportedTransaction, TransactionEncoding.ToStateTransaction, tx)
+
+	def test_destination_range(self):
+		details = {'pendingExchangeIndex':32, 'destinationAddress':'destinationPKH', 'destinationAmount':100}
+		tx = TransactionEncoding.FromStateTransaction('LTCExchangeCompletion', None, (), (), details)
+		details['destinationAmount'] = 0
+		tx = TransactionEncoding.FromStateTransaction('LTCExchangeCompletion', None, (), (), details)
+		details['destinationAmount'] = -1
+		self.assertRaisesRegexp(ExceptionReportedToUser, 'Negative output amounts are not permitted', TransactionEncoding.FromStateTransaction, 'LTCExchangeCompletion', None, (), (), details)
+		details['destinationAmount'] = 0xffffffffffffffff
+		tx = TransactionEncoding.FromStateTransaction('LTCExchangeCompletion', None, (), (), details)
+		details['destinationAmount'] += 1
+		self.assertRaisesRegexp(ExceptionReportedToUser, 'Control address output amount exceeds supported range', TransactionEncoding.FromStateTransaction, 'LTCExchangeCompletion', None, (), (), details)
