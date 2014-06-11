@@ -6,8 +6,9 @@ class OfferIsBelowMinimumExchange(Exception):
 
 def MinimumBuyOfferWithRate(rate):
 	swapBillForMinLTC = Constraints.minimumExchangeLTC * 0x100000000 // rate
-	while _ltcWithExchangeRate(rate, swapBillForMinLTC) < Constraints.minimumExchangeLTC:
+	if _ltcWithExchangeRate(rate, swapBillForMinLTC) < Constraints.minimumExchangeLTC:
 		swapBillForMinLTC += 1
+	assert _ltcWithExchangeRate(rate, swapBillForMinLTC) >= Constraints.minimumExchangeLTC
 	return max(swapBillForMinLTC, Constraints.minimumSwapBillBalance)
 
 def MinimumSellOfferWithRate(rate):

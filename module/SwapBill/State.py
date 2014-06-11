@@ -200,7 +200,6 @@ class State(object):
 		receivingAccount = (txID, 1) # (now same as change account)
 		self._balances.add(receivingAccount, 0) # only temporarily empty, change will be paid in to this after return
 		self._balances.addFirstRef(receivingAccount)
-		sell.isBacked = False
 		sell.receivingAccount = receivingAccount
 		sell.expiry = maxBlock
 		toReAdd = []
