@@ -201,8 +201,10 @@ def Main(startBlockIndex, startBlockHash, useTestNet, commandLineArgs=sys.argv[1
 				state.checkTransaction(transactionType, outputs=outputs, transactionDetails=details, sourceAccounts=sourceAccounts)
 			except InsufficientFundsForTransaction:
 				pass
-			except (BadlyFormedTransaction, TransactionFailsAgainstCurrentState) as e:
+			except TransactionFailsAgainstCurrentState as e:
 				raise TransactionNotSuccessfulAgainstCurrentState('Transaction would not complete successfully against current state: ' + str(e))
+			except BadlyFormedTransaction as e:
+				raise ExceptionReportedToUser('Transaction does not meet protocol constraints: ' + str(e))
 			else:
 				break
 			if not swapBillUnspent:
@@ -217,8 +219,10 @@ def Main(startBlockIndex, startBlockHash, useTestNet, commandLineArgs=sys.argv[1
 		transactionBuildLayer.startTransactionConstruction()
 		try:
 			state.checkTransaction(transactionType, outputs=outputs, transactionDetails=details, sourceAccounts=None)
-		except (BadlyFormedTransaction, TransactionFailsAgainstCurrentState) as e:
+		except TransactionFailsAgainstCurrentState as e:
 			raise TransactionNotSuccessfulAgainstCurrentState('Transaction would not complete successfully against current state: ' + str(e))
+		except BadlyFormedTransaction as e:
+			raise ExceptionReportedToUser('Transaction does not follow protocol rules: ' + str(e))
 		return CheckAndSend_Common(transactionType, None, outputs, outputPubKeys, details)
 
 	def CheckAndReturnPubKeyHash(address):
