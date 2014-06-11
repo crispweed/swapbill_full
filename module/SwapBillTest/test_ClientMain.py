@@ -798,6 +798,24 @@ class Test(unittest.TestCase):
 		output, result = RunClient(host, ['get_ltc_sell_backers'])
 		self.assertListEqual(result, [])
 
+	def test_bad_commission(self):
+		host = InitHost()
+		host._addUnspent(5*e(12))
+		burn = RunClient(host, ['burn', '--amount', 1*e(12) + Constraints.minimumSwapBillBalance])
+		self.assertRaisesRegexp(ExceptionReportedToUser, 'negative transaction parameter not supported', RunClient, host, ['back_ltc_sells', '--backingSwapBill', 1*e(12), '--transactionsBacked', 1000, '--blocksUntilExpiry', 20, '--commission_AsInteger', '-1'])
+		self.assertRaisesRegexp(ExceptionReportedToUser, 'negative transaction parameter not supported', RunClient, host, ['back_ltc_sells', '--backingSwapBill', 1*e(12), '--transactionsBacked', 1000, '--blocksUntilExpiry', 20, '--commission', '-0.1'])
+		self.assertRaisesRegexp(ExceptionReportedToUser, 'transaction parameter value too big', RunClient, host, ['back_ltc_sells', '--backingSwapBill', 1*e(12), '--transactionsBacked', 1000, '--blocksUntilExpiry', 20, '--commission', '1.0'])
+		self.assertRaisesRegexp(ExceptionReportedToUser, 'transaction parameter value too big', RunClient, host, ['back_ltc_sells', '--backingSwapBill', 1*e(12), '--transactionsBacked', 1000, '--blocksUntilExpiry', 20, '--commission', 0x100000000])
+		# but zero commission *is* permitted
+		RunClient(host, ['back_ltc_sells', '--backingSwapBill', 1*e(12), '--transactionsBacked', 1000, '--blocksUntilExpiry', 20, '--commission_AsInteger', 0])
+		output, info = RunClient(host, ['get_balance'])
+		self.assertDictEqual(info, {'total': Constraints.minimumSwapBillBalance, 'spendable': 0})
+		output, result = RunClient(host, ['get_ltc_sell_backers'])
+		expectedDetails = {
+		'commission as integer': 0, 'commission as float (approximation)': 0.0,
+		'backing amount': 1*e(12), 'I am backer': True, 'expires on block': 22, 'maximum per transaction': 1*e(9)
+		}
+
 	def test_bad_exchange_rate(self):
 		host = InitHost()
 		host._addUnspent(5*e(8))
