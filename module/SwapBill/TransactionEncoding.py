@@ -26,6 +26,11 @@ _fundedMappingByTypeCode = (
      ('ltcSellBacker',),
      (('ltcReceiveAddress', None),)
 	),
+    ('BackedLTCSellOffer',
+     (('exchangeRate', 4, 'backerIndex', 6, None, 7), None),
+     ('sellerReceive',),
+     (('backerLTCReceiveAddress', 'ltcOffered'),)
+	),
 	)
 
 _forwardCompatibilityMapping = ('ForwardToFutureNetworkVersion', (('amount', 6, 'maxBlock', 4, None, 7), None), ('change',), ())

@@ -246,6 +246,25 @@ class State(object):
 		self._ltcSellBackers[key] = backer
 		return change
 
+#('BackedLTCSellOffer',
+#(('exchangeRate', 4, 'backerIndex', 6, None, 7), None),
+#('sellerReceive',),
+#(('backerLTCReceiveAddress', 'ltcOffered'),)
+#),
+	#def _fundedTransaction_BackedLTCSellOffer(self, txID, swapBillInput, changeRequired, exchangeRate, backerIndex, backerLTCReceiveAddress, ltcOffered, outputs):
+		#assert outputs == ('sellerReceive',)
+		#if exchangeRate == 0:
+			#raise BadlyFormedTransaction('zero exchange rate not permitted')
+		#if not backerIndex in self._ltcSellBackers:
+			#raise TransactionFailsAgainstCurrentState('no ltc sell backer with the specified index')
+		#backer = self._ltcSellBackers[backerIndex]
+		#if backerLTCReceiveAddress != backer.ltcReceiveAddress:
+			#raise TransactionFailsAgainstCurrentState('destination address does not match backer receive address for pending exchange with the specified index')
+		#if txID is None:
+			#return
+
+		#return swapBillInput
+
 	def _fundedTransaction_ForwardToFutureNetworkVersion(self, txID, swapBillInput, changeRequired, amount, maxBlock, outputs):
 		assert outputs == ('change',)
 		if amount < Constraints.minimumSwapBillBalance:
