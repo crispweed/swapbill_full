@@ -317,7 +317,7 @@ def Main(startBlockIndex, startBlockHash, useTestNet, commandLineArgs=sys.argv[1
 			exchangeAmount = offer._swapBillOffered
 			rate_Double = float(offer.rate) / 0x100000000
 			ltc = int(exchangeAmount * rate_Double)
-			result.append(('exchange rate', rate_Double, {'swapbill offered':exchangeAmount, 'ltc equivalent':ltc, 'mine':mine}))
+			result.append(('exchange rate as float (approximation)', rate_Double, {'exchange rate as integer':offer.rate, 'swapbill offered':exchangeAmount, 'ltc equivalent':ltc, 'mine':mine}))
 		return result
 
 	elif args.action == 'get_sell_offers':
@@ -328,7 +328,7 @@ def Main(startBlockIndex, startBlockHash, useTestNet, commandLineArgs=sys.argv[1
 			depositAmount = offer._swapBillDeposit
 			rate_Double = float(offer.rate) / 0x100000000
 			swapBillEquivalent = int(ltc / rate_Double)
-			result.append(('exchange rate', rate_Double, {'ltc offered':ltc, 'deposit paid':depositAmount, 'swapbill equivalent':swapBillEquivalent, 'mine':mine}))
+			result.append(('exchange rate as float (approximation)', rate_Double, {'exchange rate as integer':offer.rate, 'ltc offered':ltc, 'deposit paid':depositAmount, 'swapbill equivalent':swapBillEquivalent, 'mine':mine}))
 		return result
 
 	elif args.action == 'get_pending_exchanges':
@@ -354,6 +354,9 @@ def Main(startBlockIndex, startBlockHash, useTestNet, commandLineArgs=sys.argv[1
 			d['backing amount'] = backer.backingAmount
 			d['maximum per transaction'] = backer.transactionMax
 			d['expires on block'] = backer.expiry
+			commission_Double = float(backer.commission) / 0x100000000
+			d['commission as float (approximation)'] = commission_Double
+			d['commission as integer'] = backer.commission
 			result.append(('ltc sell backer index', key, d))
 		return result
 

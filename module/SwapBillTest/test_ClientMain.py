@@ -312,7 +312,7 @@ class Test(unittest.TestCase):
 
 
 		output, result = RunClient(host, ['get_buy_offers', '-i'])
-		self.assertEqual(result, [('exchange rate', 0.5, {'ltc equivalent': 15*e(6), 'mine': True, 'swapbill offered': 3*e(7)})])
+		self.assertEqual(result, [('exchange rate as float (approximation)', 0.5, {'exchange rate as integer': 2147483648, 'ltc equivalent': 15*e(6), 'mine': True, 'swapbill offered': 3*e(7)})])
 
 		# two blocks advanced so far, one for burn, one for sell offer
 		host._advance(4)
@@ -323,7 +323,7 @@ class Test(unittest.TestCase):
 		output, result = RunClient(host, ['get_balance', '-i'])
 		self.assertEqual(result['total'], 1*e(7))
 		output, result = RunClient(host, ['get_buy_offers', '-i'])
-		self.assertEqual(result, [('exchange rate', 0.5, {'ltc equivalent': 15*e(6), 'mine': True, 'swapbill offered': 3*e(7)})])
+		self.assertEqual(result, [('exchange rate as float (approximation)', 0.5, {'exchange rate as integer': 2147483648, 'ltc equivalent': 15*e(6), 'mine': True, 'swapbill offered': 3*e(7)})])
 		host._advance(1)
 		self.assertEqual(host._nextBlock, 7)
 		# but expires on block 7
@@ -355,7 +355,7 @@ class Test(unittest.TestCase):
 		output, result = RunClient(host, ['get_balance', '-i'])
 		self.assertEqual(result['total'], 28125000)
 		output, result = RunClient(host, ['get_sell_offers', '-i'])
-		self.assertEqual(result, [('exchange rate', 0.5, {'ltc offered': 15*e(6), 'mine': True, 'swapbill equivalent': 3*e(7), 'deposit paid': 1875000})])
+		self.assertEqual(result, [('exchange rate as float (approximation)', 0.5, {'exchange rate as integer': 2147483648, 'ltc offered': 15*e(6), 'mine': True, 'swapbill equivalent': 3*e(7), 'deposit paid': 1875000})])
 		host._advance(1)
 		self.assertEqual(host._nextBlock, 7)
 		# but expires on block 7
@@ -597,11 +597,11 @@ class Test(unittest.TestCase):
 		ownerBalances = GetOwnerBalances(host, ownerList, info['balances'])
 		self.assertDictEqual(ownerBalances, {'alice': 1*e(7), 'bob': 3*e(7), 'clive': 6*e(7), 'dave': 7*e(7)})
 		output, result = RunClient(host, ['get_buy_offers'])
-		self.assertEqual(result, [('exchange rate', 0.5, {'ltc equivalent': 15000000, 'mine': True, 'swapbill offered': 30000000})])
+		self.assertEqual(result, [('exchange rate as float (approximation)', 0.5, {'exchange rate as integer': 2147483648, 'ltc equivalent': 15000000, 'mine': True, 'swapbill offered': 30000000})])
 		# bob makes better offer, but with smaller amount
 		host._setOwner('bob')
 		output, result = RunClient(host, ['get_buy_offers'])
-		self.assertEqual(result, [('exchange rate', 0.5, {'ltc equivalent': 15000000, 'mine': False, 'swapbill offered': 30000000})])
+		self.assertEqual(result, [('exchange rate as float (approximation)', 0.5, {'exchange rate as integer': 2147483648, 'ltc equivalent': 15000000, 'mine': False, 'swapbill offered': 30000000})])
 		RunClient(host, ['post_ltc_buy', '--swapBillOffered', 1*e(7), '--exchangeRate', '0.25'])
 		info = GetStateInfo(host)
 		ownerBalances = GetOwnerBalances(host, ownerList, info['balances'])
@@ -611,8 +611,8 @@ class Test(unittest.TestCase):
 		self.assertEqual(info['numberOfPendingExchanges'], 0)
 		output, result = RunClient(host, ['get_buy_offers'])
 		expectedResult = [
-			('exchange rate', 0.25, {'ltc equivalent': 2500000, 'mine': True, 'swapbill offered': 10000000}),
-			('exchange rate', 0.5, {'ltc equivalent': 15000000, 'mine': False, 'swapbill offered': 30000000})
+			('exchange rate as float (approximation)', 0.25, {'exchange rate as integer': 1073741824, 'ltc equivalent': 2500000, 'mine': True, 'swapbill offered': 10000000}),
+			('exchange rate as float (approximation)', 0.5, {'exchange rate as integer': 2147483648, 'ltc equivalent': 15000000, 'mine': False, 'swapbill offered': 30000000})
 		]
 		self.assertEqual(result, expectedResult)
 		# clive makes a sell offer, matching bob's buy exactly
@@ -672,7 +672,7 @@ class Test(unittest.TestCase):
 		self.assertEqual(info['numberOfLTCSellOffers'], 1)
 		self.assertEqual(info['numberOfPendingExchanges'], 2)
 		output, result = RunClient(host, ['get_buy_offers'])
-		expectedResult = [('exchange rate', 0.5, {'ltc equivalent': 15000000, 'mine': False, 'swapbill offered': 30000000})]
+		expectedResult = [('exchange rate as float (approximation)', 0.5, {'exchange rate as integer': 2147483648, 'ltc equivalent': 15000000, 'mine': False, 'swapbill offered': 30000000})]
 		self.assertEqual(result, expectedResult)
 		output, result = RunClient(host, ['get_sell_offers'])
 		# didn't check the exact calculations for this value, but seems about right
@@ -680,7 +680,7 @@ class Test(unittest.TestCase):
 		daveSwapBillReceived = 11125000
 		daveDepositRemainder = 647645
 		daveDepositMatched = 1250000 - daveDepositRemainder
-		expectedResult = [('exchange rate', 0.26953125, {'deposit paid': daveDepositRemainder, 'ltc offered': 2792969, 'mine': True, 'swapbill equivalent': 10362319})]
+		expectedResult = [('exchange rate as float (approximation)', 0.26953125, {'exchange rate as integer': 1157627904, 'deposit paid': daveDepositRemainder, 'ltc offered': 2792969, 'mine': True, 'swapbill equivalent': 10362319})]
 		self.assertEqual(result, expectedResult)
 		assert cliveCompletionPaymentExpiry > host._nextBlock
 		host._advance(cliveCompletionPaymentExpiry - host._nextBlock)
@@ -784,11 +784,15 @@ class Test(unittest.TestCase):
 		self.assertEqual(host._nextBlock, 3)
 		# expiry block is calculated as state._currentBlockIndex (which equals next block after end of synch at time of submit) + blocksUntilExpiry
 		output, result = RunClient(host, ['get_ltc_sell_backers'])
-		self.assertListEqual(result, [('ltc sell backer index', 0, {'backing amount': 1*e(12), 'I am backer': True, 'expires on block': 22, 'maximum per transaction': 1*e(9)})])
+		expectedDetails = {
+		'commission as integer': 268435456, 'commission as float (approximation)': 0.0625,
+		'backing amount': 1*e(12), 'I am backer': True, 'expires on block': 22, 'maximum per transaction': 1*e(9)
+		}
+		self.assertListEqual(result, [('ltc sell backer index', 0, expectedDetails)])
 		self.assertEqual(host._nextBlock, 3)
 		host._advance(19)
 		output, result = RunClient(host, ['get_ltc_sell_backers'])
-		self.assertListEqual(result, [('ltc sell backer index', 0, {'backing amount': 1*e(12), 'I am backer': True, 'expires on block': 22, 'maximum per transaction': 1*e(9)})])
+		self.assertListEqual(result, [('ltc sell backer index', 0, expectedDetails)])
 		self.assertEqual(host._nextBlock, 22)
 		host._advance(1)
 		self.assertEqual(host._nextBlock, 23)
