@@ -190,11 +190,17 @@ class Test(unittest.TestCase):
 		info = GetStateInfo(host)
 		self.assertEqual(info['balances'], {burnTarget:1*e(8)})
 		RunClient(host, ['post_ltc_sell', '--ltcOffered', 3*e(7)//2, '--exchangeRate', '0.5'])
+		deposit = 3*e(7)//Constraints.depositDivisor
 		info = GetStateInfo(host)
+		self.assertEqual(info['balances'], {'03:1': 1*e(8)-deposit-Constraints.minimumSwapBillBalance})
 		RunClient(host, ['post_ltc_buy', '--swapBillOffered', 3*e(7), '--exchangeRate', '0.5'])
 		info = GetStateInfo(host)
+		self.assertEqual(info['balances'], {'04:1': 1*e(8)-deposit-3*e(7)})
 		RunClient(host, ['complete_ltc_sell', '--pendingExchangeID', '0'])
 		info = GetStateInfo(host)
+		self.assertEqual(info['numberOfLTCBuyOffers'], 0)
+		self.assertEqual(info['numberOfLTCSellOffers'], 0)
+		self.assertEqual(info['numberOfPendingExchanges'], 0)
 		self.assertEqual(info['balances'], {'04:1': 1*e(8)})
 
 	def test_refund_account_locked_during_trade(self):
@@ -206,7 +212,7 @@ class Test(unittest.TestCase):
 		deposit = 3*e(7) // 16
 		output, result = RunClient(host, ['get_balance'])
 		# receiving account is created, with minimumBalance, here
-		self.assertDictEqual(result, {'total': 1*e(8)-deposit, 'spendable': 9*e(7)-deposit})
+		self.assertDictEqual(result, {'total': 1*e(8)-deposit-Constraints.minimumSwapBillBalance, 'spendable': 9*e(7)-deposit-Constraints.minimumSwapBillBalance})
 		host._setOwner('2')
 		host._addUnspent(500000000)
 		RunClient(host, ['burn', '--amount', 2*e(8)])
@@ -216,7 +222,7 @@ class Test(unittest.TestCase):
 		self.assertDictEqual(result, {'total': 170100000, 'spendable': 160100000})
 		host._setOwner('1')
 		output, result = RunClient(host, ['get_balance'])
-		self.assertDictEqual(result, {'total': 1*e(8)-deposit, 'spendable': 9*e(7)-deposit})
+		self.assertDictEqual(result, {'total': 1*e(8)-deposit-Constraints.minimumSwapBillBalance, 'spendable': 9*e(7)-deposit-Constraints.minimumSwapBillBalance})
 		# and the refund account is locked, because it may need to be credited with other amounts depending on how the trade plays out
 		# so can't spend this yet
 		host._setOwner('recipient')
@@ -224,7 +230,7 @@ class Test(unittest.TestCase):
 		payTargetAddress = result['receive_address']
 		host._setOwner('1')
 		# change output (active account) can be spent
-		RunClient(host, ['pay', '--amount', 9*e(7)-deposit, '--toAddress', payTargetAddress])
+		RunClient(host, ['pay', '--amount', 9*e(7)-deposit-Constraints.minimumSwapBillBalance, '--toAddress', payTargetAddress])
 		output, result = RunClient(host, ['get_balance'])
 		self.assertDictEqual(result, {'total': 1*e(7), 'spendable': 0})
 		# but not the minimum balance amount seeded into refund account
@@ -237,7 +243,7 @@ class Test(unittest.TestCase):
 		RunClient(host, ['post_ltc_sell', '--ltcOffered', 29900000//2, '--exchangeRate', '0.5'])
 		output, result = RunClient(host, ['get_balance'])
 		# refund account is created, with minimumBalance, here
-		self.assertDictEqual(result, {'total': 98131250, 'spendable': 88131250})
+		self.assertDictEqual(result, {'total': 98131250-Constraints.minimumSwapBillBalance, 'spendable': 88131250-Constraints.minimumSwapBillBalance})
 		host._setOwner('2')
 		host._addUnspent(500000000)
 		RunClient(host, ['burn', '--amount', '200000000'])
@@ -664,7 +670,7 @@ class Test(unittest.TestCase):
 		RunClient(host, ['post_ltc_sell', '--ltcOffered', 2*e(7) * exchangeRate // 0x100000000, '--exchangeRate_AsInteger', exchangeRate, '--blocksUntilExpiry', '100'])
 		info = GetStateInfo(host)
 		ownerBalances = GetOwnerBalances(host, ownerList, info['balances'])
-		self.assertDictEqual(ownerBalances, {'alice': 1*e(7), 'bob': 1*e(7), 'clive': 5*e(7)-625000+1*e(7), 'dave': 7*e(7) - 1250000})
+		self.assertDictEqual(ownerBalances, {'alice': 1*e(7), 'bob': 1*e(7), 'clive': 5*e(7)-625000+1*e(7), 'dave': 7*e(7)-1250000-Constraints.minimumSwapBillBalance})
 		self.assertEqual(info['numberOfLTCBuyOffers'], 1)
 		self.assertEqual(info['numberOfLTCSellOffers'], 1)
 		self.assertEqual(info['numberOfPendingExchanges'], 2)
@@ -685,27 +691,28 @@ class Test(unittest.TestCase):
 		# but the exchange doesn't expire until the end of that block
 		info = GetStateInfo(host)
 		ownerBalances = GetOwnerBalances(host, ownerList, info['balances'])
-		self.assertDictEqual(ownerBalances, {'alice': 1*e(7), 'bob': 1*e(7), 'clive': 6*e(7)-625000, 'dave': 7*e(7)-1250000})
+		self.assertDictEqual(ownerBalances, {'alice': 1*e(7), 'bob': 1*e(7), 'clive': 6*e(7)-625000, 'dave': 7*e(7)-1250000-Constraints.minimumSwapBillBalance})
 		self.assertEqual(info['numberOfLTCBuyOffers'], 1)
 		self.assertEqual(info['numberOfLTCSellOffers'], 1)
 		self.assertEqual(info['numberOfPendingExchanges'], 2)
 		host._advance(1)
-		#clive failed to make his payment within the required block clount!
-		#the pending exchange expires
+		# clive failed to make his payment within the required block clount!
+		# the pending exchange expires
 		info = GetStateInfo(host)
 		self.assertEqual(info['numberOfLTCBuyOffers'], 1)
 		self.assertEqual(info['numberOfLTCSellOffers'], 1)
 		self.assertEqual(info['numberOfPendingExchanges'], 1)
-		#bob is credited his offer amount (which was locked up for the exchange) + clive's deposit
+		# bob is credited his offer amount (which was locked up for the exchange) + clive's deposit
 		ownerBalances = GetOwnerBalances(host, ownerList, info['balances'])
-		self.assertDictEqual(ownerBalances, {'alice': 1*e(7), 'bob': 2*e(7)+625000, 'clive': 6*e(7)-625000, 'dave': 7*e(7)-1250000})
-		#dave is more on the ball, and makes his completion payment
+		self.assertDictEqual(ownerBalances, {'alice': 1*e(7), 'bob': 2*e(7)+625000, 'clive': 6*e(7)-625000, 'dave': 7*e(7)-1250000-Constraints.minimumSwapBillBalance})
+		# dave is more on the ball, and makes his completion payment
 		host._setOwner('dave')
 		RunClient(host, ['complete_ltc_sell', '--pendingExchangeID', '1'])
 		info = GetStateInfo(host)
-		#dave gets credited bob's exchange funds, and is also refunded the matched part of his exchange deposit
+		# dave gets credited bob's exchange funds, and is also refunded the matched part of his exchange deposit
+		# but seeded amount locked up in sell offer is not refunded, because part of this sell offer is still outstanding
 		ownerBalances = GetOwnerBalances(host, ownerList, info['balances'])
-		self.assertDictEqual(ownerBalances, {'alice': 1*e(7), 'bob': 2*e(7)+625000, 'clive': 6*e(7)-625000, 'dave': 7*e(7)-1250000+1*e(7)+daveDepositMatched})
+		self.assertDictEqual(ownerBalances, {'alice': 1*e(7), 'bob': 2*e(7)+625000, 'clive': 6*e(7)-625000, 'dave': 7*e(7)-1250000-Constraints.minimumSwapBillBalance+1*e(7)+daveDepositMatched})
 		self.assertEqual(info['numberOfLTCBuyOffers'], 1)
 		self.assertEqual(info['numberOfLTCSellOffers'], 1)
 		self.assertEqual(info['numberOfPendingExchanges'], 0)

@@ -50,7 +50,7 @@ class State(object):
 		expired = self._ltcSells.advanceToNextBlock()
 		for sellOffer in expired:
 			self._balances.addStateChange(sellOffer.receivingAccount)
-			self._balances.addTo_Forwarded(sellOffer.receivingAccount, sellOffer._swapBillDeposit)
+			self._balances.addTo_Forwarded(sellOffer.receivingAccount, Constraints.minimumSwapBillBalance + sellOffer._swapBillDeposit)
 			self._balances.removeRef(sellOffer.receivingAccount)
 		# ** currently iterates through all pending exchanges each block added
 		# are there scaling issues with this?
@@ -102,7 +102,10 @@ class State(object):
 			buyRemainder.refundAccount = buy.refundAccount
 			buyRemainder.expiry = buy.expiry
 			self._balances.addRef(buyRemainder.refundAccount)
-		if sellRemainder is not None:
+		if sellRemainder is None:
+			# seller gets seed amount (which was locked up implicitly in the sell offer) refunded
+			self._balances.addTo_Forwarded(sell.receivingAccount, Constraints.minimumSwapBillBalance)
+		else:
 			sellRemainder.receivingAccount = sell.receivingAccount
 			sellRemainder.expiry = sell.expiry
 			self._balances.addRef(sellRemainder.receivingAccount)
@@ -216,9 +219,13 @@ class State(object):
 			raise BadlyFormedTransaction('does not satisfy minimum exchange amount')
 		if maxBlock < self._currentBlockIndex:
 			raise TransactionFailsAgainstCurrentState('max block for transaction has been exceeded')
-		change = swapBillInput - swapBillDeposit
-		# change is always required here, since we will add a trade ref
-		if change < Constraints.minimumSwapBillBalance:
+		# note that a seed amount (minimum balance) is assigned to the sell offer, in addition to the deposit
+		change = swapBillInput - swapBillDeposit - Constraints.minimumSwapBillBalance
+		if change < 0:
+			raise InsufficientFundsForTransaction()
+		if changeRequired and change == 0:
+			raise InsufficientFundsForTransaction()
+		if change > 0 and change < Constraints.minimumSwapBillBalance:
 			raise InsufficientFundsForTransaction()
 		if txID is None:
 			return
@@ -357,10 +364,7 @@ class State(object):
 			swapBillInput += self._balances.balanceFor(sourceAccount)
 			if self._balances.isReferenced(sourceAccount):
 				changeRequired = True
-		try:
-			method(swapBillInput=swapBillInput, changeRequired=changeRequired, txID=None, outputs=outputs, **transactionDetails)
-		except TypeError as e:
-			raise InvalidTransactionParameters(e)
+		method(swapBillInput=swapBillInput, changeRequired=changeRequired, txID=None, outputs=outputs, **transactionDetails)
 	def applyFundedTransaction(self, transactionType, txID, sourceAccounts, transactionDetails, outputs):
 		try:
 			method = getattr(self, '_fundedTransaction_' + transactionType)
@@ -380,12 +384,19 @@ class State(object):
 		change = swapBillInput
 		try:
 			change = method(txID=txID, swapBillInput=swapBillInput, changeRequired=changeRequired, outputs=outputs, **transactionDetails)
-		except TypeError:
-			errorReport = 'bad transaction parameters'
 		except (BadlyFormedTransaction, TransactionFailsAgainstCurrentState) as e:
 			errorReport = str(e)
 		except InsufficientFundsForTransaction:
 			errorReport = 'insufficient funds'
+
+		# ** workaround issue with inputs potentially being credited during transaction
+		sumOfInputsAfter = 0
+		for sourceAccount in sourceAccounts:
+			if not self._balances.accountHasBalance(sourceAccount):
+				continue
+			sumOfInputsAfter += self._balances.balanceFor(sourceAccount)
+		change += sumOfInputsAfter - swapBillInput
+
 		if changeRequired:
 			assert change > 0
 		if change > 0:
@@ -402,10 +413,7 @@ class State(object):
 			method = getattr(self, '_unfundedTransaction_' + transactionType)
 		except AttributeError as e:
 			raise InvalidTransactionType(e)
-		try:
-			method(txID=None, outputs=outputs, **transactionDetails)
-		except TypeError as e:
-			raise InvalidTransactionParameters(e)
+		method(txID=None, outputs=outputs, **transactionDetails)
 	def applyUnfundedTransaction(self, transactionType, txID, transactionDetails, outputs):
 		try:
 			method = getattr(self, '_unfundedTransaction_' + transactionType)
@@ -413,8 +421,6 @@ class State(object):
 			return 'bad transaction type'
 		try:
 			method(txID=txID, outputs=outputs, **transactionDetails)
-		except TypeError:
-			return 'bad transaction parameters'
 		except (BadlyFormedTransaction, TransactionFailsAgainstCurrentState) as e:
 			return str(e)
 		except InsufficientFundsForTransaction:

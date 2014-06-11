@@ -78,6 +78,7 @@ class Balances(object):
 		return account in self._directRefCounts or account in self._redirectRefCounts
 
 	def consumeAndForwardRefs(self, fromAccounts, toAccount):
+		assert not toAccount in self._redirectRefCounts
 		redirectRefCount = 0
 		for account in fromAccounts:
 			if self.isReferenced(account):
