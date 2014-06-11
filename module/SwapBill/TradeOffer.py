@@ -22,6 +22,13 @@ def DepositRequiredForLTCSell(exchangeRate, ltcOffered):
 		deposit += 1
 	return deposit
 
+def GetSwapBillAmountRequiredToBackSell(exchangeRate, ltcOffered):
+	swapBillAmount = ltcOffered * 0x100000000 // exchangeRate
+	if _ltcWithExchangeRate(rate, swapBillAmount) < ltcOffered:
+		swapBillAmount += 1
+	assert _ltcWithExchangeRate(rate, swapBillAmount) >= ltcOffered.minimumExchangeLTC
+	return swapBillAmount
+
 class BuyOffer(object):
 	def __init__(self, swapBillOffered, rate):
 		if swapBillOffered < MinimumBuyOfferWithRate(rate):

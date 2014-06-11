@@ -108,6 +108,51 @@ class State(object):
 			self._balances.addRef(sellRemainder.receivingAccount)
 		return buyRemainder, sellRemainder
 
+	def _newBuyOffer(self, buy):
+		toReAdd = []
+		while True:
+			if self._ltcSells.empty() or not TradeOffer.OffersMeetOrOverlap(buy=buy, sell=self._ltcSells.peekCurrentBest()):
+				# no more matchable sell offers
+				self._ltcBuys.addOffer(buy)
+				break
+			sell = self._ltcSells.popCurrentBest()
+			try:
+				buyRemainder, sellRemainder = self._matchOffersAndAddExchange(buy=buy, sell=sell)
+			except TradeOffer.OfferIsBelowMinimumExchange:
+				toReAdd.append(sell)
+				continue
+			if buyRemainder is not None:
+				buy = buyRemainder
+				continue # (remainder can match against another offer)
+			# new offer is fully matched
+			if sellRemainder is not None:
+				toReAdd.append(sellRemainder)
+			break
+		for entry in toReAdd:
+			self._ltcSells.addOffer(entry)
+	def _newSellOffer(self, sell):
+		toReAdd = []
+		while True:
+			if self._ltcBuys.empty() or not TradeOffer.OffersMeetOrOverlap(buy=self._ltcBuys.peekCurrentBest(), sell=sell):
+				# no more matchable buy offers
+				self._ltcSells.addOffer(sell)
+				break
+			buy = self._ltcBuys.popCurrentBest()
+			try:
+				buyRemainder, sellRemainder = self._matchOffersAndAddExchange(buy=buy, sell=sell)
+			except TradeOffer.OfferIsBelowMinimumExchange:
+				toReAdd.append(buy)
+				continue
+			if sellRemainder is not None:
+				sell = sellRemainder
+				continue # (remainder can match against another offer)
+			# new offer is fully matched
+			if buyRemainder is not None:
+				toReAdd.append(buyRemainder)
+			break
+		for entry in toReAdd:
+			self._ltcBuys.addOffer(entry)
+
 	def _fundedTransaction_Burn(self, txID, swapBillInput, changeRequired, amount, outputs):
 		assert outputs == ('destination',)
 		if swapBillInput + amount < Constraints.minimumSwapBillBalance:
@@ -157,27 +202,7 @@ class State(object):
 		buy.receivingAccount = receivingAddress
 		buy.refundAccount = refundAccount
 		buy.expiry = maxBlock
-		toReAdd = []
-		while True:
-			if self._ltcSells.empty() or not TradeOffer.OffersMeetOrOverlap(buy=buy, sell=self._ltcSells.peekCurrentBest()):
-				# no more matchable sell offers
-				self._ltcBuys.addOffer(buy)
-				break
-			sell = self._ltcSells.popCurrentBest()
-			try:
-				buyRemainder, sellRemainder = self._matchOffersAndAddExchange(buy=buy, sell=sell)
-			except TradeOffer.OfferIsBelowMinimumExchange:
-				toReAdd.append(sell)
-				continue
-			if buyRemainder is not None:
-				buy = buyRemainder
-				continue # (remainder can match against another offer)
-			# new offer is fully matched
-			if sellRemainder is not None:
-				toReAdd.append(sellRemainder)
-			break
-		for entry in toReAdd:
-			self._ltcSells.addOffer(entry)
+		self._newBuyOffer(buy)
 		return change
 
 	def _fundedTransaction_LTCSellOffer(self, txID, swapBillInput, changeRequired, ltcOffered, exchangeRate, maxBlock, outputs):
@@ -200,29 +225,10 @@ class State(object):
 		receivingAccount = (txID, 1) # (now same as change account)
 		self._balances.add(receivingAccount, 0) # only temporarily empty, change will be paid in to this after return
 		self._balances.addFirstRef(receivingAccount)
+		sell.isBacked = False
 		sell.receivingAccount = receivingAccount
 		sell.expiry = maxBlock
-		toReAdd = []
-		while True:
-			if self._ltcBuys.empty() or not TradeOffer.OffersMeetOrOverlap(buy=self._ltcBuys.peekCurrentBest(), sell=sell):
-				# no more matchable buy offers
-				self._ltcSells.addOffer(sell)
-				break
-			buy = self._ltcBuys.popCurrentBest()
-			try:
-				buyRemainder, sellRemainder = self._matchOffersAndAddExchange(buy=buy, sell=sell)
-			except TradeOffer.OfferIsBelowMinimumExchange:
-				toReAdd.append(buy)
-				continue
-			if sellRemainder is not None:
-				sell = sellRemainder
-				continue # (remainder can match against another offer)
-			# new offer is fully matched
-			if buyRemainder is not None:
-				toReAdd.append(buyRemainder)
-			break
-		for entry in toReAdd:
-			self._ltcBuys.addOffer(entry)
+		self._newSellOffer(sell)
 		return change
 
 	def _fundedTransaction_BackLTCSells(self, txID, swapBillInput, changeRequired, backingAmount, transactionsBacked, commission, ltcReceiveAddress, maxBlock, outputs):
@@ -285,33 +291,16 @@ class State(object):
 		self._balances.add(receivingAccount, 0) # only temporarily empty, change will be paid in to this after return
 		self._balances.addFirstRef(receivingAccount)
 
-		sell.isBacked = True
 		self._balances.addRef(backer.refundAccount)
-		sell.refundAccount = backer.refundAccount
-		sell.receivingAccount = backer.refundAccount
+
+		sell.isBacked = True
+		sell.backerAccount = backer.refundAccount
+		sell.sellerAccount = receivingAccount
 
 		sell.expiry = maxBlock
-		toReAdd = []
-		while True:
-			if self._ltcBuys.empty() or not TradeOffer.OffersMeetOrOverlap(buy=self._ltcBuys.peekCurrentBest(), sell=sell):
-				# no more matchable buy offers
-				self._ltcSells.addOffer(sell)
-				break
-			buy = self._ltcBuys.popCurrentBest()
-			try:
-				buyRemainder, sellRemainder = self._matchOffersAndAddExchange(buy=buy, sell=sell)
-			except TradeOffer.OfferIsBelowMinimumExchange:
-				toReAdd.append(buy)
-				continue
-			if sellRemainder is not None:
-				sell = sellRemainder
-				continue # (remainder can match against another offer)
-			# new offer is fully matched
-			if buyRemainder is not None:
-				toReAdd.append(buyRemainder)
-			break
-		for entry in toReAdd:
-			self._ltcBuys.addOffer(entry)
+
+		self._newSellOffer(sell)
+
 		return swapBillInput
 
 	def _fundedTransaction_ForwardToFutureNetworkVersion(self, txID, swapBillInput, changeRequired, amount, maxBlock, outputs):
