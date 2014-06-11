@@ -55,10 +55,10 @@ class State(object):
 			exchange = self._pendingExchanges[key]
 			if exchange.expiry == self._currentBlockIndex:
 				# refund buyers funds locked up in the exchange, plus sellers deposit (as penalty for failing to make exchange)
-				self._balances.addTo_Forwarded(exchange.buyerAddress, exchange.swapBillAmount + exchange.swapBillDeposit)
-				self._balances.addStateChange(exchange.buyerAddress)
+				self._balances.addTo_Forwarded(exchange.buyerAccount, exchange.swapBillAmount + exchange.swapBillDeposit)
+				self._balances.addStateChange(exchange.buyerAccount)
 				self._balances.addStateChange(exchange.sellerReceivingAccount)
-				self._balances.removeRef(exchange.buyerAddress)
+				self._balances.removeRef(exchange.buyerAccount)
 				self._balances.removeRef(exchange.sellerReceivingAccount)
 				toDelete.append(key)
 		for key in toDelete:
@@ -86,7 +86,7 @@ class State(object):
 		self._balances.addStateChange(buy.refundAccount)
 		exchange.expiry = self._currentBlockIndex + Constraints.blocksForExchangeCompletion
 		exchange.ltcReceiveAddress = buy.receivingAccount
-		exchange.buyerAddress = buy.refundAccount
+		exchange.buyerAccount = buy.refundAccount
 		exchange.sellerReceivingAccount = sell.receivingAccount
 		key = self._nextExchangeIndex
 		self._nextExchangeIndex += 1
@@ -278,9 +278,9 @@ class State(object):
 		# the seller completed their side of the exchange, so credit them the buyers swapbill
 		# and the seller is also refunded their deposit here
 		self._balances.addTo_Forwarded(exchange.sellerReceivingAccount, exchange.swapBillAmount + exchange.swapBillDeposit)
-		self._balances.addStateChange(exchange.buyerAddress)
+		self._balances.addStateChange(exchange.buyerAccount)
 		self._balances.addStateChange(exchange.sellerReceivingAccount)
-		self._balances.removeRef(exchange.buyerAddress)
+		self._balances.removeRef(exchange.buyerAccount)
 		self._balances.removeRef(exchange.sellerReceivingAccount)
 		self._pendingExchanges.pop(pendingExchangeIndex)
 
