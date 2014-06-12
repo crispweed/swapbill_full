@@ -85,7 +85,7 @@ class State(object):
 	def _matchOffersAndAddExchange(self, buy, sell):
 		assert buy.refundAccount in self._balances.changeCounts
 		assert sell.receivingAccount in self._balances.changeCounts
-		exchange, buyRemainder, sellRemainder = TradeOffer.MatchOffers(buy=buy, sell=sell)
+		exchange = TradeOffer.MatchOffers(buy=buy, sell=sell)
 		self._balances.addStateChange(sell.receivingAccount)
 		self._balances.addStateChange(buy.refundAccount)
 		exchange.expiry = self._currentBlockIndex + Constraints.blocksForExchangeCompletion
@@ -97,19 +97,17 @@ class State(object):
 		# the existing account refs from buy and sell details transfer into the exchange object
 		# and then we add new refs for offer remainders as necessary
 		self._pendingExchanges[key] = exchange
-		if buyRemainder is not None:
-			buyRemainder.receivingAccount = buy.receivingAccount
-			buyRemainder.refundAccount = buy.refundAccount
-			buyRemainder.expiry = buy.expiry
-			self._balances.addRef(buyRemainder.refundAccount)
-		if sellRemainder is None:
+		if buy.hasBeenConsumed():
+			buy = None
+		else:
+			self._balances.addRef(buy.refundAccount)
+		if sell.hasBeenConsumed():
 			# seller gets seed amount (which was locked up implicitly in the sell offer) refunded
 			self._balances.addTo_Forwarded(sell.receivingAccount, Constraints.minimumSwapBillBalance)
+			sell = None
 		else:
-			sellRemainder.receivingAccount = sell.receivingAccount
-			sellRemainder.expiry = sell.expiry
-			self._balances.addRef(sellRemainder.receivingAccount)
-		return buyRemainder, sellRemainder
+			self._balances.addRef(sell.receivingAccount)
+		return buy, sell
 
 	def _newBuyOffer(self, buy):
 		toReAdd = []
@@ -289,8 +287,6 @@ class State(object):
 		sell.backingSwapBill = backingSwapBill
 		sell.expiry = maxBlock
 		self._newSellOffer(sell)
-
-
 		return swapBillInput
 
 	def _fundedTransaction_ForwardToFutureNetworkVersion(self, txID, swapBillInput, amount, maxBlock, outputs):

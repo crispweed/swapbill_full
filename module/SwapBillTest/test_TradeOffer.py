@@ -18,21 +18,18 @@ def MatchOffersWrapper(originalFunction):
 		swapBillOffered = buy._swapBillOffered
 		swapBillDeposit = sell._swapBillDeposit
 		ltcOffered = sell._ltcOffered
-		#print(originalFunction.__name__ + " was called")
-		exchange, outstandingBuy, outstandingSell = originalFunction(buy=buy, sell=sell)
+		exchange = originalFunction(buy=buy, sell=sell)
 		swapBillOffered -= exchange.swapBillAmount
 		swapBillDeposit -= exchange.swapBillDeposit
 		ltcOffered -= exchange.ltc
-		if outstandingBuy is not None:
-			swapBillOffered -= outstandingBuy._swapBillOffered
-		if outstandingSell is not None:
-			ValidateSell(outstandingSell)
-			swapBillDeposit -= outstandingSell._swapBillDeposit
-			ltcOffered -= outstandingSell._ltcOffered
+		swapBillOffered -= buy._swapBillOffered
+		ValidateSell(sell)
+		swapBillDeposit -= sell._swapBillDeposit
+		ltcOffered -= sell._ltcOffered
 		assert swapBillOffered == 0
 		assert swapBillDeposit == 0
 		assert ltcOffered == 0
-		return exchange, outstandingBuy, outstandingSell
+		return exchange
 	return Wrapper
 TradeOffer.MatchOffers = MatchOffersWrapper(TradeOffer.MatchOffers)
 
@@ -108,56 +105,61 @@ class Test(unittest.TestCase):
 		sell = self.MinimumSellOffer(0x40000000)
 		self.assertRaises(AssertionError, TradeOffer.MatchOffers, buy=buy, sell=sell)
 		# offer adjustments and match call
+		buy = TradeOffer.BuyOffer(2*e(7), 0x80000000)
 		sell = self.SellOffer(rate=0x80000000, ltcOffered=1*e(7))
-		exchange, outstandingBuy, outstandingSell = TradeOffer.MatchOffers(buy=buy, sell=sell)
+		exchange = TradeOffer.MatchOffers(buy=buy, sell=sell)
 		# offers should match exactly
-		self.assertIsNone(outstandingBuy)
-		self.assertIsNone(outstandingSell)
+		self.assertTrue(buy.hasBeenConsumed())
+		self.assertTrue(sell.hasBeenConsumed())
 		self.assertDictEqual(exchange.__dict__, {'swapBillAmount': 2*e(7), 'ltc': 1*e(7), 'swapBillDeposit': 2*e(7)//16})
 		# offer adjustments and next match call
+		buy = TradeOffer.BuyOffer(2*e(7), 0x80000000)
 		sell = TradeOffer.SellOffer(12*e(6)//16, 6*e(6), 0x80000000)
 		self.assertRaises(OfferIsBelowMinimumExchange, TradeOffer.MatchOffers, buy=buy, sell=sell)
 		# offer adjustments and next match call
 		buy = TradeOffer.BuyOffer(22*e(6), 0x80000000)
-		exchange, outstandingBuy, outstandingSell = TradeOffer.MatchOffers(buy=buy, sell=sell)
+		sell = TradeOffer.SellOffer(12*e(6)//16, 6*e(6), 0x80000000)
+		exchange = TradeOffer.MatchOffers(buy=buy, sell=sell)
 		# sell should be consumed, and buy remainder left outstanding
-		self.assertDictEqual(outstandingBuy.__dict__, {'rate': 0x80000000, '_swapBillOffered': 1*e(7)})
-		self.assertIsNone(outstandingSell)
+		self.assertDictEqual(buy.__dict__, {'rate': 0x80000000, '_swapBillOffered': 1*e(7)})
+		self.assertTrue(sell.hasBeenConsumed())
 		self.assertDictEqual(exchange.__dict__, {'swapBillAmount': 12*e(6), 'ltc': 6*e(6), 'swapBillDeposit': 12*e(6)//16})
 		# offer adjustments and next match call
 		buy = TradeOffer.BuyOffer(2*e(7), 0x80000000)
 		sell = TradeOffer.SellOffer(6*e(7)//16, 3*e(7), 0x80000000)
-		exchange, outstandingBuy, outstandingSell = TradeOffer.MatchOffers(buy=buy, sell=sell)
+		exchange = TradeOffer.MatchOffers(buy=buy, sell=sell)
 		# buy should be consumed, and sell remainder left outstanding
-		self.assertIsNone(outstandingBuy)
-		self.assertDictEqual(outstandingSell.__dict__, {'rate': 0x80000000, '_swapBillDeposit': 4*e(7)//16, '_ltcOffered': 2*e(7)})
+		self.assertTrue(buy.hasBeenConsumed())
+		self.assertDictEqual(sell.__dict__, {'rate': 0x80000000, '_swapBillDeposit': 4*e(7)//16, '_ltcOffered': 2*e(7)})
 		self.assertDictEqual(exchange.__dict__, {'swapBillAmount': 2*e(7), 'ltc': 1*e(7), 'swapBillDeposit': 2*e(7)//16})
 		# similar set of tests, but with different buy and sell rates
 		# offer setup and match call
 		buy = TradeOffer.BuyOffer(2*e(7), 0x70000000)
 		sell = TradeOffer.SellOffer(1111112, 1*e(7), 0x90000000)
-		exchange, outstandingBuy, outstandingSell = TradeOffer.MatchOffers(buy=buy, sell=sell)
+		exchange = TradeOffer.MatchOffers(buy=buy, sell=sell)
 		# offers should match exactly (at applied rate)
-		self.assertIsNone(outstandingBuy)
-		self.assertIsNone(outstandingSell)
+		self.assertTrue(buy.hasBeenConsumed())
+		self.assertTrue(sell.hasBeenConsumed())
 		self.assertDictEqual(exchange.__dict__, {'swapBillAmount': 2*e(7), 'ltc': 1*e(7), 'swapBillDeposit': 1111112})
 		# offer adjustments and next match call
+		buy = TradeOffer.BuyOffer(2*e(7), 0x70000000)
 		sell = TradeOffer.SellOffer(666667, 6*e(6), 0x90000000)
 		self.assertRaises(OfferIsBelowMinimumExchange, TradeOffer.MatchOffers, buy=buy, sell=sell)
 		# offer adjustments and next match call
 		buy = TradeOffer.BuyOffer(22*e(6), 0x70000000)
-		exchange, outstandingBuy, outstandingSell = TradeOffer.MatchOffers(buy=buy, sell=sell)
+		sell = TradeOffer.SellOffer(666667, 6*e(6), 0x90000000)
+		exchange = TradeOffer.MatchOffers(buy=buy, sell=sell)
 		# sell should be consumed, and buy remainder left outstanding
-		self.assertDictEqual(outstandingBuy.__dict__, {'rate': 0x70000000, '_swapBillOffered': 1*e(7)})
-		self.assertIsNone(outstandingSell)
+		self.assertDictEqual(buy.__dict__, {'rate': 0x70000000, '_swapBillOffered': 1*e(7)})
+		self.assertTrue(sell.hasBeenConsumed())
 		self.assertDictEqual(exchange.__dict__, {'swapBillAmount': 12*e(6), 'ltc': 6*e(6), 'swapBillDeposit': 666667})
 		# offer adjustments and next match call
 		buy = TradeOffer.BuyOffer(2*e(7), 0x70000000)
 		sell = TradeOffer.SellOffer(3333334, 3*e(7), 0x90000000)
-		exchange, outstandingBuy, outstandingSell = TradeOffer.MatchOffers(buy=buy, sell=sell)
+		exchange = TradeOffer.MatchOffers(buy=buy, sell=sell)
 		# buy should be consumed, and sell remainder left outstanding
-		self.assertIsNone(outstandingBuy)
-		self.assertDictEqual(outstandingSell.__dict__, {'rate': 0x90000000, '_swapBillDeposit': 2222223, '_ltcOffered': 2*e(7)})
+		self.assertTrue(buy.hasBeenConsumed())
+		self.assertDictEqual(sell.__dict__, {'rate': 0x90000000, '_swapBillDeposit': 2222223, '_ltcOffered': 2*e(7)})
 		self.assertDictEqual(exchange.__dict__, {'swapBillAmount': 2*e(7), 'ltc': 1*e(7), 'swapBillDeposit': 1111111})
 
 	def test_match_remainder_too_small(self):
@@ -184,9 +186,9 @@ class Test(unittest.TestCase):
 		exchangeFractionAsFloat = float(n)/d
 		assert exchangeFractionAsFloat < 0.482 and exchangeFractionAsFloat > 0.481
 		depositInExchange = deposit * n // d
-		exchange, outstandingBuy, outstandingSell = TradeOffer.MatchOffers(buy=buy, sell=sell)
-		self.assertIsNone(outstandingBuy)
-		self.assertDictEqual(outstandingSell.__dict__, {'rate': sellRate, '_swapBillDeposit': deposit-depositInExchange, '_ltcOffered': ltcOffered-ltcInExchange})
+		exchange = TradeOffer.MatchOffers(buy=buy, sell=sell)
+		self.assertTrue(buy.hasBeenConsumed())
+		self.assertDictEqual(sell.__dict__, {'rate': sellRate, '_swapBillDeposit': deposit-depositInExchange, '_ltcOffered': ltcOffered-ltcInExchange})
 		self.assertDictEqual(exchange.__dict__, {'swapBillAmount': 1*e(7), 'ltc': ltcInExchange, 'swapBillDeposit': depositInExchange})
 
 	def test_attempt_break_deposit_invariant(self):
@@ -197,9 +199,9 @@ class Test(unittest.TestCase):
 		sell = TradeOffer.SellOffer(deposit, 1*e(7)+2, 0x80000000)
 		# attempted to break the invariant for deposit always being the exact required deposit, by division rounded up
 		# but it turns out the invariant holds here, because *the exchange* loses the rounding up unit, not the outstanding sell
-		exchange, outstandingBuy, outstandingSell = TradeOffer.MatchOffers(buy=buy, sell=sell)
+		exchange= TradeOffer.MatchOffers(buy=buy, sell=sell)
 		# buy should be consumed, and sell remainder left outstanding
-		self.assertIsNone(outstandingBuy)
-		self.assertDictEqual(outstandingSell.__dict__, {'_swapBillDeposit': 625001, 'rate': 2147483648, '_ltcOffered': 5000001})
+		self.assertTrue(buy.hasBeenConsumed)
+		self.assertDictEqual(sell.__dict__, {'_swapBillDeposit': 625001, 'rate': 2147483648, '_ltcOffered': 5000001})
 		self.assertDictEqual(exchange.__dict__, {'swapBillAmount': 10000002, 'ltc': 5000001, 'swapBillDeposit': 625000})
 

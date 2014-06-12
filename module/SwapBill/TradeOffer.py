@@ -35,6 +35,8 @@ class BuyOffer(object):
 			raise OfferIsBelowMinimumExchange()
 		self._swapBillOffered = swapBillOffered
 		self.rate = rate
+	def hasBeenConsumed(self):
+		return self._swapBillOffered == 0
 
 class SellOffer(object):
 	def __init__(self, swapBillDeposit, ltcOffered, rate):
@@ -43,6 +45,8 @@ class SellOffer(object):
 		self._swapBillDeposit = swapBillDeposit
 		self._ltcOffered = ltcOffered
 		self.rate = rate
+	def hasBeenConsumed(self):
+		return self._ltcOffered == 0
 
 class Exchange(object):
 	pass
@@ -61,16 +65,19 @@ def MatchOffers(buy, sell):
 	assert ltcToBeExchanged >= Constraints.minimumExchangeLTC # should be guaranteed by buy and sell both satisfying this minimum requirement
 
 	exchange = Exchange()
-	outstandingBuy = None
-	outstandingSell = None
 
 	if ltcToBeExchanged <= sell._ltcOffered:
 		# ltc buy offer is consumed completely
 		exchange.swapBillAmount = buy._swapBillOffered
 		exchange.ltc = ltcToBeExchanged
 		exchange.swapBillDeposit = sell._swapBillDeposit * ltcToBeExchanged // sell._ltcOffered
-		if ltcToBeExchanged < sell._ltcOffered:
-			outstandingSell = SellOffer(swapBillDeposit=sell._swapBillDeposit - exchange.swapBillDeposit, ltcOffered=sell._ltcOffered - ltcToBeExchanged, rate=sell.rate)
+		ltcRemaining = sell._ltcOffered - ltcToBeExchanged
+		if ltcRemaining > 0 and ltcRemaining < MinimumSellOfferWithRate(sell.rate):
+			# ** offers must not be modified at this point
+			raise OfferIsBelowMinimumExchange()
+		buy._swapBillOffered = 0
+		sell._ltcOffered = ltcRemaining
+		sell._swapBillDeposit -= exchange.swapBillDeposit
 	else:
 		# ltc sell offer is consumed completely
 		exchange.ltc = sell._ltcOffered
@@ -78,7 +85,12 @@ def MatchOffers(buy, sell):
 		swapBillToBeExchanged =	buy._swapBillOffered * sell._ltcOffered // ltcToBeExchanged
 		assert swapBillToBeExchanged >= Constraints.minimumSwapBillBalance # should be guaranteed by the buy and sell offer minimum constraints
 		exchange.swapBillAmount = swapBillToBeExchanged
-		if swapBillToBeExchanged != buy._swapBillOffered: # TODO check whether this comparison is actually required
-			outstandingBuy = BuyOffer(swapBillOffered=buy._swapBillOffered - swapBillToBeExchanged, rate=buy.rate)
+		swapBillRemaining = buy._swapBillOffered - swapBillToBeExchanged
+		if swapBillRemaining > 0 and swapBillRemaining < MinimumBuyOfferWithRate(buy.rate):
+			# ** offers must not be modified at this point
+			raise OfferIsBelowMinimumExchange()
+		sell._ltcOffered = 0
+		sell._swapBillDeposit = 0
+		buy._swapBillOffered = swapBillRemaining
 
-	return exchange, outstandingBuy, outstandingSell
+	return exchange
