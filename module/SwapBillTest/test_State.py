@@ -994,7 +994,7 @@ class Test(unittest.TestCase):
 		self.assertEqual(state._ltcBuys.size(), 0)
 		self.assertEqual(state._ltcSells.size(), 1)
 		self.assertEqual(len(state._pendingExchanges), 1)
-		self.assertDictEqual(state._pendingExchanges[0].__dict__, {'buyerAccount':buy, 'buyerLTCReceive':'buyerReceivePKH', 'expiry':150, 'ltc':3*e(7)//2, 'sellerAccount':backerRefund, 'swapBillAmount':3*e(7), 'swapBillDeposit':3*e(7)//Constraints.depositDivisor})
+		self.assertDictEqual(state._pendingExchanges[0].__dict__, {'backerIndex':0, 'buyerAccount':buy, 'buyerLTCReceive':'buyerReceivePKH', 'expiry':150, 'ltc':3*e(7)//2, 'sellerAccount':backerRefund, 'swapBillAmount':3*e(7), 'swapBillDeposit':3*e(7)//Constraints.depositDivisor})
 		self.assertEqual(len(state._ltcSellBackers), 1)
 		self.assertDictEqual(state._ltcSellBackers[0].__dict__, {'backingAmount': 4*e(12)-4*e(7)-4*e(7)//Constraints.depositDivisor-Constraints.minimumSwapBillBalance, 'commission': 536870912, 'expiry': 200, 'ltcReceiveAddress': 'backerLTCReceivePKH', 'refundAccount': backerRefund, 'transactionMax': 4*e(9)})
 		# backer is then responsable for completing the exchange with the buyer

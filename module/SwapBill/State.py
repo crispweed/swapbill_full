@@ -96,11 +96,13 @@ class State(object):
 		exchange.buyerLTCReceive = buy.ltcReceiveAddress
 		exchange.buyerAccount = buy.refundAccount
 		exchange.sellerAccount = sell.receivingAccount
+		exchange.backerIndex= -1
 		if sell.isBacked:
 			assert sell.backingSwapBill >= exchange.swapBillAmount
 			sell.backingSwapBill -= exchange.swapBillAmount
 			self._balances.addTo_Forwarded(sell.backingReceiveAccount, exchange.swapBillAmount)
 			self._balances.addStateChange(sell.backingReceiveAccount)
+			exchange.backerIndex = sell.backerIndex
 		key = self._nextExchangeIndex
 		self._nextExchangeIndex += 1
 		# the existing account refs from buy and sell details transfer into the exchange object
@@ -302,6 +304,7 @@ class State(object):
 		sell.isBacked = True
 		sell.backingSwapBill = swapBillEquivalent
 		sell.backingReceiveAccount = receivingAccount
+		sell.backerIndex = backerIndex
 		sell.expiry = 0xffffffff
 		self._newSellOffer(sell)
 		return swapBillInput
