@@ -267,18 +267,19 @@ class State(object):
 		self._ltcSellBackers[key] = backer
 		return change
 
-	def _fundedTransaction_BackedLTCSellOffer(self, txID, swapBillInput, exchangeRate, backerIndex, backerLTCReceiveAddress, ltcOffered, outputs):
+	def _fundedTransaction_BackedLTCSellOffer(self, txID, swapBillInput, exchangeRate, backerIndex, backerLTCReceiveAddress, ltcOfferedPlusCommission, outputs):
 		assert outputs == ('sellerReceive',)
 		if exchangeRate == 0:
 			raise BadlyFormedTransaction('zero exchange rate not permitted')
+		if not backerIndex in self._ltcSellBackers:
+			raise TransactionFailsAgainstCurrentState('no ltc sell backer with the specified index')
+		backer = self._ltcSellBackers[backerIndex]
+		ltcOffered = ltcOfferedPlusCommission * 0x100000000 // (0x100000000 + backer.commission)
 		swapBillDeposit = TradeOffer.DepositRequiredForLTCSell(exchangeRate=exchangeRate, ltcOffered=ltcOffered)
 		try:
 			sell = TradeOffer.SellOffer(swapBillDeposit=swapBillDeposit, ltcOffered=ltcOffered, rate=exchangeRate)
 		except TradeOffer.OfferIsBelowMinimumExchange:
-			raise BadlyFormedTransaction('does not satisfy minimum exchange amount')
-		if not backerIndex in self._ltcSellBackers:
-			raise TransactionFailsAgainstCurrentState('no ltc sell backer with the specified index')
-		backer = self._ltcSellBackers[backerIndex]
+			raise TransactionFailsAgainstCurrentState('does not satisfy minimum exchange amount')
 		if backerLTCReceiveAddress != backer.ltcReceiveAddress:
 			raise TransactionFailsAgainstCurrentState('destination address does not match backer receive address for ltc sell backer with the specified index')
 		swapBillEquivalent = TradeOffer.GetSwapBillEquivalentRoundedUp(exchangeRate=exchangeRate, ltcOffered=ltcOffered)
