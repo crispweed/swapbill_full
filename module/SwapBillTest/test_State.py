@@ -32,6 +32,7 @@ class Test(unittest.TestCase):
 	    'LTCBuyOffer':('ltcBuy',),
 	    'LTCSellOffer':('ltcSell',),
 	    'BackLTCSells':('ltcSellBacker',),
+	    'BackedLTCSellOffer':('sellerReceive',),
 	    'LTCExchangeCompletion':(),
 	    'ForwardToFutureNetworkVersion':('change',)
 	    }
@@ -958,6 +959,7 @@ class Test(unittest.TestCase):
 	def test_backed_ltc_sell(self):
 		state = State.State(100, 'mockhash')
 		self.state = state
+		# backer commits funds
 		burn = self.Burn(4*e(12))
 		details = {'backingAmount':4*e(12), 'transactionsBacked':1000, 'commission':0x10000000, 'ltcReceiveAddress':'backerLTCReceivePKH', 'maxBlock':200}
 		outputs = self.Apply_AssertSucceeds(state, 'BackLTCSells', sourceAccounts=[burn], **details)
@@ -966,3 +968,49 @@ class Test(unittest.TestCase):
 		self.assertEqual(state._balances.balances, expectedBalances)
 		self.assertEqual(len(state._ltcSellBackers), 1)
 		self.assertDictEqual(state._ltcSellBackers[0].__dict__, {'backingAmount': 4*e(12), 'commission': 268435456, 'expiry': 200, 'ltcReceiveAddress': 'backerLTCReceivePKH', 'refundAccount': backerRefund, 'transactionMax': 4*e(9)})
+		# normal buy offer
+		burn = self.Burn(3*e(7))
+		details = {
+		    'swapBillOffered':3*e(7), 'exchangeRate':0x80000000,
+		    'maxBlock':100,
+		    'receivingAddress':'buyerReceivePKH'
+		}
+		outputs = self.Apply_AssertSucceeds(state, 'LTCBuyOffer', sourceAccounts=[burn], **details)
+		buy = outputs['ltcBuy']
+		expectedBalances[buy]=0
+		self.assertEqual(state._balances.balances, expectedBalances)
+		self.assertEqual(state._ltcBuys.size(), 1)
+		# backed sell offer
+		details = {
+		    'backerIndex':0,
+		    'backerLTCReceiveAddress':'backerLTCReceivePKH',
+		    'ltcOffered':4*e(7)//2, 'exchangeRate':0x80000000
+		}
+		outputs = self.Apply_AssertSucceeds(state, 'BackedLTCSellOffer', sourceAccounts=[], **details)
+		sell = outputs['sellerReceive']
+		# TODO commission should be subtracted from this!
+		#... and then resolve any issues with minimum balance relating to commission payments
+		# or, better, commission should be subtracted from ltc paid in for sell
+		expectedBalances[sell] = 3*e(7) # we get paid straight away!
+		self.assertEqual(state._balances.balances, expectedBalances)
+		self.assertEqual(state._ltcBuys.size(), 0)
+		self.assertEqual(state._ltcSells.size(), 1)
+		self.assertEqual(len(state._pendingExchanges), 1)
+		self.assertDictEqual(state._pendingExchanges[0].__dict__, {'buyerAccount':buy, 'buyerLTCReceive':'buyerReceivePKH', 'expiry':150, 'ltc':3*e(7)//2, 'sellerAccount':backerRefund, 'swapBillAmount':3*e(7), 'swapBillDeposit':3*e(7)//Constraints.depositDivisor})
+		self.assertEqual(len(state._ltcSellBackers), 1)
+		self.assertDictEqual(state._ltcSellBackers[0].__dict__, {'backingAmount': 4*e(12)-4*e(7)-4*e(7)//Constraints.depositDivisor-Constraints.minimumSwapBillBalance, 'commission': 268435456, 'expiry': 200, 'ltcReceiveAddress': 'backerLTCReceivePKH', 'refundAccount': backerRefund, 'transactionMax': 4*e(9)})
+		# backer is then responsable for completing the exchange with the buyer
+		details = {'pendingExchangeIndex':0, 'destinationAddress':'buyerReceivePKH', 'destinationAmount':3*e(7)//2}
+		self.Apply_AssertSucceeds(state, 'LTCExchangeCompletion', **details)
+		# and backer now gets
+		# payment of the 3*e(7) offered by A
+		# plus fraction of deposit for the amount matched (=1875000)
+		# (the rest of the deposit is left with an outstanding remainder sell offer)
+		expectedBalances[backerRefund] += 3*e(7) + 1875000 #******* will be better to refund this back to the backer object, if not yet expired
+		expectedBalances.pop(buy) # trade completes, so referenced zero balance account is cleaned up here
+		self.assertEqual(state._balances.balances, expectedBalances)
+		self.assertEqual(state._ltcBuys.size(), 0)
+		self.assertEqual(state._ltcSells.size(), 1)
+		self.assertEqual(len(state._pendingExchanges), 0)
+		self.assertEqual(len(state._ltcSellBackers), 1)
+		self.assertDictEqual(state._ltcSellBackers[0].__dict__, {'backingAmount': 4*e(12)-4*e(7)-4*e(7)//Constraints.depositDivisor-Constraints.minimumSwapBillBalance, 'commission': 268435456, 'expiry': 200, 'ltcReceiveAddress': 'backerLTCReceivePKH', 'refundAccount': backerRefund, 'transactionMax': 4*e(9)})

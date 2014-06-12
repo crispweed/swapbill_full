@@ -98,6 +98,7 @@ class State(object):
 		exchange.sellerAccount = sell.receivingAccount
 		if sell.isBacked:
 			assert sell.backingSwapBill >= exchange.swapBillAmount
+			sell.backingSwapBill -= exchange.swapBillAmount
 			self._balances.addTo_Forwarded(sell.backingReceiveAccount, exchange.swapBillAmount)
 			self._balances.addStateChange(sell.backingReceiveAccount)
 		key = self._nextExchangeIndex
@@ -279,8 +280,8 @@ class State(object):
 			raise TransactionFailsAgainstCurrentState('no ltc sell backer with the specified index')
 		backer = self._ltcSellBackers[backerIndex]
 		if backerLTCReceiveAddress != backer.ltcReceiveAddress:
-			raise TransactionFailsAgainstCurrentState('destination address does not match backer receive address for pending exchange with the specified index')
-		swapBillEquivalent = GetSwapBillEquivalentRoundedUp(exchangeRate=exchangeRate, ltcOffered=ltcOffered)
+			raise TransactionFailsAgainstCurrentState('destination address does not match backer receive address for ltc sell backer with the specified index')
+		swapBillEquivalent = TradeOffer.GetSwapBillEquivalentRoundedUp(exchangeRate=exchangeRate, ltcOffered=ltcOffered)
 		# note that minimum balance amount is implicitly seeded into sell offers
 		transactionBackingAmount = Constraints.minimumSwapBillBalance + swapBillDeposit + swapBillEquivalent
 		if transactionBackingAmount > backer.transactionMax:
@@ -292,7 +293,7 @@ class State(object):
 			raise TransactionFailsAgainstCurrentState('insufficient backing funds')
 		if txID is None:
 			return
-		self._balances.subtractFrom(backer.refundAccount, transactionBackingAmount)
+		backer.backingAmount -= transactionBackingAmount
 		receivingAccount = (txID, 1) # same as change account and already created
 		self._balances.addFirstRef(receivingAccount)
 		self._balances.addRef(backer.refundAccount)
@@ -300,7 +301,7 @@ class State(object):
 		sell.isBacked = True
 		sell.backingSwapBill = swapBillEquivalent
 		sell.backingReceiveAccount = receivingAccount
-		sell.expiry = maxBlock
+		sell.expiry = 0xffffffff
 		self._newSellOffer(sell)
 		return swapBillInput
 

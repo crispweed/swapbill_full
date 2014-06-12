@@ -24,9 +24,9 @@ def DepositRequiredForLTCSell(exchangeRate, ltcOffered):
 
 def GetSwapBillEquivalentRoundedUp(exchangeRate, ltcOffered):
 	swapBillAmount = ltcOffered * 0x100000000 // exchangeRate
-	if _ltcWithExchangeRate(rate, swapBillAmount) < ltcOffered:
+	if _ltcWithExchangeRate(exchangeRate, swapBillAmount) < ltcOffered:
 		swapBillAmount += 1
-	assert _ltcWithExchangeRate(rate, swapBillAmount) >= ltcOffered.minimumExchangeLTC
+	assert _ltcWithExchangeRate(exchangeRate, swapBillAmount) >= ltcOffered
 	return swapBillAmount
 
 class BuyOffer(object):
