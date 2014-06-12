@@ -43,15 +43,19 @@ class State(object):
 
 	def advanceToNextBlock(self):
 		expired = self._ltcBuys.advanceToNextBlock()
-		for buyOffer in expired:
-			self._balances.addStateChange(buyOffer.refundAccount)
-			self._balances.addTo_Forwarded(buyOffer.refundAccount, buyOffer._swapBillOffered)
-			self._balances.removeRef(buyOffer.refundAccount)
+		for buy in expired:
+			self._balances.addStateChange(buy.refundAccount)
+			self._balances.addTo_Forwarded(buy.refundAccount, buy._swapBillOffered)
+			self._balances.removeRef(buy.refundAccount)
 		expired = self._ltcSells.advanceToNextBlock()
-		for sellOffer in expired:
-			self._balances.addStateChange(sellOffer.receivingAccount)
-			self._balances.addTo_Forwarded(sellOffer.receivingAccount, Constraints.minimumSwapBillBalance + sellOffer._swapBillDeposit)
-			self._balances.removeRef(sellOffer.receivingAccount)
+		for sell in expired:
+			self._balances.addStateChange(sell.receivingAccount)
+			self._balances.addTo_Forwarded(sell.receivingAccount, Constraints.minimumSwapBillBalance + sell._swapBillDeposit)
+			if sell.isBacked:
+				self._balances.addTo_Forwarded(sell.receivingAccount, sell.backingSwapBill)
+				self._balances.addStateChange(sell.backingReceiveAccount)
+				self._balances.removeRef(sell.backingReceiveAccount)
+			self._balances.removeRef(sell.receivingAccount)
 		# ** currently iterates through all pending exchanges each block added
 		# are there scaling issues with this?
 		toDelete = []
@@ -92,10 +96,15 @@ class State(object):
 		exchange.buyerLTCReceive = buy.ltcReceiveAddress
 		exchange.buyerAccount = buy.refundAccount
 		exchange.sellerAccount = sell.receivingAccount
+		if sell.isBacked:
+			assert sell.backingSwapBill >= exchange.swapBillAmount
+			self._balances.addTo_Forwarded(sell.backingReceiveAccount, exchange.swapBillAmount)
+			self._balances.addStateChange(sell.backingReceiveAccount)
 		key = self._nextExchangeIndex
 		self._nextExchangeIndex += 1
 		# the existing account refs from buy and sell details transfer into the exchange object
 		# and then we add new refs for offer remainders as necessary
+		# backing receiving account ref remains with sell by default
 		self._pendingExchanges[key] = exchange
 		if buy.hasBeenConsumed():
 			buy = None
@@ -104,6 +113,8 @@ class State(object):
 		if sell.hasBeenConsumed():
 			# seller gets seed amount (which was locked up implicitly in the sell offer) refunded
 			self._balances.addTo_Forwarded(sell.receivingAccount, Constraints.minimumSwapBillBalance)
+			if sell.isBacked:
+				self._balances.removeRef(sell.backingReceiveAccount)
 			sell = None
 		else:
 			self._balances.addRef(sell.receivingAccount)
@@ -269,22 +280,26 @@ class State(object):
 		backer = self._ltcSellBackers[backerIndex]
 		if backerLTCReceiveAddress != backer.ltcReceiveAddress:
 			raise TransactionFailsAgainstCurrentState('destination address does not match backer receive address for pending exchange with the specified index')
-		backingSwapBill = TradeOffer.GetSwapBillAmountRequiredToBackSell(exchangeRate=exchangeRate, ltcOffered=ltcOffered)
-		assert backingSwapBill >= Constraints.minimumSwapBillBalance # should be guaranteed by trade offer constraints
-		if backer.backingAmount < backingSwapBill + swapBillDeposit + Constraints.minimumSwapBillBalance:
+		swapBillEquivalent = GetSwapBillEquivalentRoundedUp(exchangeRate=exchangeRate, ltcOffered=ltcOffered)
+		# note that minimum balance amount is implicitly seeded into sell offers
+		transactionBackingAmount = Constraints.minimumSwapBillBalance + swapBillDeposit + swapBillEquivalent
+		if transactionBackingAmount > backer.transactionMax:
+			raise TransactionFailsAgainstCurrentState('backing amount required for this transaction is larger than the maximum allowed per transaction by the backer')
+		backerChange = backer.backingAmount - transactionBackingAmount
+		if backerChange < 0:
 			raise TransactionFailsAgainstCurrentState('insufficient backing funds')
-		if swapBillDeposit > backer.transactionMax:
-			raise TransactionFailsAgainstCurrentState('deposit is larger than maximum backing amount per transaction')
+		if backerChange > 0 and backerChange < Constraints.minimumSwapBillBalance:
+			raise TransactionFailsAgainstCurrentState('insufficient backing funds')
 		if txID is None:
 			return
-		self._balances.subtractFrom(backer.refundAccount, backingSwapBill + swapBillDeposit)
+		self._balances.subtractFrom(backer.refundAccount, transactionBackingAmount)
 		receivingAccount = (txID, 1) # same as change account and already created
 		self._balances.addFirstRef(receivingAccount)
 		self._balances.addRef(backer.refundAccount)
+		sell.receivingAccount = backer.refundAccount
 		sell.isBacked = True
-		sell.backerAccount = backer.refundAccount
-		sell.sellerAccount = receivingAccount
-		sell.backingSwapBill = backingSwapBill
+		sell.backingSwapBill = swapBillEquivalent
+		sell.backingReceiveAccount = receivingAccount
 		sell.expiry = maxBlock
 		self._newSellOffer(sell)
 		return swapBillInput

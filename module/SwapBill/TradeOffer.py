@@ -22,7 +22,7 @@ def DepositRequiredForLTCSell(exchangeRate, ltcOffered):
 		deposit += 1
 	return deposit
 
-def GetSwapBillAmountRequiredToBackSell(exchangeRate, ltcOffered):
+def GetSwapBillEquivalentRoundedUp(exchangeRate, ltcOffered):
 	swapBillAmount = ltcOffered * 0x100000000 // exchangeRate
 	if _ltcWithExchangeRate(rate, swapBillAmount) < ltcOffered:
 		swapBillAmount += 1

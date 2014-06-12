@@ -13,6 +13,8 @@ def totalAccountedFor(state):
 		result += offer._swapBillOffered
 	for offer in state._ltcSells.getSortedOffers():
 		result += offer._swapBillDeposit + Constraints.minimumSwapBillBalance
+		if offer.isBacked:
+			result += offer.backingSwapBill
 	for key in state._pendingExchanges:
 		exchange = state._pendingExchanges[key]
 		result += exchange.swapBillAmount
