@@ -963,14 +963,14 @@ class Test(unittest.TestCase):
 		burn = self.Burn(4*e(12))
 		details = {'backingAmount':4*e(12), 'transactionsBacked':1000, 'commission':0x20000000, 'ltcReceiveAddress':'backerLTCReceivePKH', 'maxBlock':200}
 		outputs = self.Apply_AssertSucceeds(state, 'BackLTCSells', sourceAccounts=[burn], **details)
-		backerRefund = outputs['ltcSellBacker']
-		expectedBalances = {backerRefund:0}
+		backer = outputs['ltcSellBacker']
+		expectedBalances = {backer:0}
 		self.assertEqual(state._balances.balances, expectedBalances)
 		self.assertEqual(len(state._ltcSellBackers), 1)
 		expectedBackerState = {
 		    'backingAmount': 4*e(12), 'commission': 536870912,
 		    'expiry': 200,
-		    'ltcReceiveAddress': 'backerLTCReceivePKH', 'refundAccount': backerRefund, 'transactionMax': 4*e(9)
+		    'ltcReceiveAddress': 'backerLTCReceivePKH', 'refundAccount': backer, 'transactionMax': 4*e(9)
 		}
 		self.assertDictEqual(state._ltcSellBackers[0].__dict__, expectedBackerState)
 		# normal buy offer
@@ -999,7 +999,7 @@ class Test(unittest.TestCase):
 		self.assertEqual(state._ltcBuys.size(), 0)
 		self.assertEqual(state._ltcSells.size(), 1)
 		self.assertEqual(len(state._pendingExchanges), 1)
-		self.assertDictEqual(state._pendingExchanges[0].__dict__, {'backerIndex':0, 'buyerAccount':buy, 'buyerLTCReceive':'buyerReceivePKH', 'expiry':150, 'ltc':3*e(7)//2, 'sellerAccount':backerRefund, 'swapBillAmount':3*e(7), 'swapBillDeposit':3*e(7)//Constraints.depositDivisor})
+		self.assertDictEqual(state._pendingExchanges[0].__dict__, {'backerIndex':0, 'buyerAccount':buy, 'buyerLTCReceive':'buyerReceivePKH', 'expiry':150, 'ltc':3*e(7)//2, 'sellerAccount':backer, 'swapBillAmount':3*e(7), 'swapBillDeposit':3*e(7)//Constraints.depositDivisor})
 		self.assertEqual(len(state._ltcSellBackers), 1)
 		expectedBackerState['backingAmount'] -= 4*e(7)
 		expectedBackerState['backingAmount'] -= 4*e(7)//Constraints.depositDivisor
@@ -1021,3 +1021,22 @@ class Test(unittest.TestCase):
 		self.assertEqual(state._ltcSells.size(), 1)
 		self.assertEqual(len(state._pendingExchanges), 0)
 		self.assertEqual(len(state._ltcSellBackers), 1)
+		# another buy, to match the outstanding sell remainder
+		burn = self.Burn(1*e(7))
+		details = {
+		    'swapBillOffered':1*e(7), 'exchangeRate':0x80000000,
+		    'maxBlock':100,
+		    'receivingAddress':'buyerReceivePKH2'
+		}
+		outputs = self.Apply_AssertSucceeds(state, 'LTCBuyOffer', sourceAccounts=[burn], **details)
+		buy2 = outputs['ltcBuy']
+		# (matches straight away)
+		expectedBalances[buy2] = 0
+		expectedBalances[sell] += 1*e(7) # seller is paid straight away
+		expectedBalances[backer] += Constraints.minimumSwapBillBalance # TODO get this sent back to backer object
+		self.assertEqual(state._ltcBuys.size(), 0)
+		self.assertEqual(state._ltcSells.size(), 0)
+		self.assertEqual(len(state._pendingExchanges), 1)
+		self.assertDictEqual(state._pendingExchanges[1].__dict__, {'backerIndex':0, 'buyerAccount':buy2, 'buyerLTCReceive':'buyerReceivePKH2', 'expiry':150, 'ltc':1*e(7)//2, 'sellerAccount':backer, 'swapBillAmount':1*e(7), 'swapBillDeposit':1*e(7)//Constraints.depositDivisor})
+		self.assertEqual(state._balances.balances, expectedBalances)
+		self.assertDictEqual(state._ltcSellBackers[0].__dict__, expectedBackerState)
