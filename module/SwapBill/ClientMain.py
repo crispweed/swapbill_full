@@ -358,6 +358,8 @@ def Main(startBlockIndex, startBlockHash, useTestNet, commandLineArgs=sys.argv[1
 			d['swap bill paid by buyer'] = exchange.swapBillAmount
 			d['outstanding ltc payment amount'] = exchange.ltc
 			d['expires on block'] = exchange.expiry
+			if exchange.backerIndex != -1:
+				d['backer id'] = exchange.backerIndex
 			result.append(('pending exchange index', key, d))
 		return result
 

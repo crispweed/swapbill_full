@@ -843,6 +843,18 @@ class Test(unittest.TestCase):
 		host._setOwner('backer')
 		output, result = RunClient(host, ['get_ltc_sell_backers'])
 		self.assertListEqual(result, [('ltc sell backer index', 0, expectedBackerDetails)])
+		output, result = RunClient(host, ['get_pending_exchanges'])
+		expectedResult = [('pending exchange index', 0,
+		     {
+		         'expires on block': 55, 'outstanding ltc payment amount': 150000000,
+		         'I am seller (and need to complete)': True,
+		         'backer id': 0,
+		         'I am buyer (and waiting for payment)': False,
+		         'swap bill paid by buyer': 300000000,
+		         'deposit paid by seller': 18750000
+		     }
+		)]
+		self.assertEqual(result, expectedResult)
 
 	def test_bad_commission(self):
 		host = InitHost()
