@@ -89,7 +89,7 @@ class State(object):
 		self._balances.addStateChange(sell.receivingAccount)
 		self._balances.addStateChange(buy.refundAccount)
 		exchange.expiry = self._currentBlockIndex + Constraints.blocksForExchangeCompletion
-		exchange.buyerLTCReceive = buy.receivingAccount
+		exchange.buyerLTCReceive = buy.ltcReceiveAddress
 		exchange.buyerAccount = buy.refundAccount
 		exchange.sellerAccount = sell.receivingAccount
 		key = self._nextExchangeIndex
@@ -198,7 +198,7 @@ class State(object):
 			return
 		refundAccount = (txID, 1) # same as change account and already created
 		self._balances.addFirstRef(refundAccount)
-		buy.receivingAccount = receivingAddress
+		buy.ltcReceiveAddress = receivingAddress
 		buy.refundAccount = refundAccount
 		buy.expiry = maxBlock
 		self._newBuyOffer(buy)
