@@ -339,7 +339,13 @@ class State(object):
 			return
 		# the seller completed their side of the exchange, so credit them the buyers swapbill
 		# and the seller is also refunded their deposit here
-		self._balances.addTo_Forwarded(exchange.sellerAccount, exchange.swapBillAmount + exchange.swapBillDeposit)
+		backer = self._ltcSellBackers.get(exchange.backerIndex, None)
+		if backer is None:
+			# unbacked exchange, or backer expired
+			self._balances.addTo_Forwarded(exchange.sellerAccount, exchange.swapBillAmount + exchange.swapBillDeposit)
+		else:
+			#refund back into the backer object
+			backer.backingAmount += exchange.swapBillAmount + exchange.swapBillDeposit
 		self._balances.addStateChange(exchange.buyerAccount)
 		self._balances.addStateChange(exchange.sellerAccount)
 		self._balances.removeRef(exchange.buyerAccount)

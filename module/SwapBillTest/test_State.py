@@ -967,7 +967,12 @@ class Test(unittest.TestCase):
 		expectedBalances = {backerRefund:0}
 		self.assertEqual(state._balances.balances, expectedBalances)
 		self.assertEqual(len(state._ltcSellBackers), 1)
-		self.assertDictEqual(state._ltcSellBackers[0].__dict__, {'backingAmount': 4*e(12), 'commission': 536870912, 'expiry': 200, 'ltcReceiveAddress': 'backerLTCReceivePKH', 'refundAccount': backerRefund, 'transactionMax': 4*e(9)})
+		expectedBackerState = {
+		    'backingAmount': 4*e(12), 'commission': 536870912,
+		    'expiry': 200,
+		    'ltcReceiveAddress': 'backerLTCReceivePKH', 'refundAccount': backerRefund, 'transactionMax': 4*e(9)
+		}
+		self.assertDictEqual(state._ltcSellBackers[0].__dict__, expectedBackerState)
 		# normal buy offer
 		burn = self.Burn(3*e(7))
 		details = {
@@ -996,7 +1001,10 @@ class Test(unittest.TestCase):
 		self.assertEqual(len(state._pendingExchanges), 1)
 		self.assertDictEqual(state._pendingExchanges[0].__dict__, {'backerIndex':0, 'buyerAccount':buy, 'buyerLTCReceive':'buyerReceivePKH', 'expiry':150, 'ltc':3*e(7)//2, 'sellerAccount':backerRefund, 'swapBillAmount':3*e(7), 'swapBillDeposit':3*e(7)//Constraints.depositDivisor})
 		self.assertEqual(len(state._ltcSellBackers), 1)
-		self.assertDictEqual(state._ltcSellBackers[0].__dict__, {'backingAmount': 4*e(12)-4*e(7)-4*e(7)//Constraints.depositDivisor-Constraints.minimumSwapBillBalance, 'commission': 536870912, 'expiry': 200, 'ltcReceiveAddress': 'backerLTCReceivePKH', 'refundAccount': backerRefund, 'transactionMax': 4*e(9)})
+		expectedBackerState['backingAmount'] -= 4*e(7)
+		expectedBackerState['backingAmount'] -= 4*e(7)//Constraints.depositDivisor
+		expectedBackerState['backingAmount'] -= Constraints.minimumSwapBillBalance
+		self.assertDictEqual(state._ltcSellBackers[0].__dict__, expectedBackerState)
 		# backer is then responsable for completing the exchange with the buyer
 		details = {'pendingExchangeIndex':0, 'destinationAddress':'buyerReceivePKH', 'destinationAmount':3*e(7)//2}
 		self.Apply_AssertSucceeds(state, 'LTCExchangeCompletion', **details)
@@ -1004,11 +1012,12 @@ class Test(unittest.TestCase):
 		# payment of the 3*e(7) offered by A
 		# plus fraction of deposit for the amount matched (=1875000)
 		# (the rest of the deposit is left with an outstanding remainder sell offer)
-		expectedBalances[backerRefund] += 3*e(7) + 1875000 #******* will be better to refund this back to the backer object, if not yet expired
+		expectedBackerState['backingAmount'] += 3*e(7)
+		expectedBackerState['backingAmount'] += 3*e(7)//Constraints.depositDivisor
+		self.assertDictEqual(state._ltcSellBackers[0].__dict__, expectedBackerState)
 		expectedBalances.pop(buy) # trade completes, so referenced zero balance account is cleaned up here
 		self.assertEqual(state._balances.balances, expectedBalances)
 		self.assertEqual(state._ltcBuys.size(), 0)
 		self.assertEqual(state._ltcSells.size(), 1)
 		self.assertEqual(len(state._pendingExchanges), 0)
 		self.assertEqual(len(state._ltcSellBackers), 1)
-		self.assertDictEqual(state._ltcSellBackers[0].__dict__, {'backingAmount': 4*e(12)-4*e(7)-4*e(7)//Constraints.depositDivisor-Constraints.minimumSwapBillBalance, 'commission': 536870912, 'expiry': 200, 'ltcReceiveAddress': 'backerLTCReceivePKH', 'refundAccount': backerRefund, 'transactionMax': 4*e(9)})
