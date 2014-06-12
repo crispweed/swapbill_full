@@ -20,7 +20,12 @@ class Balances(object):
 			return
 		if not account in self._redirects:
 			# terminal node
+			assert account in self.balances
+			if self.balances[account] == 0:
+				# balance removal is triggered here
+				self.balances.pop(account)
 			return
+		assert not account in account in self.balances
 		childAccount = self._redirects.pop(account)
 		self._removeRedirectRef(childAccount)
 
@@ -42,8 +47,23 @@ class Balances(object):
 		else:
 			self.balances[account] = amount
 
-	def consume(self, account):
-		self.balances.pop(account)
+	#def consume(self, account):
+		#self.balances.pop(account)
+
+	def consumeContents_IfAny(self, account):
+		if not account in self.balances:
+			return 0
+		contents = self.balances[account]
+		self.balances[account] = 0
+		if not self.isReferenced(account):
+			self.balances.pop(account)
+		return contents
+
+	def removeIfZeroBalanceAndUnreferenced(self, account):
+		if self.balances[account] > 0:
+			return
+		if not self.isReferenced(account):
+			self.balances.pop(account)
 
 	def addFirstRef(self, account):
 		assert account in self.balances
@@ -62,11 +82,16 @@ class Balances(object):
 		self._directRefCounts.pop(account)
 		self.changeCounts.pop(account)
 		if account in self._redirectRefCounts:
-			# not a leaf node
+			# still redirect target from other nodes
 			return
 		if not account in self._redirects:
 			# terminal node
+			assert account in self.balances
+			if self.balances[account] == 0:
+				# balance removal is triggered here
+				self.balances.pop(account)
 			return
+		assert not account in self.balances
 		childAccount = self._redirects.pop(account)
 		self._removeRedirectRef(childAccount)
 
@@ -77,16 +102,30 @@ class Balances(object):
 		assert account in self.balances
 		return account in self._directRefCounts or account in self._redirectRefCounts
 
-	def consumeAndForwardRefs(self, fromAccounts, toAccount):
-		assert not toAccount in self._redirectRefCounts
-		redirectRefCount = 0
+	#def consumeAndForwardRefs(self, fromAccounts, toAccount):
+		#assert not toAccount in self._redirectRefCounts
+		#redirectRefCount = 0
+		#for account in fromAccounts:
+			#if self.isReferenced(account):
+				#self._redirects[account] = toAccount
+				#redirectRefCount += 1
+			#self.consume(account)
+		#if redirectRefCount > 0:
+			#self._redirectRefCounts[toAccount] = redirectRefCount
+
+	def consumeAndForward(self, fromAccounts, toAccount):
+		amount = self.balances[toAccount]
+		redirectRefCount = self._redirectRefCounts.get(toAccount, 0)
 		for account in fromAccounts:
+			if not account in self.balances:
+				continue
 			if self.isReferenced(account):
 				self._redirects[account] = toAccount
 				redirectRefCount += 1
-			self.consume(account)
+			amount += self.balances.pop(account)
 		if redirectRefCount > 0:
 			self._redirectRefCounts[toAccount] = redirectRefCount
+		self.balances[toAccount] = amount
 
 	def getEndOfForwardingChainFrom(self, account):
 		assert account in self.balances or account in self._directRefCounts

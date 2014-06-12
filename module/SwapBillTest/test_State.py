@@ -83,17 +83,35 @@ class Test(unittest.TestCase):
 		else:
 			failsWithUserFacingException = False
 		self.assertTrue(failsWithUserFacingException)
+
+		self.assertDictEqual(state._balances.balances, expectedBalances)
+		self.assertEqual(exchangesBefore, len(state._pendingExchanges))
+		self.assertEqual(totalAccountedFor(state), state._totalCreated)
+
+		swapBillInput = 0
+		atLeastOneReferenced = False
+		if sourceAccounts is not None:
+			for account in sourceAccounts:
+				if account in expectedBalances:
+					swapBillInput += expectedBalances[account]
+					expectedBalances[account] = 0
+					if state._balances.isReferenced(account):
+						atLeastOneReferenced = True
+					else:
+						expectedBalances.pop(account)
+
 		txID = self.TXID()
+
+		changeAccount = (txID, 1)
+		if atLeastOneReferenced:
+			expectedBalances[changeAccount] = 0
+		if swapBillInput != 0:
+			expectedBalances[changeAccount] = swapBillInput
+
 		error = state.applyTransaction(transactionType, txID=txID, outputs=outputs, transactionDetails=details, sourceAccounts=sourceAccounts)
 		self.assertIsNotNone(error)
 		self.assertEqual(error, expectedError)
-		swapBillInput = 0
-		if not sourceAccounts is None:
-			for account in sourceAccounts:
-				if account in expectedBalances:
-					swapBillInput += expectedBalances.pop(account)
-		if swapBillInput != 0:
-			expectedBalances[(txID, 1)] = swapBillInput
+
 		self.assertDictEqual(state._balances.balances, expectedBalances)
 		self.assertEqual(exchangesBefore, len(state._pendingExchanges))
 		self.assertEqual(totalAccountedFor(state), state._totalCreated)
@@ -293,11 +311,26 @@ class Test(unittest.TestCase):
 		Constraints.minimumSwapBillBalance = 1*e(7)
 		state = State.State(100, 'mockhash')
 		self.state = state
-		burnOutput = self.Burn(1*e(7))
-		changeOutput = self.Apply_AssertInsufficientFunds(state, 'LTCBuyOffer', sourceAccounts=[burnOutput], swapBillOffered=1*e(7), exchangeRate=0x80000000, receivingAddress='a_receive', maxBlock=200)
-		self.assertEqual(state._balances.balances, {changeOutput:1*e(7)})
-		changeOutput = self.Apply_AssertInsufficientFunds(state, 'LTCSellOffer', sourceAccounts=[changeOutput], ltcOffered=1*e(7)//2, exchangeRate=0x80000000, maxBlock=200)
-		self.assertEqual(state._balances.balances, {changeOutput:1*e(7)})
+		burn = self.Burn(2*e(7))
+		# can't leave less than minimum balance as change
+		change = self.Apply_AssertInsufficientFunds(state, 'LTCBuyOffer', sourceAccounts=[burn], swapBillOffered=12*e(6), exchangeRate=0x80000000, receivingAddress='a_receive', maxBlock=200)
+		# but all swapbill input can now be spent by the transaction
+		outputs = self.Apply_AssertSucceeds(state, 'LTCBuyOffer', sourceAccounts=[change], swapBillOffered=2*e(7), exchangeRate=0x80000000, receivingAddress='a_receive', maxBlock=200)
+		buy = outputs['ltcBuy']
+		self.assertEqual(state._balances.balances, {buy:0}) # this account is kept open with zero balance for possible future trade payments
+		burn2 = self.Burn(3*e(7))
+		# note that sell offers consume minimum balance, as well as deposit
+		# can't leave less than minimum balance as change
+		deposit = 12*e(6)
+		ltc = deposit*Constraints.depositDivisor//2
+		change2 = self.Apply_AssertInsufficientFunds(state, 'LTCSellOffer', sourceAccounts=[burn2], ltcOffered=ltc, exchangeRate=0x80000000, maxBlock=200)
+		# but all swapbill input can now be spent by the transaction
+		deposit = 2*e(7)
+		ltc = deposit*Constraints.depositDivisor//2
+		self.assertEqual(state._balances.balances, {buy:0, change2:3*e(7)})
+		outputs = self.Apply_AssertSucceeds(state, 'LTCSellOffer', sourceAccounts=[change2], ltcOffered=ltc, exchangeRate=0x80000000, maxBlock=200)
+		sell = outputs['ltcSell']
+		self.assertEqual(state._balances.balances, {buy:0, sell:0})
 
 	def test_ltc_trading1(self):
 		# this test adds tests against the ltc transaction types, and also runs through a simple exchange scenario
@@ -359,9 +392,12 @@ class Test(unittest.TestCase):
 		self.assertEqual(state._balances.balances, expectedBalances)
 		self.assertEqual(state._ltcBuys.size(), 1)
 
-		# refund account can't be completely spent yet as it is referenced by the trade
-		changeA = self.Apply_AssertInsufficientFunds(state, 'Pay', sourceAccounts=[refundA], amount=expectedBalances[refundA], maxBlock=200)
-		expectedBalances[changeA] = expectedBalances.pop(refundA)
+		# refund account *can* now be completely spent while still referenced by the trade
+		outputs = self.Apply_AssertSucceeds(state, 'Pay', sourceAccounts=[refundA], amount=expectedBalances[refundA], maxBlock=200)
+		changeA = outputs['change']
+		payTargetA = outputs['destination']
+		expectedBalances[payTargetA] = expectedBalances.pop(refundA)
+		expectedBalances[changeA] = 0 # trade reference passes to change account, and so this is kept alive with zero balance
 		self.assertEqual(state._balances.balances, expectedBalances)
 
 		# B wants to sell
@@ -468,9 +504,8 @@ class Test(unittest.TestCase):
 		# plus fraction of deposit for the amount matched (=1875000)
 		# (the rest of the deposit is left with an outstanding remainder sell offer)
 		expectedBalances[receivingB] += 3*e(7) + 1875000
+		expectedBalances.pop(changeA) # trade completes, so referenced zero balance account is cleaned up here
 		self.assertEqual(state._balances.balances, expectedBalances)
-		#self.assertEqual(state._balances.balances, {changeA:70000000-1, changeB:197500000-1, burnC:200000000, refundA:1, receivingB:1})
-		#self.assertEqual(state._balances.balances, {changeA:70000000-1, changeB:197500000-1, burnC:200000000, refundA:1, receivingB:31875000+1})
 		self.assertEqual(state._ltcBuys.size(), 0)
 		self.assertEqual(state._ltcSells.size(), 1)
 		self.assertEqual(len(state._pendingExchanges), 0)
@@ -509,25 +544,26 @@ class Test(unittest.TestCase):
 		self.assertEqual(len(state._pendingExchanges), 0)
 		self.assertEqual(state._ltcBuys.size(), 1)
 		self.assertEqual(state._ltcSells.size(), 1)
-		# cannot spend whole balance, because this is referenced by the sell offer
+		# *can* now spend whole balance, even though referenced by the sell offer
 		self.assertTrue(state._balances.accountHasBalance(receiveB))
 		self.assertTrue(state._balances.isReferenced(receiveB))
-		changeB = self.Apply_AssertInsufficientFunds(state, 'Pay', sourceAccounts=[receiveB], amount=1*e(7)-deposit-1, maxBlock=200)
-		self.assertEqual(state._balances.balances, {changeB:1*e(7)-deposit-1, refundA:1})
-		# but can spend leaving just minimum balance
-		outputs = self.Apply_AssertSucceeds(state, 'Pay', sourceAccounts=[changeB], amount=1*e(7)-deposit-2, maxBlock=200)
-		changeB2 = outputs['change']
-		payOutput = outputs['destination']
-		self.assertEqual(state._balances.balances, {changeB2:1, payOutput:1*e(7)-deposit-2, refundA:1})
-		# same for buy refund account
+		outputs = self.Apply_AssertSucceeds(state, 'Pay', sourceAccounts=[receiveB], amount=1*e(7)-deposit-1, maxBlock=200)
+		changeB = outputs['change']
+		payB = outputs['destination']
+		self.assertEqual(state._balances.balances, {payB:1*e(7)-deposit-1, changeB:0, refundA:1})
+		self.assertTrue(state._balances.accountHasBalance(changeB))
+		self.assertTrue(state._balances.isReferenced(changeB))
+		# and same for buy refund account
 		self.assertTrue(state._balances.accountHasBalance(refundA))
 		self.assertTrue(state._balances.isReferenced(refundA))
-		changeA = self.Apply_AssertInsufficientFunds(state, 'Pay', sourceAccounts=[refundA], amount=1, maxBlock=200)
-		self.assertEqual(state._balances.balances, {changeB2:1, payOutput:1*e(7)-deposit-2, changeA:1})
-		# but sell should be matched by this larger offer
+		outputs = self.Apply_AssertSucceeds(state, 'Pay', sourceAccounts=[refundA], amount=1, maxBlock=200)
+		changeA = outputs['change']
+		payA = outputs['destination']
+		self.assertEqual(state._balances.balances, {payB:1*e(7)-deposit-1, changeB:0, payA:1, changeA:0})
+		# sell should be matched by this larger offer
 		burnC = self.Burn(4*e(8))
 		refundC = self.BuyOffer(state, burnC, 'receiveLTC2', swapBillOffered=1*e(8), exchangeRate=0x80000000)
-		self.assertEqual(state._balances.balances, {changeB2:2, payOutput:1*e(7)-deposit-2, changeA:1, refundC:3*e(8)})
+		self.assertEqual(state._balances.balances, {payB:1*e(7)-deposit-1, changeB:1, payA:1, changeA:0, refundC:3*e(8)})
 		self.assertEqual(len(state._pendingExchanges), 1)
 		self.assertEqual(state._ltcBuys.size(), 2)
 		self.assertEqual(state._ltcSells.size(), 0)
@@ -535,14 +571,10 @@ class Test(unittest.TestCase):
 		self.Completion(state, 0, 'receiveLTC2', 1*e(7)//2)
 		self.assertEqual(len(state._pendingExchanges), 0)
 		# b gets deposit refunded, plus swapbill payment
-		self.assertEqual(state._balances.balances, {changeB2:2+deposit+1*e(7), payOutput:1*e(7)-deposit-2, changeA:1, refundC:3*e(8)})
-		# and the receiving account *can* now be spent, completely
-		self.assertTrue(state._balances.accountHasBalance(changeB2))
-		self.assertFalse(state._balances.isReferenced(changeB2))
-		outputs = self.Apply_AssertSucceeds(state, 'Pay', sourceAccounts=[changeB2], amount=2+deposit+1*e(7), maxBlock=200)
-		payDestination = outputs['destination']
-		payChange = outputs['change']
-		self.assertEqual(state._balances.balances, {payDestination:2+deposit+1*e(7), payOutput:1*e(7)-deposit-2, changeA:1, refundC:3*e(8)})
+		self.assertEqual(state._balances.balances, {payB:1*e(7)-deposit-1, changeB:1+deposit+1*e(7), payA:1, changeA:0, refundC:3*e(8)})
+		# and the receiving account is no longer referenced
+		self.assertTrue(state._balances.accountHasBalance(changeB))
+		self.assertFalse(state._balances.isReferenced(changeB))
 
 	def test_small_buy_remainder(self):
 		Constraints.minimumSwapBillBalance = 1
@@ -562,20 +594,17 @@ class Test(unittest.TestCase):
 		self.assertEqual(len(state._pendingExchanges), 0)
 		self.assertEqual(state._ltcBuys.size(), 1)
 		self.assertEqual(state._ltcSells.size(), 1)
-		# refund account can't be spent completely as this is still referenced by the trade offer
-		# (different tests for not being able to spend completely follow)
+		# refund account *can* now be spent completely although still referenced by the trade offer
 		self.assertTrue(state._balances.accountHasBalance(refundA))
 		self.assertTrue(state._balances.isReferenced(refundA))
-		changeA = self.Apply_AssertInsufficientFunds(state, 'Pay', sourceAccounts=[refundA], amount=1, maxBlock=200)
-		expectedBalances.pop(refundA)
-		expectedBalances[changeA] = 1
+		outputs = self.Apply_AssertSucceeds(state, 'Pay', sourceAccounts=[refundA], amount=1, maxBlock=200)
+		changeA = outputs['change']
+		payA = outputs['destination']
+		expectedBalances[payA] = expectedBalances.pop(refundA)
+		expectedBalances[changeA] = 0
 		self.assertEqual(state._balances.balances, expectedBalances)
-		details = {'amount':1, 'maxBlock':200}
-		changeA2 = self.Apply_AssertInsufficientFunds(state, 'ForwardToFutureNetworkVersion', sourceAccounts=[changeA], **details)
-		expectedBalances.pop(changeA)
-		expectedBalances[changeA2] = 1
-		self.assertEqual(state._balances.balances, expectedBalances)
-		# (end of bunch of tests for stuff not being able to use refund account)
+		self.assertTrue(state._balances.isReferenced(changeA))
+		self.assertFalse(state._balances.isReferenced(payA))
 		# but buy should be matched by this larger offer
 		burnC = self.Burn(4*e(8))
 		receiveC = self.SellOffer(state, burnC, ltcOffered=2*e(8), exchangeRate=0x80000000)
@@ -591,15 +620,7 @@ class Test(unittest.TestCase):
 		self.assertEqual(len(state._pendingExchanges), 0)
 		depositPart = depositC * 10100000 // (4*e(8))
 		expectedBalances[receiveC] += 10100000+depositPart
-		self.assertEqual(state._balances.balances, expectedBalances)
-		# and the refund account *can* now be used
-		self.assertTrue(state._balances.accountHasBalance(changeA2))
-		self.assertFalse(state._balances.isReferenced(changeA2))
-		outputs = self.Apply_AssertSucceeds(state, 'Pay', sourceAccounts=[changeA2], amount=1, maxBlock=200)
-		payDestination = outputs['destination']
-		payChange = outputs['change']
-		expectedBalances.pop(changeA2)
-		expectedBalances[payDestination] = 1
+		expectedBalances.pop(changeA) # trade completed, so this account is no longer referenced, and therefore cleaned up
 		self.assertEqual(state._balances.balances, expectedBalances)
 
 	def test_exact_match(self):
@@ -681,15 +702,17 @@ class Test(unittest.TestCase):
 		# (and b now has all swapbill except deposit for outstanding sell offer = 625000)
 		expectedBalances[receiveB] += 1*e(7)+625000
 		self.assertEqual(state._balances.balances, expectedBalances)
-		# but receiving account can't be completely spent yet as this is locked until exchange completed
+		# receiving account *can* now be completely spent even though referenced by exchange
 		self.assertTrue(state._balances.accountHasBalance(receiveB))
 		self.assertTrue(state._balances.isReferenced(receiveB))
-		changeB = self.Apply_AssertInsufficientFunds(state, 'Pay', sourceAccounts=[receiveB], amount=expectedBalances[receiveB], maxBlock=200)
-		expectedBalances[changeB] = expectedBalances.pop(receiveB)
+		outputs = self.Apply_AssertSucceeds(state, 'Pay', sourceAccounts=[receiveB], amount=expectedBalances[receiveB], maxBlock=200)
+		changeB = outputs['change']
+		payB = outputs['destination']
+		expectedBalances[payB] = expectedBalances.pop(receiveB)
+		expectedBalances[changeB] = 0
 		self.assertEqual(state._balances.balances, expectedBalances)
-		# (reference is transfered to the new change output)
-		self.assertTrue(state._balances.accountHasBalance(changeB))
 		self.assertTrue(state._balances.isReferenced(changeB))
+		self.assertFalse(state._balances.isReferenced(payB))
 		# a goes on to buy the rest
 		burnA2 = self.Burn(1*e(7)+1)
 		refundA2 = self.BuyOffer(state, burnA2, 'receiveLTC2', swapBillOffered=1*e(7), exchangeRate=0x80000000)
@@ -803,8 +826,7 @@ class Test(unittest.TestCase):
 		self.assertEqual(state._balances.balances, expectedBalances)
 		self.assertEqual(len(state._pendingExchanges), 1)
 		# at this point, refund account should still be referenced for the trade
-		failedPayChange = self.Apply_AssertInsufficientFunds(state, 'Pay', amount=expectedBalances[refund], maxBlock=200, sourceAccounts=[refund])
-		expectedBalances[failedPayChange] = expectedBalances.pop(refund)
+		self.assertTrue(state._balances.isReferenced(refund))
 		# go ahead and complete last pending exchange
 		self.Completion(state, 2, 'receiveLTC', 25*e(5))
 		# matched seller gets deposit refund + swapbill counterparty payment
@@ -812,10 +834,7 @@ class Test(unittest.TestCase):
 		self.assertEqual(state._balances.balances, expectedBalances)
 		self.assertEqual(len(state._pendingExchanges), 0)
 		# and refund account can now be spent
-		outputs = self.Apply_AssertSucceeds(state, 'Pay', amount=expectedBalances[failedPayChange], maxBlock=200, sourceAccounts=[failedPayChange])
-		dest = outputs['destination']
-		expectedBalances[dest] = expectedBalances.pop(failedPayChange)
-		self.assertEqual(state._balances.balances, expectedBalances)
+		self.assertFalse(state._balances.isReferenced(refund))
 
 	def test_sell_matches_multiple_buys(self):
 		Constraints.minimumSwapBillBalance = 1
@@ -854,10 +873,15 @@ class Test(unittest.TestCase):
 		# at this point, receive account should still be referenced for the trade
 		self.assertTrue(state._balances.accountHasBalance(receive))
 		self.assertTrue(state._balances.isReferenced(receive))
-		change = self.Apply_AssertInsufficientFunds(state, 'Pay', sourceAccounts=[receive], amount=expectedBalances[receive], maxBlock=200)
+		outputs = self.Apply_AssertSucceeds(state, 'Pay', sourceAccounts=[receive], amount=expectedBalances[receive], maxBlock=200)
+		change = outputs['change']
+		pay = outputs['destination']
 		self.assertTrue(state._balances.accountHasBalance(change))
 		self.assertTrue(state._balances.isReferenced(change))
-		expectedBalances[change] = expectedBalances.pop(receive)
+		self.assertTrue(state._balances.accountHasBalance(pay))
+		self.assertFalse(state._balances.isReferenced(pay))
+		expectedBalances[pay] = expectedBalances.pop(receive)
+		expectedBalances[change] = 0
 		# go ahead and complete last pending exchange
 		self.Completion(state, 2, 'receiveLTC', 25*e(5))
 		# seller gets deposit refund + swapbill counterparty payment for this trade
@@ -882,9 +906,6 @@ class Test(unittest.TestCase):
 		# attempt to commit more than available
 		details['backingAmount'] = 2*e(10)
 		active = self.Apply_AssertInsufficientFunds(state, 'BackLTCSells', sourceAccounts=[active], **details)
-		# trade ref is added on output, so can't spend all
-		details['backingAmount'] = 1*e(10)+Constraints.minimumSwapBillBalance
-		active = self.Apply_AssertInsufficientFunds(state, 'BackLTCSells', sourceAccounts=[active], **details)
 		# change amount below minimum balance
 		details['backingAmount'] = 1*e(10)+Constraints.minimumSwapBillBalance-1
 		active = self.Apply_AssertInsufficientFunds(state, 'BackLTCSells', sourceAccounts=[active], **details)
@@ -902,11 +923,12 @@ class Test(unittest.TestCase):
 		self.assertEqual(len(state._ltcSellBackers), 0)
 		# control transaction which succeeds
 		outputs = self.Apply_AssertSucceeds(state, 'BackLTCSells', sourceAccounts=[active], **details)
-		active = outputs['ltcSellBacker']
+		refund = outputs['ltcSellBacker']
+		active = refund
 		self.assertDictEqual(state._balances.balances, {active:Constraints.minimumSwapBillBalance})
 		self.assertTrue(state._balances.isReferenced(active))
 		self.assertEqual(len(state._ltcSellBackers), 1)
-		self.assertDictEqual(state._ltcSellBackers[0].__dict__, {'backingAmount': 10000000000, 'commission': 134217728, 'expiry': 100, 'ltcReceiveAddress': 'madeUpAddress', 'refundAccount': ('tx7', 1), 'transactionMax': 99900000})
+		self.assertDictEqual(state._ltcSellBackers[0].__dict__, {'backingAmount': 10000000000, 'commission': 134217728, 'expiry': 100, 'ltcReceiveAddress': 'madeUpAddress', 'refundAccount': refund, 'transactionMax': 99900000})
 		# but then expires (and is refunded)
 		state.advanceToNextBlock()
 		self.assertFalse(state._balances.isReferenced(active))
