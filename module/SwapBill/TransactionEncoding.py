@@ -29,7 +29,7 @@ _fundedMappingByTypeCode = (
     ('BackedLTCSellOffer',
      (('exchangeRate', 4, 'backerIndex', 6, None, 7), None),
      ('sellerReceive',),
-     (('backerLTCReceiveAddress', 'ltcOffered'),)
+     (('backerLTCReceiveAddress', 'ltcOfferedPlusCommission'),)
 	),
 	)
 

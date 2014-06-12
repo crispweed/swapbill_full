@@ -775,7 +775,7 @@ class Test(unittest.TestCase):
 		self.assertRaisesRegexp(ExceptionReportedToUser, 'Transaction parameter value exceeds supported range.', RunClient, host, ['pay', '--amount', 1*e(15), '--toAddress', payTargetAddress])
 		self.assertRaisesRegexp(ExceptionReportedToUser, 'Negative values are not allowed for transaction parameters.', RunClient, host, ['pay', '--amount', -1*e(7), '--toAddress', payTargetAddress])
 
-	def test_back_ltc_sells(self):
+	def test_ltc_sells_backer_expiry(self):
 		host = InitHost()
 		host._addUnspent(2*e(12))
 		RunClient(host, ['burn', '--amount', 1*e(12)])
@@ -799,6 +799,43 @@ class Test(unittest.TestCase):
 		self.assertEqual(host._nextBlock, 23)
 		output, result = RunClient(host, ['get_ltc_sell_backers'])
 		self.assertListEqual(result, [])
+
+	def test_backed_ltc_sell(self):
+		host = InitHost()
+		ownerList = ('backer', 'buyer', 'seller')
+		host._setOwner('backer')
+		host._addUnspent(2*e(12))
+		RunClient(host, ['burn', '--amount', 1*e(12)])
+		RunClient(host, ['back_ltc_sells', '--backingSwapBill', 1*e(12), '--transactionsBacked', 1000, '--blocksUntilExpiry', 20, '--commission_AsInteger', 0x10000000])
+		output, info = RunClient(host, ['get_balance'])
+		self.assertDictEqual(info, {'balance': 0})
+		self.assertEqual(host._nextBlock, 3)
+		output, result = RunClient(host, ['get_ltc_sell_backers'])
+		expectedBackerDetails = {
+		'commission as integer': 268435456, 'commission as float (approximation)': 0.0625,
+		'backing amount': 1*e(12), 'I am backer': True, 'expires on block': 22, 'maximum per transaction': 1*e(9)
+		}
+		self.assertListEqual(result, [('ltc sell backer index', 0, expectedBackerDetails)])
+		host._setOwner('buyer')
+		RunClient(host, ['burn', '--amount', 3*e(8)])
+		RunClient(host, ['post_ltc_buy', '--swapBillOffered', 3*e(8), '--exchangeRate', '0.5', '--blocksUntilExpiry', 100])
+		info = GetStateInfo(host)
+		self.assertEqual(info['numberOfLTCBuyOffers'], 1)
+		self.assertEqual(info['numberOfLTCSellOffers'], 0)
+		self.assertEqual(info['numberOfPendingExchanges'], 0)
+		ownerBalances = GetOwnerBalances(host, ownerList, info['balances'])
+		self.assertDictEqual(ownerBalances, {})
+		output, result = RunClient(host, ['get_buy_offers'])
+		self.assertEqual(result, [('exchange rate as float (approximation)', 0.5, {'exchange rate as integer': 2147483648, 'ltc equivalent': 15*e(7), 'mine': True, 'swapbill offered': 3*e(8)})])
+		host._setOwner('seller')
+		ltcOffered = 15*e(7)
+		commission = ltcOffered // 16
+		RunClient(host, ['post_ltc_sell', '--ltcOffered', ltcOffered+commission, '--exchangeRate', '0.5', '--backerID', 0])
+		info = GetStateInfo(host)
+		ownerBalances = GetOwnerBalances(host, ownerList, info['balances'])
+		#*** TODO - seed amount for sell offer should go back into backer object also!
+		self.assertDictEqual(ownerBalances, {'backer':Constraints.minimumSwapBillBalance, 'seller': 3*e(8)})
+
 
 	def test_bad_commission(self):
 		host = InitHost()

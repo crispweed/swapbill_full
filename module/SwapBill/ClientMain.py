@@ -68,6 +68,13 @@ sp.add_argument('--blocksUntilExpiry', type=int, default=2, help='after this num
 sp.add_argument('--exchangeRate', help='the exchange rate SWP/LTC, in floating point representation (must be greater than 0 and less than 1)')
 sp.add_argument('--exchangeRate_AsInteger', help='the exchange rate SWP/LTC, in integer representation (must be greater than 0 and less than 4294967296)')
 
+sp = subparsers.add_parser('post_ltc_sell', help='make an offer to sell litecoin for swapbill')
+sp.add_argument('--ltcOffered', required=True, help='amount of ltc offered')
+sp.add_argument('--exchangeRate', help='the exchange rate SWP/LTC, in floating point representation (must be greater than 0 and less than 1)')
+sp.add_argument('--exchangeRate_AsInteger', help='the exchange rate SWP/LTC, in integer representation (must be greater than 0 and less than 4294967296)')
+sp.add_argument('--backerID', help='the id of the ltc sell backer to be used for the exchange, if a backed sell is desired')
+sp.add_argument('--blocksUntilExpiry', type=int, default=2, help="(doesn't apply to backed sells) after this number of blocks the offer expires (and swapbill remaining in any unmatched part of the offer is returned)")
+
 sp = subparsers.add_parser('complete_ltc_sell', help='complete an ltc exchange by fulfilling a pending exchange payment')
 sp.add_argument('--pendingExchangeID', required=True, help='the id of the pending exchange payment to fulfill')
 
@@ -264,14 +271,23 @@ def Main(startBlockIndex, startBlockHash, useTestNet, commandLineArgs=sys.argv[1
 		return CheckAndSend_Funded(transactionType, outputs, outputPubKeyHashes, details)
 
 	elif args.action == 'post_ltc_sell':
-		transactionType = 'LTCSellOffer'
-		outputs = ('ltcSell',)
+		details = {'exchangeRate':ExchangeRateFromArgs(args)}
+		if args.backerID is None:
+			transactionType = 'LTCSellOffer'
+			outputs = ('ltcSell',)
+			details['maxBlock'] = state._currentBlockIndex + args.blocksUntilExpiry
+			details['ltcOffered'] = int(args.ltcOffered)
+		else:
+			backerID = int(args.backerID)
+			if not backerID in state._ltcSellBackers:
+				raise ExceptionReportedToUser('No backer with the specified ID.')
+			backer = state._ltcSellBackers[backerID]
+			transactionType = 'BackedLTCSellOffer'
+			outputs = ('sellerReceive',)
+			details['ltcOfferedPlusCommission'] = int(args.ltcOffered)
+			details['backerIndex'] = int(args.backerID)
+			details['backerLTCReceiveAddress'] = backer.ltcReceiveAddress
 		outputPubKeyHashes = (wallet.addKeyPairAndReturnPubKeyHash(),)
-		details = {
-		    'ltcOffered':int(args.ltcOffered),
-		    'exchangeRate':ExchangeRateFromArgs(args),
-		    'maxBlock':state._currentBlockIndex + args.blocksUntilExpiry
-		}
 		return CheckAndSend_Funded(transactionType, outputs, outputPubKeyHashes, details)
 
 	elif args.action == 'complete_ltc_sell':

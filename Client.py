@@ -8,7 +8,7 @@ from SwapBill import ClientMain
 from SwapBill.ExceptionReportedToUser import ExceptionReportedToUser
 
 try:
-	result = ClientMain.Main(startBlockIndex=280696, startBlockHash='114460c38e75a8305143c0bba61de3d3573cd9e028e04465bb840e1e038cdd7d', useTestNet=True)
+	result = ClientMain.Main(startBlockIndex=300909, startBlockHash='3610b1e7ea80e3a4a73cac696261736e849290dce07598c4da85a9f5a4504c29', useTestNet=True)
 except ExceptionReportedToUser as e:
 	print("Operation failed:", e)
 else:
