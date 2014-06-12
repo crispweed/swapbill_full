@@ -282,7 +282,7 @@ def Main(startBlockIndex, startBlockHash, useTestNet, commandLineArgs=sys.argv[1
 		exchange = state._pendingExchanges[pendingExchangeID]
 		details = {
 		    'pendingExchangeIndex':pendingExchangeID,
-		    'destinationAddress':exchange.ltcReceiveAddress,
+		    'destinationAddress':exchange.buyerLTCReceive,
 		    'destinationAmount':exchange.ltc
 		}
 		return CheckAndSend_UnFunded(transactionType, (), (), details)
@@ -336,7 +336,7 @@ def Main(startBlockIndex, startBlockHash, useTestNet, commandLineArgs=sys.argv[1
 		for key in state._pendingExchanges:
 			d = {}
 			exchange = state._pendingExchanges[key]
-			d['I am seller (and need to complete)'] = exchange.sellerReceivingAccount in ownedAccounts.tradeOfferChangeCounts
+			d['I am seller (and need to complete)'] = exchange.sellerAccount in ownedAccounts.tradeOfferChangeCounts
 			d['I am buyer (and waiting for payment)'] = exchange.buyerAccount in ownedAccounts.tradeOfferChangeCounts
 			d['deposit paid by seller'] = exchange.swapBillDeposit
 			d['swap bill paid by buyer'] = exchange.swapBillAmount
