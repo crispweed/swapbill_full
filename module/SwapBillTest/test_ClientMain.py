@@ -356,7 +356,7 @@ class Test(unittest.TestCase):
 		# so this should be 6
 		# so didn't expire yet, on block 6
 		output, result = RunClient(host, ['get_balance', '-i'])
-		self.assertEqual(result['total'], 28125000)
+		self.assertEqual(result['total'], 18125000)
 		output, result = RunClient(host, ['get_sell_offers', '-i'])
 		self.assertEqual(result, [('exchange rate as float (approximation)', 0.5, {'exchange rate as integer': 2147483648, 'ltc offered': 15*e(6), 'mine': True, 'swapbill equivalent': 3*e(7), 'deposit paid': 1875000})])
 		host._advance(1)
