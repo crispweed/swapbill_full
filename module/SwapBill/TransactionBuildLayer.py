@@ -28,7 +28,8 @@ class TransactionBuildLayer(object):
 	def getSwapBillUnspent(self, state):
 		result = []
 		for account in self._ownedAccounts.accounts:
-			result.append(account)
+			if state._balances.balanceFor(account) > 0:
+				result.append(account)
 		result.sort()
 		return result
 

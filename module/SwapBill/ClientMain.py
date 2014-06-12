@@ -307,13 +307,8 @@ def Main(startBlockIndex, startBlockHash, useTestNet, commandLineArgs=sys.argv[1
 	elif args.action == 'get_balance':
 		total = 0
 		for account in ownedAccounts.accounts:
-			amount = state._balances.balanceFor(account)
-			total += amount
-		spendable = total
-		if transactionBuildLayer.checkIfThereIsAtLeastOneOutstandingTradeRef(state):
-			spendable -= Constraints.minimumSwapBillBalance
-			assert spendable >= 0
-		return {'spendable':spendable, 'total':total}
+			total += state._balances.balanceFor(account)
+		return {'balance':total}
 
 	elif args.action == 'get_buy_offers':
 		result = []
