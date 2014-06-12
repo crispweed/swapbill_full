@@ -1033,7 +1033,7 @@ class Test(unittest.TestCase):
 		# (matches straight away)
 		expectedBalances[buy2] = 0
 		expectedBalances[sell] += 1*e(7) # seller is paid straight away
-		expectedBalances[backer] += Constraints.minimumSwapBillBalance # TODO get this sent back to backer object
+		expectedBackerState['backingAmount'] += Constraints.minimumSwapBillBalance
 		self.assertEqual(state._ltcBuys.size(), 0)
 		self.assertEqual(state._ltcSells.size(), 0)
 		self.assertEqual(len(state._pendingExchanges), 1)

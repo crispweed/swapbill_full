@@ -114,8 +114,14 @@ class State(object):
 		else:
 			self._balances.addRef(buy.refundAccount)
 		if sell.hasBeenConsumed():
-			# seller gets seed amount (which was locked up implicitly in the sell offer) refunded
-			self._balances.addTo_Forwarded(sell.receivingAccount, Constraints.minimumSwapBillBalance)
+			# seller (or backer) gets seed amount (which was locked up implicitly in the sell offer) refunded
+			backer = self._ltcSellBackers.get(exchange.backerIndex, None)
+			if backer is None:
+				# unbacked exchange, or backer expired
+				self._balances.addTo_Forwarded(sell.receivingAccount, Constraints.minimumSwapBillBalance)
+			else:
+				#refund back into the backer object
+				backer.backingAmount += Constraints.minimumSwapBillBalance
 			if sell.isBacked:
 				self._balances.removeRef(sell.backingReceiveAccount)
 			sell = None

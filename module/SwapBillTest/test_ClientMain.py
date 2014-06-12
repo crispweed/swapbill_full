@@ -833,9 +833,16 @@ class Test(unittest.TestCase):
 		RunClient(host, ['post_ltc_sell', '--ltcOffered', ltcOffered+commission, '--exchangeRate', '0.5', '--backerID', 0])
 		info = GetStateInfo(host)
 		ownerBalances = GetOwnerBalances(host, ownerList, info['balances'])
-		#*** TODO - seed amount for sell offer should go back into backer object also!
-		self.assertDictEqual(ownerBalances, {'backer':Constraints.minimumSwapBillBalance, 'seller': 3*e(8)})
-
+		self.assertDictEqual(ownerBalances, {'seller': 3*e(8)})
+		# deposit taken from backer object
+		# seller paid directly from backer object
+		# minimum balance seeded into sell offer is refunded back to backer object directly
+		deposit = 3*e(8)//Constraints.depositDivisor
+		expectedBackerDetails['backing amount'] -= deposit
+		expectedBackerDetails['backing amount'] -= 3*e(8)
+		host._setOwner('backer')
+		output, result = RunClient(host, ['get_ltc_sell_backers'])
+		self.assertListEqual(result, [('ltc sell backer index', 0, expectedBackerDetails)])
 
 	def test_bad_commission(self):
 		host = InitHost()
