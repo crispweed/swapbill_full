@@ -243,7 +243,7 @@ class State(object):
 		assert outputs == ('ltcSellBacker',)
 		if backingAmount < Constraints.minimumSwapBillBalance:
 			raise BadlyFormedTransaction('backing amount is below minimum balance')
-		transactionMax = (backingAmount - Constraints.minimumSwapBillBalance) // transactionsBacked
+		transactionMax = backingAmount // transactionsBacked
 		if transactionMax < Constraints.minimumSwapBillBalance:
 			raise BadlyFormedTransaction('transaction max is below minimum balance')
 		if maxBlock < self._currentBlockIndex:

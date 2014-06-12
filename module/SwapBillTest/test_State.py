@@ -143,7 +143,7 @@ class Test(unittest.TestCase):
 
 	def test_bad_transactions(self):
 		Constraints.minimumSwapBillBalance = 1
-		state = State.State(100, 'mochhash')
+		state = State.State(100, 'mockhash')
 		self.assertRaises(InvalidTransactionType, state.checkTransaction, 'Burnee', outputs=('destination',), transactionDetails={'amount':1}, sourceAccounts=[])
 		self.assertRaises(TypeError, state.checkTransaction, 'Burn', outputs=('destination',), transactionDetails={}, sourceAccounts=[])
 		self.assertRaises(TypeError, state.checkTransaction, 'Burn', outputs=('destination',), transactionDetails={'amount':0, 'spuriousAdditionalDetail':0}, sourceAccounts=[])
@@ -176,7 +176,7 @@ class Test(unittest.TestCase):
 
 	def test_forwarding(self):
 		Constraints.minimumSwapBillBalance = 10
-		state = State.State(100, 'mochhash')
+		state = State.State(100, 'mockhash')
 		self.state = state
 		burn = self.Burn(100000000)
 		self.assertEqual(state._balances.balances, {burn:100000000})
@@ -219,7 +219,7 @@ class Test(unittest.TestCase):
 
 	def test_burn_and_pay(self):
 		Constraints.minimumSwapBillBalance = 10
-		state = State.State(100, 'mochhash')
+		state = State.State(100, 'mockhash')
 		self.state = state
 		output1 = self.Burn(10)
 		self.assertEqual(state._balances.balances, {output1:10})
@@ -276,7 +276,7 @@ class Test(unittest.TestCase):
 
 	def test_pay_from_multiple(self):
 		Constraints.minimumSwapBillBalance = 1
-		state = State.State(100, 'mochhash')
+		state = State.State(100, 'mockhash')
 		self.state = state
 		output1 = self.Burn(10)
 		self.assertEqual(state._balances.balances, {output1:10})
@@ -337,7 +337,7 @@ class Test(unittest.TestCase):
 	def test_ltc_trading1(self):
 		# this test adds tests against the ltc transaction types, and also runs through a simple exchange scenario
 		Constraints.minimumSwapBillBalance = 1
-		state = State.State(100, 'mochhash')
+		state = State.State(100, 'mockhash')
 		self.state = state
 		burnA = self.Burn(100000000)
 		burnB = self.Burn(200000000)
@@ -899,7 +899,7 @@ class Test(unittest.TestCase):
 	def test_bad_back_ltc_sells(self):
 		state = State.State(100, 'mockhash')
 		self.state = state
-		active = self.Burn(1*e(10)+Constraints.minimumSwapBillBalance)
+		active = self.Burn(1*e(10))
 		details = {'backingAmount':1*e(10), 'transactionsBacked':100, 'commission':0x8000000, 'ltcReceiveAddress':'madeUpAddress', 'maxBlock':100}
 		# bad outputs specs
 		self.assertRaises(AssertionError, state.checkTransaction, 'BackLTCSells', outputs=(), transactionDetails=details, sourceAccounts=[active])
@@ -909,33 +909,33 @@ class Test(unittest.TestCase):
 		details['backingAmount'] = 2*e(10)
 		active = self.Apply_AssertInsufficientFunds(state, 'BackLTCSells', sourceAccounts=[active], **details)
 		# change amount below minimum balance
-		details['backingAmount'] = 1*e(10)+Constraints.minimumSwapBillBalance-1
+		details['backingAmount'] = 1*e(10)-1
 		active = self.Apply_AssertInsufficientFunds(state, 'BackLTCSells', sourceAccounts=[active], **details)
 		details['backingAmount'] = 1*e(10)
 		# can't pay from nonexistant account
 		self.Apply_AssertInsufficientFunds(state, 'BackLTCSells', sourceAccounts=['madeUpOutput'], **details)
-		self.assertDictEqual(state._balances.balances, {active:1*e(10)+Constraints.minimumSwapBillBalance})
+		self.assertDictEqual(state._balances.balances, {active:1*e(10)})
 		self.assertFalse(state._balances.isReferenced(active))
 		# transaction with maxBlock before current block
 		details['maxBlock'] = 99
 		active = self.Apply_AssertFails(state, 'BackLTCSells', sourceAccounts=[active], expectedError='max block for transaction has been exceeded', **details)
 		details['maxBlock'] = 100
-		self.assertDictEqual(state._balances.balances, {active:1*e(10)+Constraints.minimumSwapBillBalance})
+		self.assertDictEqual(state._balances.balances, {active:1*e(10)})
 		self.assertFalse(state._balances.isReferenced(active))
 		self.assertEqual(len(state._ltcSellBackers), 0)
 		# control transaction which succeeds
 		outputs = self.Apply_AssertSucceeds(state, 'BackLTCSells', sourceAccounts=[active], **details)
 		refund = outputs['ltcSellBacker']
 		active = refund
-		self.assertDictEqual(state._balances.balances, {active:Constraints.minimumSwapBillBalance})
+		self.assertDictEqual(state._balances.balances, {active:0})
 		self.assertTrue(state._balances.isReferenced(active))
 		self.assertEqual(len(state._ltcSellBackers), 1)
-		self.assertDictEqual(state._ltcSellBackers[0].__dict__, {'backingAmount': 10000000000, 'commission': 134217728, 'expiry': 100, 'ltcReceiveAddress': 'madeUpAddress', 'refundAccount': refund, 'transactionMax': 99900000})
+		self.assertDictEqual(state._ltcSellBackers[0].__dict__, {'backingAmount': 1*e(10), 'commission': 134217728, 'expiry': 100, 'ltcReceiveAddress': 'madeUpAddress', 'refundAccount': refund, 'transactionMax': 1*e(8)})
 		# but then expires (and is refunded)
 		state.advanceToNextBlock()
 		self.assertFalse(state._balances.isReferenced(active))
 		self.assertEqual(len(state._ltcSellBackers), 0)
-		self.assertDictEqual(state._balances.balances, {active:1*e(10)+Constraints.minimumSwapBillBalance})
+		self.assertDictEqual(state._balances.balances, {active:1*e(10)})
 
 	def test_input_credited_during_transaction_regression(self):
 		# copied from exact match case, but modified to use single active output throughout
@@ -954,3 +954,15 @@ class Test(unittest.TestCase):
 		self.assertEqual(len(state._pendingExchanges), 0)
 		self.assertEqual(state._balances.balances, {active:2*e(7)+1})
 		self.assertEqual(totalAccountedFor(state), state._totalCreated)
+
+	def test_backed_ltc_sell(self):
+		state = State.State(100, 'mockhash')
+		self.state = state
+		burn = self.Burn(4*e(12))
+		details = {'backingAmount':4*e(12), 'transactionsBacked':1000, 'commission':0x10000000, 'ltcReceiveAddress':'backerLTCReceivePKH', 'maxBlock':200}
+		outputs = self.Apply_AssertSucceeds(state, 'BackLTCSells', sourceAccounts=[burn], **details)
+		backerRefund = outputs['ltcSellBacker']
+		expectedBalances = {backerRefund:0}
+		self.assertEqual(state._balances.balances, expectedBalances)
+		self.assertEqual(len(state._ltcSellBackers), 1)
+		self.assertDictEqual(state._ltcSellBackers[0].__dict__, {'backingAmount': 4*e(12), 'commission': 268435456, 'expiry': 200, 'ltcReceiveAddress': 'backerLTCReceivePKH', 'refundAccount': backerRefund, 'transactionMax': 4*e(9)})

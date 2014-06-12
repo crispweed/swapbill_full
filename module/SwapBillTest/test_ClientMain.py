@@ -778,16 +778,16 @@ class Test(unittest.TestCase):
 	def test_back_ltc_sells(self):
 		host = InitHost()
 		host._addUnspent(2*e(12))
-		RunClient(host, ['burn', '--amount', 1*e(12)+Constraints.minimumSwapBillBalance*2])
-		RunClient(host, ['back_ltc_sells', '--backingSwapBill', 1*e(12)+Constraints.minimumSwapBillBalance, '--transactionsBacked', 1000, '--blocksUntilExpiry', 20, '--commission_AsInteger', 0x10000000])
+		RunClient(host, ['burn', '--amount', 1*e(12)])
+		RunClient(host, ['back_ltc_sells', '--backingSwapBill', 1*e(12), '--transactionsBacked', 1000, '--blocksUntilExpiry', 20, '--commission_AsInteger', 0x10000000])
 		output, info = RunClient(host, ['get_balance'])
-		self.assertDictEqual(info, {'balance': Constraints.minimumSwapBillBalance})
+		self.assertDictEqual(info, {'balance': 0})
 		self.assertEqual(host._nextBlock, 3)
 		# expiry block is calculated as state._currentBlockIndex (which equals next block after end of synch at time of submit) + blocksUntilExpiry
 		output, result = RunClient(host, ['get_ltc_sell_backers'])
 		expectedDetails = {
 		'commission as integer': 268435456, 'commission as float (approximation)': 0.0625,
-		'backing amount': 1*e(12)+Constraints.minimumSwapBillBalance, 'I am backer': True, 'expires on block': 22, 'maximum per transaction': 1*e(9)
+		'backing amount': 1*e(12), 'I am backer': True, 'expires on block': 22, 'maximum per transaction': 1*e(9)
 		}
 		self.assertListEqual(result, [('ltc sell backer index', 0, expectedDetails)])
 		self.assertEqual(host._nextBlock, 3)
