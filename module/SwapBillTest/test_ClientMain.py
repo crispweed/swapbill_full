@@ -638,6 +638,7 @@ class Test(unittest.TestCase):
 				'outstanding ltc payment amount': 2500000,
 				'swap bill paid by buyer': 10000000,
 				'expires on block': 57,
+		        'blocks until expiry': 50,
 				'I am buyer (and waiting for payment)': False,
 				'deposit paid by seller': 625000
 			})]
@@ -652,6 +653,7 @@ class Test(unittest.TestCase):
 				'outstanding ltc payment amount': 2500000,
 				'swap bill paid by buyer': 10000000,
 				'expires on block': 57,
+		        'blocks until expiry': 50,
 				'I am buyer (and waiting for payment)': True,
 				'deposit paid by seller': 625000
 			})]
@@ -787,12 +789,16 @@ class Test(unittest.TestCase):
 		output, result = RunClient(host, ['get_ltc_sell_backers'])
 		expectedDetails = {
 		'commission as integer': 268435456, 'commission as float (approximation)': 0.0625,
-		'backing amount': 1*e(12), 'I am backer': True, 'expires on block': 22, 'maximum per transaction': 1*e(9)
+		'backing amount': 1*e(12), 'I am backer': True,
+		'expires on block': 22,
+		'blocks until expiry': 20,
+		'maximum per transaction': 1*e(9)
 		}
 		self.assertListEqual(result, [('ltc sell backer index', 0, expectedDetails)])
 		self.assertEqual(host._nextBlock, 3)
 		host._advance(19)
 		output, result = RunClient(host, ['get_ltc_sell_backers'])
+		expectedDetails['blocks until expiry'] = 1
 		self.assertListEqual(result, [('ltc sell backer index', 0, expectedDetails)])
 		self.assertEqual(host._nextBlock, 22)
 		host._advance(1)
@@ -813,7 +819,10 @@ class Test(unittest.TestCase):
 		output, result = RunClient(host, ['get_ltc_sell_backers'])
 		expectedBackerDetails = {
 		'commission as integer': 268435456, 'commission as float (approximation)': 0.0625,
-		'backing amount': 1*e(12), 'I am backer': True, 'expires on block': 22, 'maximum per transaction': 1*e(9)
+		'backing amount': 1*e(12), 'I am backer': True,
+		'expires on block': 22,
+		'blocks until expiry': 20,
+		'maximum per transaction': 1*e(9)
 		}
 		self.assertListEqual(result, [('ltc sell backer index', 0, expectedBackerDetails)])
 		host._setOwner('buyer')
@@ -840,13 +849,16 @@ class Test(unittest.TestCase):
 		deposit = 3*e(8)//Constraints.depositDivisor
 		expectedBackerDetails['backing amount'] -= deposit
 		expectedBackerDetails['backing amount'] -= 3*e(8)
+		expectedBackerDetails['blocks until expiry'] = 17
 		host._setOwner('backer')
 		output, result = RunClient(host, ['get_ltc_sell_backers'])
 		self.assertListEqual(result, [('ltc sell backer index', 0, expectedBackerDetails)])
 		output, result = RunClient(host, ['get_pending_exchanges'])
 		expectedResult = [('pending exchange index', 0,
 		     {
-		         'expires on block': 55, 'outstanding ltc payment amount': 150000000,
+		         'expires on block': 55,
+		         'blocks until expiry': 50,
+		         'outstanding ltc payment amount': 150000000,
 		         'I am seller (and need to complete)': True,
 		         'backer id': 0,
 		         'I am buyer (and waiting for payment)': False,

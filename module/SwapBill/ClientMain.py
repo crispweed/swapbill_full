@@ -1,10 +1,11 @@
 from __future__ import print_function
-import sys, argparse, binascii, traceback, struct, time, os
+import sys
 supportedVersions = ('2.7', '3.2', '3.3', '3.4')
 thisVersion = str(sys.version_info.major) + '.' + str(sys.version_info.minor)
 if not thisVersion in supportedVersions:
 	print('This version of python (' + thisVersion + ') is not supported. Supported versions are:', supportedVersions)
 	exit()
+import argparse, binascii, traceback, struct, time, os
 PY3 = sys.version_info.major > 2
 if PY3:
 	import io
@@ -358,6 +359,7 @@ def Main(startBlockIndex, startBlockHash, useTestNet, commandLineArgs=sys.argv[1
 			d['swap bill paid by buyer'] = exchange.swapBillAmount
 			d['outstanding ltc payment amount'] = exchange.ltc
 			d['expires on block'] = exchange.expiry
+			d['blocks until expiry'] = exchange.expiry - state._currentBlockIndex + 1
 			if exchange.backerIndex != -1:
 				d['backer id'] = exchange.backerIndex
 			result.append(('pending exchange index', key, d))
@@ -372,6 +374,7 @@ def Main(startBlockIndex, startBlockHash, useTestNet, commandLineArgs=sys.argv[1
 			d['backing amount'] = backer.backingAmount
 			d['maximum per transaction'] = backer.transactionMax
 			d['expires on block'] = backer.expiry
+			d['blocks until expiry'] = backer.expiry - state._currentBlockIndex + 1
 			commission_Double = float(backer.commission) / 0x100000000
 			d['commission as float (approximation)'] = commission_Double
 			d['commission as integer'] = backer.commission
