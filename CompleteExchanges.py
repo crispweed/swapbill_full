@@ -23,7 +23,8 @@ startBlockHash='3610b1e7ea80e3a4a73cac696261736e849290dce07598c4da85a9f5a4504c29
 
 while True:
 	try:
-		result = ClientMain.Main(commandLineArgs=['get_pending_exchanges'], startBlockIndex=startBlockIndex, startBlockHash=startBlockHash, useTestNet=True)
+		#-i option is important here, as this prevents us completing the same exchange multiple times!
+		result = ClientMain.Main(commandLineArgs=['get_pending_exchanges', '-i'], startBlockIndex=startBlockIndex, startBlockHash=startBlockHash, useTestNet=True)
 	except ExceptionReportedToUser as e:
 		print("get_pending_exchanges failed:", e)
 		time.sleep(40)
