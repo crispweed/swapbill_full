@@ -1063,3 +1063,17 @@ class Test(unittest.TestCase):
 		#self.assertEqual(len(state._pendingExchanges), 0)
 		#self.assertEqual(state._balances.balances, {receiveB:1*e(7)+1*e(7), refundA:1})
 		#self.assertEqual(totalAccountedFor(state), state._totalCreated)
+
+	#def test_missing_account_regression(self):
+		#state = State.State(100, 'mockhash')
+		#self.state = state
+		#burn = self.Burn(28*e(6))
+		#buyer = self.BuyOffer(state, burn, 'receiveLTC1', swapBillOffered=14*e(6), exchangeRate=4026531840)
+		#buyer = self.BuyOffer(state, buyer, 'receiveLTC2', swapBillOffered=14*e(6), exchangeRate=4026531840)
+		#self.assertEqual(state._ltcBuys.size(), 2)
+		#burn = self.Burn(3*e(7))
+		#seller = self.SellOffer(state, burn, ltcOffered=9696969, exchangeRate=4026531840)
+		## can't match either buy because remainder would be too small
+		#self.assertEqual(state._ltcBuys.size(), 2)
+		#self.assertEqual(state._ltcSells.size(), 1)
+

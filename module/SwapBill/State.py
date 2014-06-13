@@ -217,6 +217,7 @@ class State(object):
 		if txID is None:
 			return
 		refundAccount = (txID, 1) # same as change account and already created
+		#print("refundAccount:", refundAccount)
 		self._balances.addFirstRef(refundAccount)
 		buy.ltcReceiveAddress = receivingAddress
 		buy.refundAccount = refundAccount
@@ -355,6 +356,8 @@ class State(object):
 		self._balances.addStateChange(exchange.buyerAccount)
 		self._balances.addStateChange(exchange.sellerAccount)
 		self._balances.removeRef(exchange.buyerAccount)
+		#if not exchange.buyerAccount in self._balances.balances:
+			#print('removed account:', exchange.buyerAccount)
 		self._balances.removeRef(exchange.sellerAccount)
 		self._pendingExchanges.pop(pendingExchangeIndex)
 

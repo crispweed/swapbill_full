@@ -29,6 +29,8 @@ class OwnedAccounts(object):
 				report += ' - trade offer updated\n'
 		for accountToRemove in toRemove:
 			self.tradeOfferChangeCounts.pop(accountToRemove)
+			if accountToRemove in self.accounts and not accountToRemove in state._balances.balances:
+				self.accounts.pop(accountToRemove)
 		return report
 
 	def updateForNewOutputs(self, wallet, state, txID, hostTX, outputs, scriptPubKeys):

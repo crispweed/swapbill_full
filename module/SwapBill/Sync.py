@@ -28,8 +28,8 @@ def _processTransactions(state, wallet, ownedAccounts, transactions, applyToStat
 			print(inputsReport, end="", file=out)
 		if not applyToState:
 			continue
-		inBetweenReport = ownedAccounts.checkForTradeOfferChanges(state)
-		assert inBetweenReport == ''
+		#inBetweenReport = ownedAccounts.checkForTradeOfferChanges(state)
+		#assert inBetweenReport == ''
 		error = state.applyTransaction(transactionType, txID, sourceAccounts=sourceAccounts, transactionDetails=transactionDetails, outputs=outputs)
 		outputsReport = ownedAccounts.checkForTradeOfferChanges(state)
 		outputsReport += ownedAccounts.updateForNewOutputs(wallet, state, txID, hostTX, outputs, scriptPubKeys)
@@ -44,8 +44,8 @@ def _processTransactions(state, wallet, ownedAccounts, transactions, applyToStat
 def _processBlock(host, state, wallet, ownedAccounts, blockHash, reportPrefix, out):
 	transactions = host.getBlockTransactions(blockHash)
 	_processTransactions(state, wallet, ownedAccounts, transactions, True, reportPrefix, out)
-	inBetweenReport = ownedAccounts.checkForTradeOfferChanges(state)
-	assert inBetweenReport == ''
+	#inBetweenReport = ownedAccounts.checkForTradeOfferChanges(state)
+	#assert inBetweenReport == ''
 	state.advanceToNextBlock()
 	tradeOffersChanged = ownedAccounts.checkForTradeOfferChanges(state)
 	if tradeOffersChanged:
