@@ -1,7 +1,7 @@
 from __future__ import print_function
 import os
 from os import path
-from SwapBill import RawTransaction, Address, Amounts
+from SwapBill import RawTransaction, Address, Amounts, RPC
 from SwapBill.ExceptionReportedToUser import ExceptionReportedToUser
 
 class SigningFailed(ExceptionReportedToUser):
@@ -45,10 +45,14 @@ class Host(object):
 		return Address.ToPubKeyHash(self._addressVersion, self._rpcHost.call('getnewaddress'))
 
 	def signAndSend(self, unsignedTransactionHex, privateKeys, maximumSignedSize):
+		#print('\t\tunsignedTransactionHex =', unsignedTransactionHex.__repr__())
+		#print('\t\tprivateKeys =', privateKeys.__repr__())
+		#print('\t\tmaximumSignedSize =', maximumSignedSize.__repr__())
+		#return None
 		## lowest level transaction send interface
 		signingResult = self._rpcHost.call('signrawtransaction', unsignedTransactionHex)
 		if signingResult['complete'] != True:
-			privateKeysWif = []
+			privateKeys_WIF = []
 			for privateKey in privateKeys:
 				privateKeys_WIF.append(Address.PrivateKeyToWIF(privateKey, self._privateKeyAddressVersion))
 			signingResult = self._rpcHost.call('signrawtransaction', signingResult['hex'], None, privateKeys_WIF)
