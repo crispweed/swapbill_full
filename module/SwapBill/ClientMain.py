@@ -13,7 +13,7 @@ else:
 	import StringIO as io
 from os import path
 try:
-	from SwapBill import RawTransaction, Address, TransactionFee
+	from SwapBill import RawTransaction, Address, TransactionFee, ParseConfig, RPC
 	from SwapBill import TransactionEncoding, BuildHostedTransaction, Sync, Host, TransactionBuildLayer, Wallet
 	from SwapBill import FormatTransactionForUserDisplay
 	from SwapBill.Sync import SyncAndReturnStateAndOwnedAccounts
@@ -138,10 +138,42 @@ def Main(startBlockIndex, startBlockHash, useTestNet, commandLineArgs=sys.argv[1
 		except Exception as e:
 			raise ExceptionReportedToUser("Failed to create directory " + dataDir + ":", e)
 
-	wallet = Wallet.Wallet(path.join(dataDir, 'wallet.txt'), privateKeyAddressVersion=b'\xef', keyGenerator=keyGenerator) # litecoin testnet private key address version
+	if useTestNet:
+		addressVersion = b'\x6f'
+		privateKeyAddressVersion = b'\xef'
+	else:
+		addressVersion = b'\x30'
+		privateKeyAddressVersion = b'\xbf'
+
+	wallet = Wallet.Wallet(path.join(dataDir, 'wallet.txt'), privateKeyAddressVersion=privateKeyAddressVersion, keyGenerator=keyGenerator) # litecoin testnet private key address version
 
 	if host is None:
-		host = Host.Host(useTestNet=useTestNet, dataDirectory=dataDir, configFile=args.configFile)
+		configFile = args.configFile
+		if configFile is None:
+			if os.name == 'nt':
+				configFile = path.join(path.expanduser("~"), 'AppData', 'Roaming', 'Litecoin', 'litecoin.conf')
+			else:
+				configFile = path.join(path.expanduser("~"), '.litecoin', 'litecoin.conf')
+		with open(configFile, mode='rb') as f:
+			configFileBuffer = f.read()
+		clientConfig = ParseConfig.Parse(configFileBuffer)
+		RPC_HOST = clientConfig.get('externalip', 'localhost')
+		try:
+			RPC_PORT = clientConfig['rpcport']
+		except KeyError:
+			if useTestNet:
+				RPC_PORT = 19332
+			else:
+				RPC_PORT = 9332
+		assert int(RPC_PORT) > 1 and int(RPC_PORT) < 65535
+		try:
+			RPC_USER = clientConfig['rpcuser']
+			RPC_PASSWORD = clientConfig['rpcpassword']
+		except KeyError:
+			raise ExceptionReportedToUser('Values for rpcuser and rpcpassword must both be set in your config file.')
+		rpcHost = RPC.Host('http://' + RPC_USER + ':' + RPC_PASSWORD + '@' + RPC_HOST + ':' + str(RPC_PORT))
+		submittedTransactionsLogFileName = path.join(dataDir, 'submittedTransactions.txt')
+		host = Host.Host(rpcHost=rpcHost, addressVersion=addressVersion, privateKeyAddressVersion=privateKeyAddressVersion, submittedTransactionsLogFileName=submittedTransactionsLogFileName)
 
 	includePending = hasattr(args, 'includepending') and args.includepending
 
