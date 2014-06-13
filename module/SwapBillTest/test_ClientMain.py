@@ -902,3 +902,48 @@ class Test(unittest.TestCase):
 		self.assertRaisesRegexp(ExceptionReportedToUser, 'Negative values are not allowed for transaction parameters.', RunClient, host, ['post_ltc_buy', '--swapBillOffered', 3*e(7), '--exchangeRate_AsInteger', '-1'])
 		self.assertRaisesRegexp(ExceptionReportedToUser, 'Transaction parameter value exceeds supported range.', RunClient, host, ['post_ltc_buy', '--swapBillOffered', 3*e(7), '--exchangeRate', '1.0'])
 		self.assertRaisesRegexp(ExceptionReportedToUser, 'Transaction parameter value exceeds supported range.', RunClient, host, ['post_ltc_buy', '--swapBillOffered', 3*e(7), '--exchangeRate_AsInteger', 0x100000000])
+
+	def test_backed_sell_matches_multiple(self):
+		host = InitHost()
+		ownerList = ['buyer', 'seller', 'backer']
+		host._addUnspent(5*e(12))
+		host._setOwner('buyer')
+		burn = RunClient(host, ['burn', '--amount', 6*e(9)])
+		RunClient(host, ['post_ltc_buy', '--swapBillOffered', 2*e(9), '--exchangeRate', '0.5', '--blocksUntilExpiry', 100])
+		RunClient(host, ['post_ltc_buy', '--swapBillOffered', 4*e(9), '--exchangeRate', '0.5', '--blocksUntilExpiry', 100])
+		info = GetStateInfo(host)
+		self.assertEqual(info['numberOfLTCBuyOffers'], 2)
+		self.assertEqual(info['numberOfLTCSellOffers'], 0)
+		self.assertEqual(info['numberOfPendingExchanges'], 0)
+		ownerBalances = GetOwnerBalances(host, ownerList, info['balances'])
+		self.assertEqual(ownerBalances, {})
+		host._setOwner('backer')
+		RunClient(host, ['burn', '--amount', 1*e(12)])
+		RunClient(host, ['back_ltc_sells', '--backingSwapBill', 1*e(12), '--transactionsBacked', 10, '--blocksUntilExpiry', 100, '--commission_AsInteger', 0])
+		host._setOwner('seller')
+		ltcOffered = 6*e(9)//2
+		deposit = 6*e(9)//Constraints.depositDivisor
+		RunClient(host, ['post_ltc_sell', '--ltcOffered', ltcOffered, '--exchangeRate', '0.5', '--backerID', 0])
+		info = GetStateInfo(host)
+		self.assertEqual(info['numberOfLTCBuyOffers'], 0)
+		self.assertEqual(info['numberOfLTCSellOffers'], 0)
+		self.assertEqual(info['numberOfPendingExchanges'], 2)
+		# the backer gets a trade count incremented twice here, which triggered an incorrect assert
+		host._setOwner('backer')
+		output, result = RunClient(host, ['get_balance'])
+		self.assertDictEqual(result, {'balance': 0})
+		ownerBalances = GetOwnerBalances(host, ownerList, info['balances'])
+		self.assertEqual(ownerBalances, {'seller':6*e(9)})
+		expectedBackerDetails = {'commission as float (approximation)': 0.0, 'blocks until expiry': 99, 'I am backer': True, 'backing amount': 1*e(12)-6*e(9)-deposit, 'expires on block': 105, 'maximum per transaction': 1*e(11), 'commission as integer': 0}
+		output, result = RunClient(host, ['get_ltc_sell_backers'])
+		self.assertListEqual(result, [('ltc sell backer index', 0, expectedBackerDetails)])
+		RunClient(host, ['complete_ltc_sell', '--pendingExchangeID', 0])
+		RunClient(host, ['complete_ltc_sell', '--pendingExchangeID', 1])
+		output, result = RunClient(host, ['get_balance'])
+		self.assertDictEqual(result, {'balance': 0})
+		ownerBalances = GetOwnerBalances(host, ownerList, info['balances'])
+		self.assertEqual(ownerBalances, {'seller':6*e(9)})
+		expectedBackerDetails['backing amount'] += 6*e(9)+deposit
+		expectedBackerDetails['blocks until expiry'] -= 2
+		output, result = RunClient(host, ['get_ltc_sell_backers'])
+		self.assertListEqual(result, [('ltc sell backer index', 0, expectedBackerDetails)])

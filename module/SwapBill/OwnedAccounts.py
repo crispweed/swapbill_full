@@ -25,7 +25,6 @@ class OwnedAccounts(object):
 				toRemove.append(account)
 				report += ' - trade offer completed\n'
 			elif state._balances.changeCounts[account] != changeCount:
-				assert state._balances.changeCounts[account] == changeCount + 1
 				self.tradeOfferChangeCounts[account] = state._balances.changeCounts[account]
 				report += ' - trade offer updated\n'
 		for accountToRemove in toRemove:
