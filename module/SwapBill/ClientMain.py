@@ -377,7 +377,10 @@ def Main(startBlockIndex, startBlockHash, useTestNet, commandLineArgs=sys.argv[1
 			depositAmount = offer._swapBillDeposit
 			rate_Double = float(offer.rate) / 0x100000000
 			swapBillEquivalent = int(ltc / rate_Double)
-			result.append(('exchange rate as float (approximation)', rate_Double, {'exchange rate as integer':offer.rate, 'ltc offered':ltc, 'deposit paid':depositAmount, 'swapbill equivalent':swapBillEquivalent, 'mine':mine}))
+			details = {'exchange rate as integer':offer.rate, 'ltc offered':ltc, 'deposit paid':depositAmount, 'swapbill equivalent':swapBillEquivalent, 'mine':mine}
+			if offer.isBacked:
+				details['backer id'] = offer.backerIndex
+			result.append(('exchange rate as float (approximation)', rate_Double, details))
 		return result
 
 	elif args.action == 'get_pending_exchanges':
