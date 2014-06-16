@@ -1,11 +1,12 @@
 from __future__ import print_function, division
+from SwapBill import Amounts
 from SwapBill.HardCodedProtocolConstraints import Constraints
 
 class OfferIsBelowMinimumExchange(Exception):
 	pass
 
 def MinimumBuyOfferWithRate(rate):
-	swapBillForMinLTC = Constraints.minimumExchangeLTC * 0x100000000 // rate
+	swapBillForMinLTC = Constraints.minimumExchangeLTC * Amounts.percentDivisor // rate
 	if _ltcWithExchangeRate(rate, swapBillForMinLTC) < Constraints.minimumExchangeLTC:
 		swapBillForMinLTC += 1
 	assert _ltcWithExchangeRate(rate, swapBillForMinLTC) >= Constraints.minimumExchangeLTC
@@ -16,14 +17,14 @@ def MinimumSellOfferWithRate(rate):
 	return max(ltcForMinSwapBill, Constraints.minimumExchangeLTC)
 
 def DepositRequiredForLTCSell(exchangeRate, ltcOffered):
-	swapBillAmount = ltcOffered * 0x100000000 // exchangeRate
+	swapBillAmount = ltcOffered * Amounts.percentDivisor // exchangeRate
 	deposit = swapBillAmount // Constraints.depositDivisor
 	if deposit * Constraints.depositDivisor != swapBillAmount:
 		deposit += 1
 	return deposit
 
 def GetSwapBillEquivalentRoundedUp(exchangeRate, ltcOffered):
-	swapBillAmount = ltcOffered * 0x100000000 // exchangeRate
+	swapBillAmount = ltcOffered * Amounts.percentDivisor // exchangeRate
 	if _ltcWithExchangeRate(exchangeRate, swapBillAmount) < ltcOffered:
 		swapBillAmount += 1
 	assert _ltcWithExchangeRate(exchangeRate, swapBillAmount) >= ltcOffered
@@ -52,7 +53,7 @@ class Exchange(object):
 	pass
 
 def _ltcWithExchangeRate(exchangeRate, swapBillAmount):
-	return swapBillAmount * exchangeRate // 0x100000000
+	return swapBillAmount * exchangeRate // Amounts.percentDivisor
 
 def OffersMeetOrOverlap(buy, sell):
 	return buy.rate <= sell.rate

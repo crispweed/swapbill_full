@@ -318,7 +318,7 @@ class Test(unittest.TestCase):
 		RunClient(host, ['post_ltc_buy', '--swapBillOffered', 3*e(7), '--exchangeRate', '0.5', '--blocksUntilExpiry', '4'])
 		host.holdNewTransactions = True
 		output, result = RunClient(host, ['get_buy_offers', '-i'])
-		self.assertEqual(result, [('exchange rate as float (approximation)', 0.5, {'exchange rate as integer': 2147483648, 'ltc equivalent': Amounts.ToString(15*e(6)), 'mine': True, 'swapbill offered': Amounts.ToString(3*e(7))})])
+		self.assertEqual(result, [('exchange rate', '0.5', {'ltc equivalent': Amounts.ToString(15*e(6)), 'mine': True, 'swapbill offered': Amounts.ToString(3*e(7))})])
 		# two blocks advanced so far, one for burn, one for sell offer
 		host._advance(4)
 		self.assertEqual(host._nextBlock, 6)
@@ -328,7 +328,7 @@ class Test(unittest.TestCase):
 		output, result = RunClient(host, ['get_balance', '-i'])
 		self.assertEqual(result['balance'], 1*e(7))
 		output, result = RunClient(host, ['get_buy_offers', '-i'])
-		self.assertEqual(result, [('exchange rate as float (approximation)', 0.5, {'exchange rate as integer': 2147483648, 'ltc equivalent': Amounts.ToString(15*e(6)), 'mine': True, 'swapbill offered': Amounts.ToString(3*e(7))})])
+		self.assertEqual(result, [('exchange rate', '0.5', {'ltc equivalent': Amounts.ToString(15*e(6)), 'mine': True, 'swapbill offered': Amounts.ToString(3*e(7))})])
 		host._advance(1)
 		self.assertEqual(host._nextBlock, 7)
 		# but expires on block 7
@@ -360,7 +360,7 @@ class Test(unittest.TestCase):
 		output, result = RunClient(host, ['get_balance', '-i'])
 		self.assertEqual(result['balance'], 18125000)
 		output, result = RunClient(host, ['get_sell_offers', '-i'])
-		self.assertEqual(result, [('exchange rate as float (approximation)', 0.5, {'exchange rate as integer': 2147483648, 'ltc offered': Amounts.ToString(15*e(6)), 'mine': True, 'swapbill equivalent': Amounts.ToString(3*e(7)), 'deposit paid': Amounts.ToString(1875000)})])
+		self.assertEqual(result, [('exchange rate', '0.5', {'ltc offered': Amounts.ToString(15*e(6)), 'mine': True, 'swapbill equivalent': Amounts.ToString(3*e(7)), 'deposit paid': Amounts.ToString(1875000)})])
 		host._advance(1)
 		self.assertEqual(host._nextBlock, 7)
 		# but expires on block 7
@@ -602,11 +602,11 @@ class Test(unittest.TestCase):
 		ownerBalances = GetOwnerBalances(host, ownerList, info['balances'])
 		self.assertDictEqual(ownerBalances, {'alice': 1*e(7), 'bob': 3*e(7), 'clive': 6*e(7), 'dave': 7*e(7)})
 		output, result = RunClient(host, ['get_buy_offers'])
-		self.assertEqual(result, [('exchange rate as float (approximation)', 0.5, {'exchange rate as integer': 2147483648, 'ltc equivalent': Amounts.ToString(15000000), 'mine': True, 'swapbill offered': Amounts.ToString(30000000)})])
+		self.assertEqual(result, [('exchange rate', '0.5', {'ltc equivalent': Amounts.ToString(15000000), 'mine': True, 'swapbill offered': Amounts.ToString(30000000)})])
 		# bob makes better offer, but with smaller amount
 		host._setOwner('bob')
 		output, result = RunClient(host, ['get_buy_offers'])
-		self.assertEqual(result, [('exchange rate as float (approximation)', 0.5, {'exchange rate as integer': 2147483648, 'ltc equivalent': Amounts.ToString(15000000), 'mine': False, 'swapbill offered': Amounts.ToString(30000000)})])
+		self.assertEqual(result, [('exchange rate', '0.5', {'ltc equivalent': Amounts.ToString(15000000), 'mine': False, 'swapbill offered': Amounts.ToString(30000000)})])
 		RunClient(host, ['post_ltc_buy', '--swapBillOffered', 1*e(7), '--exchangeRate', '0.25'])
 		info = GetStateInfo(host)
 		ownerBalances = GetOwnerBalances(host, ownerList, info['balances'])
@@ -616,8 +616,8 @@ class Test(unittest.TestCase):
 		self.assertEqual(info['numberOfPendingExchanges'], 0)
 		output, result = RunClient(host, ['get_buy_offers'])
 		expectedResult = [
-			('exchange rate as float (approximation)', 0.25, {'exchange rate as integer': 1073741824, 'ltc equivalent': Amounts.ToString(2500000), 'mine': True, 'swapbill offered': Amounts.ToString(10000000)}),
-			('exchange rate as float (approximation)', 0.5, {'exchange rate as integer': 2147483648, 'ltc equivalent': Amounts.ToString(15000000), 'mine': False, 'swapbill offered': Amounts.ToString(30000000)})
+			('exchange rate', '0.25', {'ltc equivalent': Amounts.ToString(2500000), 'mine': True, 'swapbill offered': Amounts.ToString(10000000)}),
+			('exchange rate', '0.5', {'ltc equivalent': Amounts.ToString(15000000), 'mine': False, 'swapbill offered': Amounts.ToString(30000000)})
 		]
 		self.assertEqual(result, expectedResult)
 		# clive makes a sell offer, matching bob's buy exactly
@@ -670,8 +670,8 @@ class Test(unittest.TestCase):
 		self.assertEqual(info['numberOfLTCSellOffers'], 0)
 		self.assertEqual(info['numberOfPendingExchanges'], 1)
 		host._setOwner('dave')
-		exchangeRate = 1157627904
-		RunClient(host, ['post_ltc_sell', '--ltcOffered', 2*e(7) * exchangeRate // 0x100000000, '--exchangeRate_AsInteger', str(exchangeRate), '--blocksUntilExpiry', '100'])
+		exchangeRate = 269531250
+		RunClient(host, ['post_ltc_sell', '--ltcOffered', 2*e(7) * exchangeRate // Amounts.percentDivisor, '--exchangeRate', Amounts.PercentToString(exchangeRate), '--blocksUntilExpiry', '100'])
 		info = GetStateInfo(host)
 		ownerBalances = GetOwnerBalances(host, ownerList, info['balances'])
 		self.assertDictEqual(ownerBalances, {'alice': 1*e(7), 'bob': 1*e(7), 'clive': 5*e(7)-625000+1*e(7), 'dave': 7*e(7)-1250000-Constraints.minimumSwapBillBalance})
@@ -679,7 +679,7 @@ class Test(unittest.TestCase):
 		self.assertEqual(info['numberOfLTCSellOffers'], 1)
 		self.assertEqual(info['numberOfPendingExchanges'], 2)
 		output, result = RunClient(host, ['get_buy_offers'])
-		expectedResult = [('exchange rate as float (approximation)', 0.5, {'exchange rate as integer': 2147483648, 'ltc equivalent': Amounts.ToString(15000000), 'mine': False, 'swapbill offered': Amounts.ToString(30000000)})]
+		expectedResult = [('exchange rate', '0.5', {'ltc equivalent': Amounts.ToString(15000000), 'mine': False, 'swapbill offered': Amounts.ToString(30000000)})]
 		self.assertEqual(result, expectedResult)
 		output, result = RunClient(host, ['get_sell_offers'])
 		# didn't check the exact calculations for this value, but seems about right
@@ -687,7 +687,7 @@ class Test(unittest.TestCase):
 		daveSwapBillReceived = 11125000
 		daveDepositRemainder = 647645
 		daveDepositMatched = 1250000 - daveDepositRemainder
-		expectedResult = [('exchange rate as float (approximation)', 0.26953125, {'exchange rate as integer': 1157627904, 'deposit paid': Amounts.ToString(daveDepositRemainder), 'ltc offered': Amounts.ToString(2792969), 'mine': True, 'swapbill equivalent': Amounts.ToString(10362319)})]
+		expectedResult = [('exchange rate', '0.26953125', {'deposit paid': Amounts.ToString(daveDepositRemainder), 'ltc offered': Amounts.ToString(2792969), 'mine': True, 'swapbill equivalent': Amounts.ToString(10362319)})]
 		self.assertEqual(result, expectedResult)
 		assert cliveCompletionPaymentExpiry > host._nextBlock
 		host._advance(cliveCompletionPaymentExpiry - host._nextBlock)
@@ -783,14 +783,14 @@ class Test(unittest.TestCase):
 		host = InitHost()
 		host._addUnspent(2*e(12))
 		RunClient(host, ['burn', '--amount', 1*e(12)])
-		RunClient(host, ['back_ltc_sells', '--backingSwapBill', 1*e(12), '--transactionsBacked', '1000', '--blocksUntilExpiry', '20', '--commission_AsInteger', str(0x10000000)])
+		RunClient(host, ['back_ltc_sells', '--backingSwapBill', 1*e(12), '--transactionsBacked', '1000', '--blocksUntilExpiry', '20', '--commission', '0.625'])
 		output, info = RunClient(host, ['get_balance'])
 		self.assertDictEqual(info, {'balance': 0})
 		self.assertEqual(host._nextBlock, 3)
 		# expiry block is calculated as state._currentBlockIndex (which equals next block after end of synch at time of submit) + blocksUntilExpiry
 		output, result = RunClient(host, ['get_ltc_sell_backers'])
 		expectedDetails = {
-		'commission as integer': 268435456, 'commission as float (approximation)': 0.0625,
+		'commission': '0.625',
 		'backing amount': Amounts.ToString(1*e(12)), 'I am backer': True,
 		'expires on block': 22,
 		'blocks until expiry': 20,
@@ -814,14 +814,14 @@ class Test(unittest.TestCase):
 		host._setOwner('backer')
 		host._addUnspent(2*e(12))
 		RunClient(host, ['burn', '--amount', 1*e(12)])
-		RunClient(host, ['back_ltc_sells', '--backingSwapBill', 1*e(12), '--transactionsBacked', '1000', '--blocksUntilExpiry', '20', '--commission_AsInteger', str(0x10000000)])
+		RunClient(host, ['back_ltc_sells', '--backingSwapBill', 1*e(12), '--transactionsBacked', '1000', '--blocksUntilExpiry', '20', '--commission', '0.0625'])
 		output, info = RunClient(host, ['get_balance'])
 		self.assertDictEqual(info, {'balance': 0})
 		self.assertEqual(host._nextBlock, 3)
 		output, result = RunClient(host, ['get_ltc_sell_backers'])
 		expectedBackingAmount = 1*e(12)
 		expectedBackerDetails = {
-		'commission as integer': 268435456, 'commission as float (approximation)': 0.0625,
+		'commission': '0.0625',
 		'backing amount': Amounts.ToString(expectedBackingAmount), 'I am backer': True,
 		'expires on block': 22,
 		'blocks until expiry': 20,
@@ -838,7 +838,7 @@ class Test(unittest.TestCase):
 		ownerBalances = GetOwnerBalances(host, ownerList, info['balances'])
 		self.assertDictEqual(ownerBalances, {})
 		output, result = RunClient(host, ['get_buy_offers'])
-		self.assertEqual(result, [('exchange rate as float (approximation)', 0.5, {'exchange rate as integer': 2147483648, 'ltc equivalent': Amounts.ToString(15*e(7)), 'mine': True, 'swapbill offered': Amounts.ToString(3*e(8))})])
+		self.assertEqual(result, [('exchange rate', '0.5', {'ltc equivalent': Amounts.ToString(15*e(7)), 'mine': True, 'swapbill offered': Amounts.ToString(3*e(8))})])
 		host._setOwner('seller')
 		ltcOffered = 15*e(7)
 		commission = ltcOffered // 16
@@ -876,17 +876,17 @@ class Test(unittest.TestCase):
 		host = InitHost()
 		host._addUnspent(5*e(12))
 		burn = RunClient(host, ['burn', '--amount', 1*e(12) + Constraints.minimumSwapBillBalance])
-		self.assertRaisesRegexp(ExceptionReportedToUser, 'Negative values are not allowed for transaction parameters.', RunClient, host, ['back_ltc_sells', '--backingSwapBill', 1*e(12), '--transactionsBacked', '1000', '--blocksUntilExpiry', '20', '--commission_AsInteger', '-1'])
-		self.assertRaisesRegexp(ExceptionReportedToUser, 'Negative values are not allowed for transaction parameters.', RunClient, host, ['back_ltc_sells', '--backingSwapBill', 1*e(12), '--transactionsBacked', '1000', '--blocksUntilExpiry', '20', '--commission', '-0.1'])
-		self.assertRaisesRegexp(ExceptionReportedToUser, 'Transaction parameter value exceeds supported range.', RunClient, host, ['back_ltc_sells', '--backingSwapBill', 1*e(12), '--transactionsBacked', '1000', '--blocksUntilExpiry', '20', '--commission', '1.0'])
-		self.assertRaisesRegexp(ExceptionReportedToUser, 'Transaction parameter value exceeds supported range.', RunClient, host, ['back_ltc_sells', '--backingSwapBill', 1*e(12), '--transactionsBacked', '1000', '--blocksUntilExpiry', '20', '--commission', 0x100000000])
-		# but zero commission *is* permitted
-		RunClient(host, ['back_ltc_sells', '--backingSwapBill', 1*e(12), '--transactionsBacked', '1000', '--blocksUntilExpiry', '20', '--commission_AsInteger', '0'])
+		self.assertRaisesRegexp(ExceptionReportedToUser, 'Bad decimal string [(]negative values are not permitted[)]', RunClient, host, ['back_ltc_sells', '--backingSwapBill', 1*e(12), '--transactionsBacked', '1000', '--blocksUntilExpiry', '20', '--commission', '-0.1'])
+		self.assertRaisesRegexp(ExceptionReportedToUser, 'Bad percentage string [(]value must be greater than 0.0 and less than 1.0[)]', RunClient, host, ['back_ltc_sells', '--backingSwapBill', 1*e(12), '--transactionsBacked', '1000', '--blocksUntilExpiry', '20', '--commission', '1.0'])
+		# zero commission not permitted
+		self.assertRaisesRegexp(ExceptionReportedToUser, 'Bad percentage string [(]value must be greater than 0.0 and less than 1.0[)]', RunClient, host, ['back_ltc_sells', '--backingSwapBill', 1*e(12), '--transactionsBacked', '1000', '--blocksUntilExpiry', '20', '--commission', '0'])
+		self.assertRaisesRegexp(ExceptionReportedToUser, 'Bad percentage string [(]value must be greater than 0.0 and less than 1.0[)]', RunClient, host, ['back_ltc_sells', '--backingSwapBill', 1*e(12), '--transactionsBacked', '1000', '--blocksUntilExpiry', '20', '--commission', '0.0'])
+		RunClient(host, ['back_ltc_sells', '--backingSwapBill', 1*e(12), '--transactionsBacked', '1000', '--blocksUntilExpiry', '20', '--commission', '0.1'])
 		output, info = RunClient(host, ['get_balance'])
 		self.assertDictEqual(info, {'balance': Constraints.minimumSwapBillBalance})
 		output, result = RunClient(host, ['get_ltc_sell_backers'])
 		expectedDetails = {
-		'commission as integer': 0, 'commission as float (approximation)': 0.0,
+		'commission': "0.1",
 		'backing amount': 1*e(12), 'I am backer': True, 'expires on block': 22, 'maximum per transaction': 1*e(9)
 		}
 
@@ -894,18 +894,12 @@ class Test(unittest.TestCase):
 		host = InitHost()
 		host._addUnspent(5*e(8))
 		burn = RunClient(host, ['burn', '--amount', 1*e(8)])
-		self.assertRaisesRegexp(ExceptionReportedToUser, 'Transaction does not meet protocol constraints: zero exchange rate not permitted', RunClient, host, ['post_ltc_sell', '--ltcOffered', 3*e(7)//2, '--exchangeRate', '0.0'])
-		self.assertRaisesRegexp(ExceptionReportedToUser, 'Transaction does not meet protocol constraints: zero exchange rate not permitted', RunClient, host, ['post_ltc_sell', '--ltcOffered', 3*e(7)//2, '--exchangeRate_AsInteger', '0'])
-		self.assertRaisesRegexp(ExceptionReportedToUser, 'Negative values are not allowed for transaction parameters.', RunClient, host, ['post_ltc_sell', '--ltcOffered', 3*e(7)//2, '--exchangeRate', '-0.5'])
-		self.assertRaisesRegexp(ExceptionReportedToUser, 'Negative values are not allowed for transaction parameters.', RunClient, host, ['post_ltc_sell', '--ltcOffered', 3*e(7)//2, '--exchangeRate_AsInteger', '-1'])
-		self.assertRaisesRegexp(ExceptionReportedToUser, 'Transaction parameter value exceeds supported range.', RunClient, host, ['post_ltc_sell', '--ltcOffered', 3*e(7)//2, '--exchangeRate', '1.0'])
-		self.assertRaisesRegexp(ExceptionReportedToUser, 'Transaction parameter value exceeds supported range.', RunClient, host, ['post_ltc_sell', '--ltcOffered', 3*e(7)//2, '--exchangeRate_AsInteger', str(0x100000000)])
-		self.assertRaisesRegexp(ExceptionReportedToUser, 'Transaction does not meet protocol constraints: zero exchange rate not permitted', RunClient, host, ['post_ltc_buy', '--swapBillOffered', 3*e(7), '--exchangeRate', '0.0'])
-		self.assertRaisesRegexp(ExceptionReportedToUser, 'Transaction does not meet protocol constraints: zero exchange rate not permitted', RunClient, host, ['post_ltc_buy', '--swapBillOffered', 3*e(7), '--exchangeRate_AsInteger', '0'])
-		self.assertRaisesRegexp(ExceptionReportedToUser, 'Negative values are not allowed for transaction parameters.', RunClient, host, ['post_ltc_buy', '--swapBillOffered', 3*e(7), '--exchangeRate', '-0.5'])
-		self.assertRaisesRegexp(ExceptionReportedToUser, 'Negative values are not allowed for transaction parameters.', RunClient, host, ['post_ltc_buy', '--swapBillOffered', 3*e(7), '--exchangeRate_AsInteger', '-1'])
-		self.assertRaisesRegexp(ExceptionReportedToUser, 'Transaction parameter value exceeds supported range.', RunClient, host, ['post_ltc_buy', '--swapBillOffered', 3*e(7), '--exchangeRate', '1.0'])
-		self.assertRaisesRegexp(ExceptionReportedToUser, 'Transaction parameter value exceeds supported range.', RunClient, host, ['post_ltc_buy', '--swapBillOffered', 3*e(7), '--exchangeRate_AsInteger', str(0x100000000)])
+		self.assertRaisesRegexp(ExceptionReportedToUser, 'Bad percentage string [(]value must be greater than 0.0 and less than 1.0[)]', RunClient, host, ['post_ltc_sell', '--ltcOffered', 3*e(7)//2, '--exchangeRate', '0.0'])
+		self.assertRaisesRegexp(ExceptionReportedToUser, 'Bad decimal string [(]negative values are not permitted[)]', RunClient, host, ['post_ltc_sell', '--ltcOffered', 3*e(7)//2, '--exchangeRate', '-0.5'])
+		self.assertRaisesRegexp(ExceptionReportedToUser, 'Bad percentage string [(]value must be greater than 0.0 and less than 1.0[)]', RunClient, host, ['post_ltc_sell', '--ltcOffered', 3*e(7)//2, '--exchangeRate', '1.0'])
+		self.assertRaisesRegexp(ExceptionReportedToUser, 'Bad percentage string [(]value must be greater than 0.0 and less than 1.0[)]', RunClient, host, ['post_ltc_buy', '--swapBillOffered', 3*e(7), '--exchangeRate', '0.0'])
+		self.assertRaisesRegexp(ExceptionReportedToUser, 'Bad decimal string [(]negative values are not permitted[)]', RunClient, host, ['post_ltc_buy', '--swapBillOffered', 3*e(7), '--exchangeRate', '-0.5'])
+		self.assertRaisesRegexp(ExceptionReportedToUser, 'Bad percentage string [(]value must be greater than 0.0 and less than 1.0[)]', RunClient, host, ['post_ltc_buy', '--swapBillOffered', 3*e(7), '--exchangeRate', '1.0'])
 
 	def test_backed_sell_matches_multiple(self):
 		host = InitHost()
@@ -923,11 +917,12 @@ class Test(unittest.TestCase):
 		self.assertEqual(ownerBalances, {})
 		host._setOwner('backer')
 		RunClient(host, ['burn', '--amount', 1*e(12)])
-		RunClient(host, ['back_ltc_sells', '--backingSwapBill', 1*e(12), '--transactionsBacked', '10', '--blocksUntilExpiry', '100', '--commission_AsInteger', '0'])
+		RunClient(host, ['back_ltc_sells', '--backingSwapBill', 1*e(12), '--transactionsBacked', '10', '--blocksUntilExpiry', '100', '--commission', '0.1'])
 		host._setOwner('seller')
 		ltcOffered = 6*e(9)//2
 		deposit = 6*e(9)//Constraints.depositDivisor
-		RunClient(host, ['post_ltc_sell', '--ltcOffered', ltcOffered, '--exchangeRate', '0.5', '--backerID', 0])
+		ltcCommission = ltcOffered // 10
+		RunClient(host, ['post_ltc_sell', '--ltcOffered', ltcOffered + ltcCommission, '--exchangeRate', '0.5', '--backerID', 0])
 		info = GetStateInfo(host)
 		self.assertEqual(info['numberOfLTCBuyOffers'], 0)
 		self.assertEqual(info['numberOfLTCSellOffers'], 0)
@@ -938,7 +933,7 @@ class Test(unittest.TestCase):
 		self.assertDictEqual(result, {'balance': 0})
 		ownerBalances = GetOwnerBalances(host, ownerList, info['balances'])
 		self.assertEqual(ownerBalances, {'seller':6*e(9)})
-		expectedBackerDetails = {'commission as float (approximation)': 0.0, 'blocks until expiry': 99, 'I am backer': True, 'backing amount': Amounts.ToString(1*e(12)-6*e(9)-deposit), 'expires on block': 105, 'maximum per transaction': Amounts.ToString(1*e(11)), 'commission as integer': 0}
+		expectedBackerDetails = {'commission': '0.1', 'blocks until expiry': 99, 'I am backer': True, 'backing amount': Amounts.ToString(1*e(12)-6*e(9)-deposit), 'expires on block': 105, 'maximum per transaction': Amounts.ToString(1*e(11))}
 		output, result = RunClient(host, ['get_ltc_sell_backers'])
 		self.assertListEqual(result, [('ltc sell backer index', 0, expectedBackerDetails)])
 		RunClient(host, ['complete_ltc_sell', '--pendingExchangeID', '0'])

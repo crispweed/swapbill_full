@@ -1,6 +1,6 @@
 from __future__ import print_function
 import binascii
-from SwapBill import TradeOfferHeap, TradeOffer, Balances
+from SwapBill import TradeOfferHeap, TradeOffer, Balances, Amounts
 from SwapBill.HardCodedProtocolConstraints import Constraints
 from SwapBill.Amounts import e
 
@@ -204,8 +204,8 @@ class State(object):
 
 	def _fundedTransaction_LTCBuyOffer(self, txID, swapBillInput, swapBillOffered, exchangeRate, receivingAddress, maxBlock, outputs):
 		assert outputs == ('ltcBuy',)
-		if exchangeRate == 0:
-			raise BadlyFormedTransaction('zero exchange rate not permitted')
+		if exchangeRate == 0 or exchangeRate >= Amounts.percentDivisor:
+			raise BadlyFormedTransaction('invalid exchange rate value')
 		try:
 			buy = TradeOffer.BuyOffer(swapBillOffered=swapBillOffered, rate=exchangeRate)
 		except TradeOffer.OfferIsBelowMinimumExchange:
@@ -227,8 +227,8 @@ class State(object):
 
 	def _fundedTransaction_LTCSellOffer(self, txID, swapBillInput, ltcOffered, exchangeRate, maxBlock, outputs):
 		assert outputs == ('ltcSell',)
-		if exchangeRate == 0:
-			raise BadlyFormedTransaction('zero exchange rate not permitted')
+		if exchangeRate == 0 or exchangeRate >= Amounts.percentDivisor:
+			raise BadlyFormedTransaction('invalid exchange rate value')
 		swapBillDeposit = TradeOffer.DepositRequiredForLTCSell(exchangeRate=exchangeRate, ltcOffered=ltcOffered)
 		try:
 			sell = TradeOffer.SellOffer(swapBillDeposit=swapBillDeposit, ltcOffered=ltcOffered, rate=exchangeRate)
@@ -251,6 +251,8 @@ class State(object):
 
 	def _fundedTransaction_BackLTCSells(self, txID, swapBillInput, backingAmount, transactionsBacked, commission, ltcReceiveAddress, maxBlock, outputs):
 		assert outputs == ('ltcSellBacker',)
+		if commission == 0 or commission >= Amounts.percentDivisor:
+			raise BadlyFormedTransaction('invalid commission value')
 		if backingAmount < Constraints.minimumSwapBillBalance:
 			raise BadlyFormedTransaction('backing amount is below minimum balance')
 		transactionMax = backingAmount // transactionsBacked
@@ -278,12 +280,12 @@ class State(object):
 
 	def _fundedTransaction_BackedLTCSellOffer(self, txID, swapBillInput, exchangeRate, backerIndex, backerLTCReceiveAddress, ltcOfferedPlusCommission, outputs):
 		assert outputs == ('sellerReceive',)
-		if exchangeRate == 0:
-			raise BadlyFormedTransaction('zero exchange rate not permitted')
+		if exchangeRate == 0 or exchangeRate >= Amounts.percentDivisor:
+			raise BadlyFormedTransaction('invalid exchange rate value')
 		if not backerIndex in self._ltcSellBackers:
 			raise TransactionFailsAgainstCurrentState('no ltc sell backer with the specified index')
 		backer = self._ltcSellBackers[backerIndex]
-		ltcOffered = ltcOfferedPlusCommission * 0x100000000 // (0x100000000 + backer.commission)
+		ltcOffered = ltcOfferedPlusCommission * Amounts.percentDivisor // (Amounts.percentDivisor + backer.commission)
 		swapBillDeposit = TradeOffer.DepositRequiredForLTCSell(exchangeRate=exchangeRate, ltcOffered=ltcOffered)
 		try:
 			sell = TradeOffer.SellOffer(swapBillDeposit=swapBillDeposit, ltcOffered=ltcOffered, rate=exchangeRate)
