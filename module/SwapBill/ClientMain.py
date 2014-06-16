@@ -13,7 +13,7 @@ else:
 	import StringIO as io
 from os import path
 try:
-	from SwapBill import RawTransaction, Address, TransactionFee, ParseConfig, RPC
+	from SwapBill import RawTransaction, Address, TransactionFee, ParseConfig, RPC, Amounts
 	from SwapBill import TransactionEncoding, BuildHostedTransaction, Sync, Host, TransactionBuildLayer, Wallet
 	from SwapBill import FormatTransactionForUserDisplay
 	from SwapBill.Sync import SyncAndReturnStateAndOwnedAccounts
@@ -273,12 +273,13 @@ def Main(startBlockIndex, startBlockHash, useTestNet, commandLineArgs=sys.argv[1
 		return pubKeyHash
 
 	if args.action == 'burn':
-		if int(args.amount) < TransactionFee.dustLimit:
+		amount = Amounts.FromString(args.amount)
+		if amount < TransactionFee.dustLimit:
 			raise ExceptionReportedToUser('Burn amount is below dust limit.')
 		transactionType = 'Burn'
 		outputs = ('destination',)
 		outputPubKeyHashes = (wallet.addKeyPairAndReturnPubKeyHash(),)
-		details = {'amount':int(args.amount)}
+		details = {'amount':amount}
 		return CheckAndSend_Funded(transactionType, outputs, outputPubKeyHashes, details)
 
 	elif args.action == 'pay':
@@ -286,7 +287,7 @@ def Main(startBlockIndex, startBlockHash, useTestNet, commandLineArgs=sys.argv[1
 		outputs = ('change', 'destination')
 		outputPubKeyHashes = (wallet.addKeyPairAndReturnPubKeyHash(), CheckAndReturnPubKeyHash(args.toAddress))
 		details = {
-		    'amount':int(args.amount),
+		    'amount':Amounts.FromString(args.amount),
 		    'maxBlock':state._currentBlockIndex + args.blocksUntilExpiry
 		}
 		return CheckAndSend_Funded(transactionType, outputs, outputPubKeyHashes, details)
@@ -296,7 +297,7 @@ def Main(startBlockIndex, startBlockHash, useTestNet, commandLineArgs=sys.argv[1
 		outputs = ('ltcBuy',)
 		outputPubKeyHashes = (wallet.addKeyPairAndReturnPubKeyHash(),)
 		details = {
-		    'swapBillOffered':int(args.swapBillOffered),
+		    'swapBillOffered':Amounts.FromString(args.swapBillOffered),
 		    'exchangeRate':ExchangeRateFromArgs(args),
 		    'receivingAddress':host.getNewNonSwapBillAddress(),
 		    'maxBlock':state._currentBlockIndex + args.blocksUntilExpiry
@@ -309,7 +310,7 @@ def Main(startBlockIndex, startBlockHash, useTestNet, commandLineArgs=sys.argv[1
 			transactionType = 'LTCSellOffer'
 			outputs = ('ltcSell',)
 			details['maxBlock'] = state._currentBlockIndex + args.blocksUntilExpiry
-			details['ltcOffered'] = int(args.ltcOffered)
+			details['ltcOffered'] = Amounts.FromString(args.ltcOffered)
 		else:
 			backerID = int(args.backerID)
 			if not backerID in state._ltcSellBackers:
@@ -317,7 +318,7 @@ def Main(startBlockIndex, startBlockHash, useTestNet, commandLineArgs=sys.argv[1
 			backer = state._ltcSellBackers[backerID]
 			transactionType = 'BackedLTCSellOffer'
 			outputs = ('sellerReceive',)
-			details['ltcOfferedPlusCommission'] = int(args.ltcOffered)
+			details['ltcOfferedPlusCommission'] = Amounts.FromString(args.ltcOffered)
 			details['backerIndex'] = int(args.backerID)
 			details['backerLTCReceiveAddress'] = backer.ltcReceiveAddress
 		outputPubKeyHashes = (wallet.addKeyPairAndReturnPubKeyHash(),)
@@ -341,7 +342,7 @@ def Main(startBlockIndex, startBlockHash, useTestNet, commandLineArgs=sys.argv[1
 		outputs = ('ltcSellBacker',)
 		outputPubKeyHashes = (wallet.addKeyPairAndReturnPubKeyHash(),)
 		details = {
-		    'backingAmount':int(args.backingSwapBill),
+		    'backingAmount':Amounts.FromString(args.backingSwapBill),
 		    'transactionsBacked':int(args.transactionsBacked),
 		    'ltcReceiveAddress':host.getNewNonSwapBillAddress(),
 		    'commission':CommissionFromArgs(args),
@@ -366,7 +367,7 @@ def Main(startBlockIndex, startBlockHash, useTestNet, commandLineArgs=sys.argv[1
 			exchangeAmount = offer._swapBillOffered
 			rate_Double = float(offer.rate) / 0x100000000
 			ltc = int(exchangeAmount * rate_Double)
-			result.append(('exchange rate as float (approximation)', rate_Double, {'exchange rate as integer':offer.rate, 'swapbill offered':exchangeAmount, 'ltc equivalent':ltc, 'mine':mine}))
+			result.append(('exchange rate as float (approximation)', rate_Double, {'exchange rate as integer':offer.rate, 'swapbill offered':Amounts.ToString(exchangeAmount), 'ltc equivalent':Amounts.ToString(ltc), 'mine':mine}))
 		return result
 
 	elif args.action == 'get_sell_offers':
@@ -377,7 +378,7 @@ def Main(startBlockIndex, startBlockHash, useTestNet, commandLineArgs=sys.argv[1
 			depositAmount = offer._swapBillDeposit
 			rate_Double = float(offer.rate) / 0x100000000
 			swapBillEquivalent = int(ltc / rate_Double)
-			details = {'exchange rate as integer':offer.rate, 'ltc offered':ltc, 'deposit paid':depositAmount, 'swapbill equivalent':swapBillEquivalent, 'mine':mine}
+			details = {'exchange rate as integer':offer.rate, 'ltc offered':Amounts.ToString(ltc), 'deposit paid':Amounts.ToString(depositAmount), 'swapbill equivalent':Amounts.ToString(swapBillEquivalent), 'mine':mine}
 			if offer.isBacked:
 				details['backer id'] = offer.backerIndex
 			result.append(('exchange rate as float (approximation)', rate_Double, details))
@@ -390,9 +391,9 @@ def Main(startBlockIndex, startBlockHash, useTestNet, commandLineArgs=sys.argv[1
 			exchange = state._pendingExchanges[key]
 			d['I am seller (and need to complete)'] = exchange.sellerAccount in ownedAccounts.tradeOfferChangeCounts
 			d['I am buyer (and waiting for payment)'] = exchange.buyerAccount in ownedAccounts.tradeOfferChangeCounts
-			d['deposit paid by seller'] = exchange.swapBillDeposit
-			d['swap bill paid by buyer'] = exchange.swapBillAmount
-			d['outstanding ltc payment amount'] = exchange.ltc
+			d['deposit paid by seller'] = Amounts.ToString(exchange.swapBillDeposit)
+			d['swap bill paid by buyer'] = Amounts.ToString(exchange.swapBillAmount)
+			d['outstanding ltc payment amount'] = Amounts.ToString(exchange.ltc)
 			d['expires on block'] = exchange.expiry
 			d['blocks until expiry'] = exchange.expiry - state._currentBlockIndex + 1
 			if exchange.backerIndex != -1:
@@ -406,8 +407,8 @@ def Main(startBlockIndex, startBlockHash, useTestNet, commandLineArgs=sys.argv[1
 			d = {}
 			backer = state._ltcSellBackers[key]
 			d['I am backer'] = backer.refundAccount in ownedAccounts.tradeOfferChangeCounts
-			d['backing amount'] = backer.backingAmount
-			d['maximum per transaction'] = backer.transactionMax
+			d['backing amount'] = Amounts.ToString(backer.backingAmount)
+			d['maximum per transaction'] = Amounts.ToString(backer.transactionMax)
 			d['expires on block'] = backer.expiry
 			d['blocks until expiry'] = backer.expiry - state._currentBlockIndex + 1
 			commission_Double = float(backer.commission) / 0x100000000

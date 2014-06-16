@@ -20,6 +20,8 @@ def ToString(satoshis):
 	return result
 
 def FromString(s):
+	if s[0] == '-':
+		raise ExceptionReportedToUser('Bad amount string (negative values are not permitted).')
 	pos = s.find('.')
 	if pos == -1:
 		satoshisString = s + '0' * 8

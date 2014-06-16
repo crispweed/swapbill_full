@@ -1,6 +1,7 @@
 from __future__ import print_function
 import unittest
 from SwapBill import Amounts
+from SwapBill.ExceptionReportedToUser import ExceptionReportedToUser
 
 roundTripPairs=(
     ('0', 0),
@@ -33,3 +34,7 @@ class Test(unittest.TestCase):
 			self.assertEqual(Amounts.ToString(amount), s)
 		for s, amount in nonStandardButParsed:
 			self.assertEqual(Amounts.FromString(s), amount)
+
+	def test_bad_amount_strings(self):
+		self.assertRaisesRegexp(ExceptionReportedToUser, 'Too much precision in amount string', Amounts.FromString, '0.000000001')
+		self.assertRaisesRegexp(ExceptionReportedToUser, 'negative values are not permitted', Amounts.FromString, '-1')
