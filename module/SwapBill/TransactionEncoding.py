@@ -1,12 +1,15 @@
 from __future__ import print_function
 import struct, binascii
-from SwapBill import Address, HostTransaction, ControlAddressPrefix
+from SwapBill import Address, HostTransaction, ControlAddressPrefix, Amounts
 from SwapBill.ExceptionReportedToUser import ExceptionReportedToUser
 
 class UnsupportedTransaction(Exception):
 	pass
 class NotValidSwapBillTransaction(Exception):
 	pass
+
+# for exchange rate and commission parameters
+assert Amounts.percentBytes == 4
 
 _fundedMappingByTypeCode = (
     ('Burn', ((0, 17), 'amount'), ('destination',), ()),

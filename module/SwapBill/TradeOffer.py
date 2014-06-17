@@ -5,30 +5,48 @@ from SwapBill.HardCodedProtocolConstraints import Constraints
 class OfferIsBelowMinimumExchange(Exception):
 	pass
 
+def _ltcToSwapBill(rate, ltc):
+	swapBill = ltc * Amounts.percentDivisor // rate
+	rounded = (swapBill * rate != ltc * Amounts.percentDivisor)
+	if rounded:
+		# the actual exact converted amount is in between swapbill and swapbill + 1 in this case
+		assert (swapBill + 1) * rate > ltc * Amounts.percentDivisor
+	return swapBill, rounded
+def _swapBillToLTC(rate, swapBill):
+	ltc = swapBill * rate // Amounts.percentDivisor
+	rounded = (ltc * Amounts.percentDivisor != swapBill * rate)
+	if rounded:
+		# the actual exact converted amount is in between ltc and ltc + 1 in this case
+		assert (ltc + 1) * Amounts.percentDivisor > swapBill * rate
+	return ltc, rounded
+
+def ltcToSwapBill_RoundedUp(rate, ltc):
+	swapBill, rounded = _ltcToSwapBill(rate, ltc)
+	if rounded:
+		swapBill += 1
+	return swapBill
+def swapBillToLTC_RoundedUp(rate, swapBill):
+	ltc, rounded = _swapBillToLTC(rate, swapBill)
+	if rounded:
+		ltc += 1
+	return ltc
+
+
 def MinimumBuyOfferWithRate(rate):
-	swapBillForMinLTC = Constraints.minimumExchangeLTC * Amounts.percentDivisor // rate
-	if _ltcWithExchangeRate(rate, swapBillForMinLTC) < Constraints.minimumExchangeLTC:
-		swapBillForMinLTC += 1
-	assert _ltcWithExchangeRate(rate, swapBillForMinLTC) >= Constraints.minimumExchangeLTC
+	swapBillForMinLTC = ltcToSwapBill_RoundedUp(rate, Constraints.minimumExchangeLTC)
 	return max(swapBillForMinLTC, Constraints.minimumSwapBillBalance)
 
 def MinimumSellOfferWithRate(rate):
-	ltcForMinSwapBill = _ltcWithExchangeRate(rate, Constraints.minimumSwapBillBalance)
+	ltcForMinSwapBill = swapBillToLTC_RoundedUp(rate, Constraints.minimumSwapBillBalance)
 	return max(ltcForMinSwapBill, Constraints.minimumExchangeLTC)
 
-def DepositRequiredForLTCSell(exchangeRate, ltcOffered):
-	swapBillAmount = ltcOffered * Amounts.percentDivisor // exchangeRate
-	deposit = swapBillAmount // Constraints.depositDivisor
-	if deposit * Constraints.depositDivisor != swapBillAmount:
+def DepositRequiredForLTCSell(rate, ltcOffered):
+	swapBill = ltcToSwapBill_RoundedUp(rate, ltcOffered)
+	deposit = swapBill // Constraints.depositDivisor
+	if deposit * Constraints.depositDivisor != swapBill:
 		deposit += 1
 	return deposit
 
-def GetSwapBillEquivalentRoundedUp(exchangeRate, ltcOffered):
-	swapBillAmount = ltcOffered * Amounts.percentDivisor // exchangeRate
-	if _ltcWithExchangeRate(exchangeRate, swapBillAmount) < ltcOffered:
-		swapBillAmount += 1
-	assert _ltcWithExchangeRate(exchangeRate, swapBillAmount) >= ltcOffered
-	return swapBillAmount
 
 class BuyOffer(object):
 	def __init__(self, swapBillOffered, rate):
@@ -48,6 +66,8 @@ class SellOffer(object):
 		self.rate = rate
 	def hasBeenConsumed(self):
 		return self._ltcOffered == 0
+	def swapBillEquivalent(self):
+		return self._swapBillOffered * Amounts.percentDivisor // self.rate
 
 class Exchange(object):
 	pass
@@ -62,8 +82,12 @@ def MatchOffers(buy, sell):
 	assert OffersMeetOrOverlap(buy, sell)
 	appliedRate = (buy.rate + sell.rate) // 2
 
-	ltcToBeExchanged = _ltcWithExchangeRate(appliedRate, buy._swapBillOffered)
+	ltcToBeExchanged, rounded = _swapBillToLTC(appliedRate, buy._swapBillOffered)
 	assert ltcToBeExchanged >= Constraints.minimumExchangeLTC # should be guaranteed by buy and sell both satisfying this minimum requirement
+
+	if rounded and ltcToBeExchanged + 1 == sell._ltcOffered:
+		# we round up in this case to ensure that posting matching offers based on the displayed equivalent value actually does match
+		ltcToBeExchanged += 1
 
 	exchange = Exchange()
 

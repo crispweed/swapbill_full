@@ -6,7 +6,7 @@ from SwapBill.HardCodedProtocolConstraints import Constraints
 from SwapBill.Amounts import e
 
 def ValidateSell(sell):
-	requiredDeposit = TradeOffer.DepositRequiredForLTCSell(exchangeRate=sell.rate, ltcOffered=sell._ltcOffered)
+	requiredDeposit = TradeOffer.DepositRequiredForLTCSell(rate=sell.rate, ltcOffered=sell._ltcOffered)
 	if sell._swapBillDeposit != requiredDeposit:
 		print('_swapBillDeposit:', sell._swapBillDeposit)
 		print('required deposit:', requiredDeposit)
@@ -57,11 +57,11 @@ class Test(unittest.TestCase):
 		self.assertEqual(TradeOffer.DepositRequiredForLTCSell(500000000, 1*e(7)-1), 1*e(7)*2//Constraints.depositDivisor)
 		self.assertEqual(TradeOffer.DepositRequiredForLTCSell(250000000, 1*e(7)-1), 1*e(7)*4//Constraints.depositDivisor)
 		# (based on current protocol constraints)
-		self.assertEqual(TradeOffer.DepositRequiredForLTCSell(exchangeRate=500000000, ltcOffered=0), 0)
-		self.assertEqual(TradeOffer.DepositRequiredForLTCSell(exchangeRate=500000000, ltcOffered=1), 1)
-		self.assertEqual(TradeOffer.DepositRequiredForLTCSell(exchangeRate=500000000, ltcOffered=7), 1)
-		self.assertEqual(TradeOffer.DepositRequiredForLTCSell(exchangeRate=500000000, ltcOffered=8), 1)
-		self.assertEqual(TradeOffer.DepositRequiredForLTCSell(exchangeRate=500000000, ltcOffered=9), 2)
+		self.assertEqual(TradeOffer.DepositRequiredForLTCSell(rate=500000000, ltcOffered=0), 0)
+		self.assertEqual(TradeOffer.DepositRequiredForLTCSell(rate=500000000, ltcOffered=1), 1)
+		self.assertEqual(TradeOffer.DepositRequiredForLTCSell(rate=500000000, ltcOffered=7), 1)
+		self.assertEqual(TradeOffer.DepositRequiredForLTCSell(rate=500000000, ltcOffered=8), 1)
+		self.assertEqual(TradeOffer.DepositRequiredForLTCSell(rate=500000000, ltcOffered=9), 2)
 
 	def test_internal(self):
 		self.assertEqual(TradeOffer._ltcWithExchangeRate(500000000, 122), 61)
@@ -82,7 +82,7 @@ class Test(unittest.TestCase):
 		self.assertRaises(OfferIsBelowMinimumExchange, TradeOffer.SellOffer, 2*e(6)//16, 1*e(6), 500000000) # swapbill equivalent below minimum balance
 		rate = 437500000
 		ltcOffered = TradeOffer.MinimumSellOfferWithRate(rate)
-		deposit = TradeOffer.DepositRequiredForLTCSell(exchangeRate=rate, ltcOffered=ltcOffered)
+		deposit = TradeOffer.DepositRequiredForLTCSell(rate=rate, ltcOffered=ltcOffered)
 		sell = TradeOffer.SellOffer(deposit,ltcOffered, rate)
 		self.assertDictEqual(sell.__dict__, {'_swapBillDeposit': deposit, 'rate': rate, '_ltcOffered': ltcOffered})
 		self.assertRaises(OfferIsBelowMinimumExchange, TradeOffer.SellOffer, deposit, ltcOffered-1, rate)
@@ -162,6 +162,13 @@ class Test(unittest.TestCase):
 	def test_match_remainder_too_small(self):
 		buy = TradeOffer.BuyOffer(2*e(7)-1, 500000000)
 		sell = TradeOffer.SellOffer(2*e(7)//16, 1*e(7), 500000000)
+		# the ltc equivalent for this buy offer now gets rounded up
+		exchange = TradeOffer.MatchOffers(buy=buy, sell=sell)
+		self.assertTrue(buy.hasBeenConsumed())
+		self.assertTrue(sell.hasBeenConsumed())
+		self.assertDictEqual(exchange.__dict__, {'swapBillAmount': 2*e(7)-1, 'ltc': 1*e(7), 'swapBillDeposit': 2*e(7)//16})
+		buy = TradeOffer.BuyOffer(2*e(7)-2, 500000000)
+		sell = TradeOffer.SellOffer(2*e(7)//16, 1*e(7), 500000000)
 		self.assertRaises(OfferIsBelowMinimumExchange, TradeOffer.MatchOffers, buy=buy, sell=sell)
 		buy = TradeOffer.BuyOffer(2*e(7), 500000000)
 		sell = TradeOffer.SellOffer((2*e(7)-2)//16+1, 1*e(7)-1, 500000000)
@@ -192,7 +199,7 @@ class Test(unittest.TestCase):
 		# set up sell which is split exactly in half by partially matching buy
 		# the idea being that one half of the split has to lose the rounding up unit
 		buy = TradeOffer.BuyOffer(1*e(7)+2, 500000000)
-		deposit = TradeOffer.DepositRequiredForLTCSell(exchangeRate=500000000, ltcOffered=1*e(7)+2)
+		deposit = TradeOffer.DepositRequiredForLTCSell(rate=500000000, ltcOffered=1*e(7)+2)
 		sell = TradeOffer.SellOffer(deposit, 1*e(7)+2, 500000000)
 		# attempted to break the invariant for deposit always being the exact required deposit, by division rounded up
 		# but it turns out the invariant holds here, because *the exchange* loses the rounding up unit, not the outstanding sell
