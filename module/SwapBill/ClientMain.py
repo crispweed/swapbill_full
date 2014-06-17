@@ -80,8 +80,7 @@ sp = subparsers.add_parser('back_ltc_sells', help='commit swapbill to back ltc e
 sp.add_argument('--backingSwapBill', required=True, help='amount of swapbill to commit, in decimal (one satoshi is 0.00000001)')
 sp.add_argument('--transactionsBacked', required=True, help='the number of transactions you want to back, which then implies a maximum backing amount per transaction')
 sp.add_argument('--blocksUntilExpiry', type=int, default=200, help='number of blocks for which the backing amount should remain committed')
-sp.add_argument('--commission', help='the rate of commission for backed transactions, in floating point representation (must be greater than or equal to 0 and less than 1)')
-sp.add_argument('--commission_AsInteger', help='the rate of commission for backed transactions, in integer representation (must be greater than or equal to 0 and less than 4294967296)')
+sp.add_argument('--commission', required=True, help='the rate of commission for backed transactions, as a decimal fraction (must be greater than 0.0 and less than 1.0)')
 
 subparsers.add_parser('collect', help='combine all current owned swapbill outputs into active account')
 
