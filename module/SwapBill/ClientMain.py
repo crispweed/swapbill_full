@@ -345,9 +345,9 @@ def Main(startBlockIndex, startBlockHash, useTestNet, commandLineArgs=sys.argv[1
 		for offer in state._ltcBuys.getSortedOffers():
 			mine = offer.refundAccount in ownedAccounts.tradeOfferChangeCounts
 			exchangeAmount = offer._swapBillOffered
-			rate_Double = float(offer.rate) / Amounts.percentDivisor
-			ltc = int(exchangeAmount * rate_Double)
-			result.append(('exchange rate', Amounts.PercentToString(offer.rate), {'swapbill offered':Amounts.ToString(exchangeAmount), 'ltc equivalent':Amounts.ToString(ltc), 'mine':mine}))
+			ltc = offer.ltcEquivalent()
+			details = {'swapbill offered':Amounts.ToString(exchangeAmount), 'ltc equivalent':Amounts.ToString(ltc), 'mine':mine}
+			result.append(('exchange rate', Amounts.PercentToString(offer.rate), details))
 		return result
 
 	elif args.action == 'get_sell_offers':
@@ -356,9 +356,8 @@ def Main(startBlockIndex, startBlockHash, useTestNet, commandLineArgs=sys.argv[1
 			mine = offer.receivingAccount in ownedAccounts.tradeOfferChangeCounts
 			ltc = offer._ltcOffered
 			depositAmount = offer._swapBillDeposit
-			rate_Double = float(offer.rate) / Amounts.percentDivisor
-			swapBillEquivalent = int(ltc / rate_Double)
-			details = {'ltc offered':Amounts.ToString(ltc), 'deposit paid':Amounts.ToString(depositAmount), 'swapbill equivalent':Amounts.ToString(swapBillEquivalent), 'mine':mine}
+			swapBillEquivalent = offer.swapBillEquivalent()
+			details = {'ltc offered':Amounts.ToString(ltc), 'deposit':Amounts.ToString(depositAmount), 'swapbill equivalent':Amounts.ToString(swapBillEquivalent), 'mine':mine}
 			if offer.isBacked:
 				details['backer id'] = offer.backerIndex
 			result.append(('exchange rate', Amounts.PercentToString(offer.rate), details))

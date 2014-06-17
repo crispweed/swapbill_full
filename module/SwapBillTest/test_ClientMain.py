@@ -360,7 +360,7 @@ class Test(unittest.TestCase):
 		output, result = RunClient(host, ['get_balance', '-i'])
 		self.assertEqual(result['balance'], 18125000)
 		output, result = RunClient(host, ['get_sell_offers', '-i'])
-		self.assertEqual(result, [('exchange rate', '0.5', {'ltc offered': Amounts.ToString(15*e(6)), 'mine': True, 'swapbill equivalent': Amounts.ToString(3*e(7)), 'deposit paid': Amounts.ToString(1875000)})])
+		self.assertEqual(result, [('exchange rate', '0.5', {'ltc offered': Amounts.ToString(15*e(6)), 'mine': True, 'swapbill equivalent': Amounts.ToString(3*e(7)), 'deposit': Amounts.ToString(1875000)})])
 		host._advance(1)
 		self.assertEqual(host._nextBlock, 7)
 		# but expires on block 7
@@ -687,7 +687,7 @@ class Test(unittest.TestCase):
 		daveSwapBillReceived = 11125000
 		daveDepositRemainder = 647645
 		daveDepositMatched = 1250000 - daveDepositRemainder
-		expectedResult = [('exchange rate', '0.26953125', {'deposit paid': Amounts.ToString(daveDepositRemainder), 'ltc offered': Amounts.ToString(2792969), 'mine': True, 'swapbill equivalent': Amounts.ToString(10362319)})]
+		expectedResult = [('exchange rate', '0.26953125', {'deposit': Amounts.ToString(daveDepositRemainder), 'ltc offered': Amounts.ToString(2792969), 'mine': True, 'swapbill equivalent': Amounts.ToString(10362320)})]
 		self.assertEqual(result, expectedResult)
 		assert cliveCompletionPaymentExpiry > host._nextBlock
 		host._advance(cliveCompletionPaymentExpiry - host._nextBlock)

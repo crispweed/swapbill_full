@@ -56,6 +56,8 @@ class BuyOffer(object):
 		self.rate = rate
 	def hasBeenConsumed(self):
 		return self._swapBillOffered == 0
+	def ltcEquivalent(self):
+		return swapBillToLTC_RoundedUp(self.rate, self._swapBillOffered)
 
 class SellOffer(object):
 	def __init__(self, swapBillDeposit, ltcOffered, rate):
@@ -67,7 +69,7 @@ class SellOffer(object):
 	def hasBeenConsumed(self):
 		return self._ltcOffered == 0
 	def swapBillEquivalent(self):
-		return self._swapBillOffered * Amounts.percentDivisor // self.rate
+		return ltcToSwapBill_RoundedUp(self.rate, self._ltcOffered)
 
 class Exchange(object):
 	pass
