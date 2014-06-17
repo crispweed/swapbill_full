@@ -1,6 +1,6 @@
 from __future__ import print_function
 import ecdsa, hashlib, os
-from SwapBill import Base58Check
+from SwapBill import Base58Check, Amounts
 
 class OwnedAccounts(object):
 	def __init__(self):
@@ -13,7 +13,7 @@ class OwnedAccounts(object):
 			spentAccount = (hostTX.inputTXID(i), hostTX.inputVOut(i))
 			if spentAccount in self.accounts:
 				self.accounts.pop(spentAccount)
-				report += ' - ' + str(state._balances.balanceFor(spentAccount)) + ' swapbill output consumed\n'
+				report += ' - ' + Amounts.ToString(state._balances.balanceFor(spentAccount)) + ' swapbill output consumed\n'
 		return report
 
 	def checkForTradeOfferChanges(self, state):
@@ -45,5 +45,5 @@ class OwnedAccounts(object):
 			if newOwnedAccount in state._balances.changeCounts:
 				self.tradeOfferChangeCounts[newOwnedAccount] = state._balances.changeCounts[newOwnedAccount]
 			self.accounts[newOwnedAccount] = (hostTX.outputAmount(i + 1), privateKey, scriptPubKeys[i + 1])
-			report += ' - ' + str(state._balances.balanceFor(newOwnedAccount)) + ' swapbill output added\n'
+			report += ' - ' + Amounts.ToString(state._balances.balanceFor(newOwnedAccount)) + ' swapbill output added\n'
 		return report

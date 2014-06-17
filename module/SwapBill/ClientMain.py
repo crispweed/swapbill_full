@@ -338,7 +338,7 @@ def Main(startBlockIndex, startBlockHash, useTestNet, commandLineArgs=sys.argv[1
 		total = 0
 		for account in ownedAccounts.accounts:
 			total += state._balances.balanceFor(account)
-		return {'balance':total}
+		return {'balance':Amounts.ToString(total)}
 
 	elif args.action == 'get_buy_offers':
 		result = []
