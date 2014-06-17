@@ -142,12 +142,12 @@ class State(object):
 			except TradeOffer.OfferIsBelowMinimumExchange:
 				toReAdd.append(sell)
 				continue
+			if sellRemainder is not None:
+				toReAdd.append(sellRemainder)
 			if buyRemainder is not None:
 				buy = buyRemainder
 				continue # (remainder can match against another offer)
 			# new offer is fully matched
-			if sellRemainder is not None:
-				toReAdd.append(sellRemainder)
 			break
 		for entry in toReAdd:
 			self._ltcSells.addOffer(entry)
@@ -164,12 +164,12 @@ class State(object):
 			except TradeOffer.OfferIsBelowMinimumExchange:
 				toReAdd.append(buy)
 				continue
+			if buyRemainder is not None:
+				toReAdd.append(buyRemainder)
 			if sellRemainder is not None:
 				sell = sellRemainder
 				continue # (remainder can match against another offer)
 			# new offer is fully matched
-			if buyRemainder is not None:
-				toReAdd.append(buyRemainder)
 			break
 		for entry in toReAdd:
 			self._ltcBuys.addOffer(entry)

@@ -547,68 +547,81 @@ class Test(unittest.TestCase):
 		self.assertEqual(state._balances.balances, {receive:19*e(7)})
 		self.assertEqual(totalAccountedFor(state), state._totalCreated)
 
-	def test_small_sell_remainder(self):
-		Constraints.minimumSwapBillBalance = 1
+	def test_small_sell_remainder_match_failure(self):
+		Constraints.minimumSwapBillBalance = 1*e(7)
 		state = State.State(100, 'starthash')
 		self.state = state
-		burnB = self.Burn(1*e(7))
-		receiveB = self.SellOffer(state, burnB, ltcOffered=1*e(7)//2, exchangeRate=500000000)
-		# deposit is 10000000 // 16
-		deposit = 625000
-		self.assertEqual(state._balances.balances, {receiveB:1*e(7)-deposit-1})
-		burnA = self.Burn(99*e(5)+1)
-		refundA = self.BuyOffer(state, burnA, 'receiveLTC', swapBillOffered=99*e(5), exchangeRate=500000000)
+		swapBillDesired = 19*e(6)
+		deposit = swapBillDesired // Constraints.depositDivisor
+		burnB = self.Burn(2*e(7) + deposit)
+		receiveB = self.SellOffer(state, burnB, ltcOffered=swapBillDesired//2, exchangeRate=500000000)
+		expectedBalances = {receiveB:1*e(7)}
+		self.assertEqual(state._balances.balances, expectedBalances)
+		burnA = self.Burn(2*e(7))
+		refundA = self.BuyOffer(state, burnA, 'receiveLTC', swapBillOffered=1*e(7), exchangeRate=500000000)
 		# the offers can't match, because of small (sell) remainder
-		self.assertEqual(state._balances.balances, {receiveB:1*e(7)-deposit-1, refundA:1})
+		self.assertEqual(state._balances.balances, {receiveB:1*e(7), refundA:1*e(7)})
+		expectedBalances[refundA] = 1*e(7)
+		self.assertEqual(state._balances.balances, expectedBalances)
 		self.assertEqual(len(state._pendingExchanges), 0)
 		self.assertEqual(state._ltcBuys.size(), 1)
 		self.assertEqual(state._ltcSells.size(), 1)
 		# *can* now spend whole balance, even though referenced by the sell offer
 		self.assertTrue(state._balances.accountHasBalance(receiveB))
 		self.assertTrue(state._balances.isReferenced(receiveB))
-		outputs = self.Apply_AssertSucceeds(state, 'Pay', sourceAccounts=[receiveB], amount=1*e(7)-deposit-1, maxBlock=200)
+		outputs = self.Apply_AssertSucceeds(state, 'Pay', sourceAccounts=[receiveB], amount=1*e(7), maxBlock=200)
 		changeB = outputs['change']
 		payB = outputs['destination']
-		self.assertEqual(state._balances.balances, {payB:1*e(7)-deposit-1, changeB:0, refundA:1})
+		expectedBalances[changeB] = 0
+		expectedBalances[payB] = expectedBalances.pop(receiveB)
+		self.assertEqual(state._balances.balances, expectedBalances)
 		self.assertTrue(state._balances.accountHasBalance(changeB))
 		self.assertTrue(state._balances.isReferenced(changeB))
 		# and same for buy refund account
 		self.assertTrue(state._balances.accountHasBalance(refundA))
 		self.assertTrue(state._balances.isReferenced(refundA))
-		outputs = self.Apply_AssertSucceeds(state, 'Pay', sourceAccounts=[refundA], amount=1, maxBlock=200)
+		outputs = self.Apply_AssertSucceeds(state, 'Pay', sourceAccounts=[refundA], amount=1*e(7), maxBlock=200)
 		changeA = outputs['change']
 		payA = outputs['destination']
-		self.assertEqual(state._balances.balances, {payB:1*e(7)-deposit-1, changeB:0, payA:1, changeA:0})
+		expectedBalances[changeA] = 0
+		expectedBalances[payA] = expectedBalances.pop(refundA)
+		self.assertEqual(state._balances.balances, expectedBalances)
 		# sell should be matched by this larger offer
 		burnC = self.Burn(4*e(8))
 		refundC = self.BuyOffer(state, burnC, 'receiveLTC2', swapBillOffered=1*e(8), exchangeRate=500000000)
-		self.assertEqual(state._balances.balances, {payB:1*e(7)-deposit-1, changeB:1, payA:1, changeA:0, refundC:3*e(8)})
+		# b gets minimum balance seeded into sell offer returned here
+		expectedBalances[changeB] = Constraints.minimumSwapBillBalance
+		expectedBalances[refundC] = 3*e(8)
+		self.assertEqual(state._balances.balances, expectedBalances)
 		self.assertEqual(len(state._pendingExchanges), 1)
 		self.assertEqual(state._ltcBuys.size(), 2)
 		self.assertEqual(state._ltcSells.size(), 0)
 		# completion
-		self.Completion(state, 0, 'receiveLTC2', 1*e(7)//2)
+		self.Completion(state, 0, 'receiveLTC2', swapBillDesired//2)
 		self.assertEqual(len(state._pendingExchanges), 0)
 		# b gets deposit refunded, plus swapbill payment
-		self.assertEqual(state._balances.balances, {payB:1*e(7)-deposit-1, changeB:1+deposit+1*e(7), payA:1, changeA:0, refundC:3*e(8)})
+		expectedBalances[changeB] += deposit
+		expectedBalances[changeB] += swapBillDesired
+		self.assertEqual(state._balances.balances, expectedBalances)
 		# and the receiving account is no longer referenced
 		self.assertTrue(state._balances.accountHasBalance(changeB))
 		self.assertFalse(state._balances.isReferenced(changeB))
 
 	def test_small_buy_remainder(self):
-		Constraints.minimumSwapBillBalance = 1
+		Constraints.minimumSwapBillBalance = 1*e(7)
 		state = State.State(100, 'starthash')
 		self.state = state
-		burnB = self.Burn(1*e(7))
-		receiveB = self.SellOffer(state, burnB, ltcOffered=1*e(7)//2, exchangeRate=500000000)
-		# deposit is 1*e(7) // 16
-		depositB = 625000
-		expectedBalances = {receiveB:1*e(7)-depositB-1}
+		swapBillDesired = 1*e(7)
+		deposit = swapBillDesired // Constraints.depositDivisor
+		burnB = self.Burn(2*e(7) + deposit)
+		receiveB = self.SellOffer(state, burnB, ltcOffered=swapBillDesired//2, exchangeRate=500000000)
+		expectedBalances = {receiveB:1*e(7)}
 		self.assertEqual(state._balances.balances, expectedBalances)
-		burnA = self.Burn(10100001)
-		refundA = self.BuyOffer(state, burnA, 'receiveLTC', swapBillOffered=10100000, exchangeRate=500000000)
+		swapBillOffered = 19*e(6)
+		burnA = self.Burn(1*e(7) + swapBillOffered)
+		refundA = self.BuyOffer(state, burnA, 'receiveLTC', swapBillOffered=swapBillOffered, exchangeRate=500000000)
 		# the offers can't match, because of small (buy) remainder
-		expectedBalances[refundA] = 1
+		expectedBalances[refundA] = 1*e(7)
 		self.assertEqual(state._balances.balances, expectedBalances)
 		self.assertEqual(len(state._pendingExchanges), 0)
 		self.assertEqual(state._ltcBuys.size(), 1)
@@ -616,7 +629,7 @@ class Test(unittest.TestCase):
 		# refund account *can* now be spent completely although still referenced by the trade offer
 		self.assertTrue(state._balances.accountHasBalance(refundA))
 		self.assertTrue(state._balances.isReferenced(refundA))
-		outputs = self.Apply_AssertSucceeds(state, 'Pay', sourceAccounts=[refundA], amount=1, maxBlock=200)
+		outputs = self.Apply_AssertSucceeds(state, 'Pay', sourceAccounts=[refundA], amount=expectedBalances[refundA], maxBlock=200)
 		changeA = outputs['change']
 		payA = outputs['destination']
 		expectedBalances[payA] = expectedBalances.pop(refundA)
@@ -625,22 +638,78 @@ class Test(unittest.TestCase):
 		self.assertTrue(state._balances.isReferenced(changeA))
 		self.assertFalse(state._balances.isReferenced(payA))
 		# but buy should be matched by this larger offer
-		burnC = self.Burn(4*e(8))
-		receiveC = self.SellOffer(state, burnC, ltcOffered=2*e(8), exchangeRate=500000000)
-		# deposit is 4*e(8) // 16
-		depositC = 25000000
-		expectedBalances[receiveC] = 4*e(8)-depositC-1
+		swapBillDesiredC = 4*e(8)
+		depositC = swapBillDesiredC // Constraints.depositDivisor
+		burnC = self.Burn(depositC + 1*e(7))
+		receiveC = self.SellOffer(state, burnC, ltcOffered=swapBillDesiredC//2, exchangeRate=500000000)
+		expectedBalances[receiveC] = 0
 		self.assertEqual(state._balances.balances, expectedBalances)
 		self.assertEqual(len(state._pendingExchanges), 1)
 		self.assertEqual(state._ltcBuys.size(), 0)
 		self.assertEqual(state._ltcSells.size(), 2)
 		# completion
-		self.Completion(state, 0, 'receiveLTC', 10100000 // 2)
+		self.Completion(state, 0, 'receiveLTC', swapBillOffered//2)
 		self.assertEqual(len(state._pendingExchanges), 0)
-		depositPart = depositC * 10100000 // (4*e(8))
-		expectedBalances[receiveC] += 10100000+depositPart
+		depositPart = depositC * swapBillOffered // swapBillDesiredC
+		expectedBalances[receiveC] += swapBillOffered + depositPart
 		expectedBalances.pop(changeA) # trade completed, so this account is no longer referenced, and therefore cleaned up
 		self.assertEqual(state._balances.balances, expectedBalances)
+
+	def test_small_sell_remainder_offer_split(self):
+		Constraints.minimumSwapBillBalance = 1*e(7)
+		state = State.State(100, 'starthash')
+		self.state = state
+		swapBillDesired = 40*e(6)
+		deposit = swapBillDesired // Constraints.depositDivisor
+		burnB = self.Burn(Constraints.minimumSwapBillBalance + deposit)
+		receiveB = self.SellOffer(state, burnB, ltcOffered=swapBillDesired//2, exchangeRate=500000000)
+		expectedBalances = {receiveB:0}
+		self.assertEqual(state._balances.balances, expectedBalances)
+		swapBillOffered = 41*e(6)
+		burnA = self.Burn(swapBillOffered)
+		refundA = self.BuyOffer(state, burnA, 'receiveLTC', swapBillOffered=swapBillOffered, exchangeRate=500000000)
+		# sell cannot be consumed completely because of small remainder
+		expectedBalances[refundA] = 0
+		self.assertEqual(state._balances.balances, expectedBalances)
+		self.assertEqual(len(state._pendingExchanges), 1)
+		self.assertEqual(state._ltcBuys.size(), 1)
+		self.assertEqual(state._ltcSells.size(), 1)
+		exchangeDetails = {
+			'backerIndex': -1, 'buyerAccount': refundA, 'buyerLTCReceive': 'receiveLTC', 'expiry': 150,
+			'sellerAccount': receiveB,
+			'ltc': 30*e(6)//2,
+			'swapBillAmount': 30*e(6),
+			'swapBillDeposit': 30*e(6)//Constraints.depositDivisor
+		    }
+		self.assertDictEqual(state._pendingExchanges[0].__dict__, exchangeDetails)
+
+	def test_small_buy_remainder_offer_split(self):
+		Constraints.minimumSwapBillBalance = 1*e(7)
+		state = State.State(100, 'starthash')
+		self.state = state
+		swapBillDesired = 41*e(6)
+		deposit = swapBillDesired // Constraints.depositDivisor
+		burnB = self.Burn(Constraints.minimumSwapBillBalance + deposit)
+		receiveB = self.SellOffer(state, burnB, ltcOffered=swapBillDesired//2, exchangeRate=500000000)
+		expectedBalances = {receiveB:0}
+		self.assertEqual(state._balances.balances, expectedBalances)
+		swapBillOffered = 39*e(6)
+		burnA = self.Burn(swapBillOffered)
+		refundA = self.BuyOffer(state, burnA, 'receiveLTC', swapBillOffered=swapBillOffered, exchangeRate=500000000)
+		# buy cannot be consumed completely because of small remainder
+		expectedBalances[refundA] = 0
+		self.assertEqual(state._balances.balances, expectedBalances)
+		self.assertEqual(len(state._pendingExchanges), 1)
+		self.assertEqual(state._ltcBuys.size(), 1)
+		self.assertEqual(state._ltcSells.size(), 1)
+		exchangeDetails = {
+			'backerIndex': -1, 'buyerAccount': refundA, 'buyerLTCReceive': 'receiveLTC', 'expiry': 150,
+			'sellerAccount': receiveB,
+			'ltc': 29*e(6)//2,
+			'swapBillAmount': 29*e(6),
+			'swapBillDeposit': 29*e(6)//Constraints.depositDivisor
+		    }
+		self.assertDictEqual(state._pendingExchanges[0].__dict__, exchangeDetails)
 
 	def test_exact_match(self):
 		Constraints.minimumSwapBillBalance = 1

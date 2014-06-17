@@ -55,12 +55,10 @@ class Test(unittest.TestCase):
 		self.assertEqual(TradeOffer.DepositRequiredForLTCSell(rate=500000000, ltcOffered=9), 2)
 
 	def test_internal(self):
-		self.assertEqual(TradeOffer._ltcWithExchangeRate(500000000, 122), 61)
-		self.assertEqual(TradeOffer._ltcWithExchangeRate(250000000, 100), 25)
-		self.assertEqual(TradeOffer._ltcWithExchangeRate(250000000, 101), 25)
-		# ltc calculation rounds down
-		self.assertEqual(TradeOffer._ltcWithExchangeRate(Amounts.percentDivisor // 3, 100000000), 100000000 // 3)
-		## TODO: define maximum range for swapbill values, and test with these?
+		self.assertEqual(TradeOffer.swapBillToLTC_RoundedUp(500000000, 122), 61)
+		self.assertEqual(TradeOffer.swapBillToLTC_RoundedUp(250000000, 100), 25)
+		self.assertEqual(TradeOffer.swapBillToLTC_RoundedUp(250000000, 101), 26)
+		self.assertEqual(TradeOffer.swapBillToLTC_RoundedUp(Amounts.percentDivisor // 3, 100000000), 100000000 // 3 + 1)
 
 	def test_offer_creation(self):
 		self.assertRaises(OfferIsBelowMinimumExchange, TradeOffer.BuyOffer, 5000, 375000000)
