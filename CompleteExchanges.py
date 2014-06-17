@@ -18,8 +18,8 @@ def getMatchingExchange(result, backerID):
 		return key, d
 	return None, None
 
-startBlockIndex=300909
-startBlockHash='3610b1e7ea80e3a4a73cac696261736e849290dce07598c4da85a9f5a4504c29'
+startBlockIndex=305846
+startBlockHash='f7598a6372065a3707b1ea31921dc281af40fd50ef54dc123f7d51a7c33fd252'
 
 while True:
 	try:
