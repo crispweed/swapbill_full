@@ -5,16 +5,8 @@ from SwapBill.TradeOffer import OfferIsBelowMinimumExchange, OfferIsBelowMinimum
 from SwapBill.HardCodedProtocolConstraints import Constraints
 from SwapBill.Amounts import e
 
-def ValidateSell(sell):
-	requiredDeposit = TradeOffer.DepositRequiredForLTCSell(rate=sell.rate, ltcOffered=sell._ltcOffered)
-	if sell._swapBillDeposit != requiredDeposit:
-		print('_swapBillDeposit:', sell._swapBillDeposit)
-		print('required deposit:', requiredDeposit)
-		raise Exception('Deposit invariant violated')
-
 def MatchOffersWrapper(originalFunction):
 	def Wrapper(buy, sell):
-		ValidateSell(sell)
 		swapBillOffered = buy._swapBillOffered
 		swapBillDeposit = sell._swapBillDeposit
 		ltcOffered = sell._ltcOffered
@@ -23,7 +15,6 @@ def MatchOffersWrapper(originalFunction):
 		swapBillDeposit -= exchange.swapBillDeposit
 		ltcOffered -= exchange.ltc
 		swapBillOffered -= buy._swapBillOffered
-		ValidateSell(sell)
 		swapBillDeposit -= sell._swapBillDeposit
 		ltcOffered -= sell._ltcOffered
 		assert swapBillOffered == 0
