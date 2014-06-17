@@ -843,7 +843,7 @@ class Test(unittest.TestCase):
 		host._setOwner('seller')
 		ltcOffered = 15*e(7)
 		commission = ltcOffered // 16
-		RunClient(host, ['post_ltc_sell', '--ltcOffered', ltcOffered+commission, '--exchangeRate', '0.5', '--backerID', 0])
+		RunClient(host, ['post_ltc_sell', '--ltcOffered', ltcOffered+commission, '--exchangeRate', '0.5', '--backerID', 0, '--includesCommission'])
 		info = GetStateInfo(host)
 		ownerBalances = GetOwnerBalances(host, ownerList, info['balances'])
 		self.assertDictEqual(ownerBalances, {'seller': 3*e(8)})
@@ -872,6 +872,19 @@ class Test(unittest.TestCase):
 		     }
 		)]
 		self.assertEqual(result, expectedResult)
+
+	def test_backed_ltc_sell_add_commission(self):
+		host = InitHost()
+		host._setOwner('backer')
+		host._addUnspent(2*e(12))
+		RunClient(host, ['burn', '--amount', 1*e(12)])
+		RunClient(host, ['back_ltc_sells', '--backingSwapBill', 1*e(12), '--transactionsBacked', '1000', '--blocksUntilExpiry', '20', '--commission', '0.0625'])
+		host._setOwner('seller')
+		ltcOffered = 15*e(7)
+		commission = ltcOffered // 16
+		RunClient(host, ['post_ltc_sell', '--ltcOffered', ltcOffered, '--exchangeRate', '0.5', '--backerID', 0])
+		output, result = RunClient(host, ['get_sell_offers'])
+		self.assertEqual(result, [('exchange rate', '0.5', {'backer id':0, 'ltc offered': Amounts.ToString(ltcOffered), 'mine': False, 'swapbill equivalent': Amounts.ToString(ltcOffered*2), 'deposit': Amounts.ToString(ltcOffered*2//Constraints.depositDivisor)})])
 
 	def test_bad_commission(self):
 		host = InitHost()
@@ -923,7 +936,7 @@ class Test(unittest.TestCase):
 		ltcOffered = 6*e(9)//2
 		deposit = 6*e(9)//Constraints.depositDivisor
 		ltcCommission = ltcOffered // 10
-		RunClient(host, ['post_ltc_sell', '--ltcOffered', ltcOffered + ltcCommission, '--exchangeRate', '0.5', '--backerID', 0])
+		RunClient(host, ['post_ltc_sell', '--ltcOffered', ltcOffered + ltcCommission, '--exchangeRate', '0.5', '--backerID', 0, '--includesCommission'])
 		info = GetStateInfo(host)
 		self.assertEqual(info['numberOfLTCBuyOffers'], 0)
 		self.assertEqual(info['numberOfLTCSellOffers'], 0)

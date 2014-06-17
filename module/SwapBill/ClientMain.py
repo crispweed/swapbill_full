@@ -64,14 +64,10 @@ sp.add_argument('--exchangeRate', required=True, help='the exchange rate SWP/LTC
 
 sp = subparsers.add_parser('post_ltc_sell', help='make an offer to sell litecoin for swapbill')
 sp.add_argument('--ltcOffered', required=True, help='amount of ltc offered, in decimal (one satoshi is 0.00000001)')
-sp.add_argument('--blocksUntilExpiry', type=int, default=2, help='after this number of blocks the offer expires (and swapbill remaining in any unmatched part of the offer is returned)')
-sp.add_argument('--exchangeRate', required=True, help='the exchange rate SWP/LTC as a decimal fraction (e.g. 0.5 means one LTC for two swapbill), must be greater than 0.0 and less than 1.0')
-
-sp = subparsers.add_parser('post_ltc_sell', help='make an offer to sell litecoin for swapbill')
-sp.add_argument('--ltcOffered', required=True, help='amount of ltc offered, in decimal (one satoshi is 0.00000001)')
 sp.add_argument('--exchangeRate', required=True, help='the exchange rate SWP/LTC as a decimal fraction (e.g. 0.5 means one LTC for two swapbill), must be greater than 0.0 and less than 1.0')
 sp.add_argument('--backerID', help='the id of the ltc sell backer to be used for the exchange, if a backed sell is desired')
 sp.add_argument('--blocksUntilExpiry', type=int, default=2, help="(doesn't apply to backed sells) after this number of blocks the offer expires (and swapbill remaining in any unmatched part of the offer is returned)")
+sp.add_argument('--includesCommission', help='(only applies to backed sells) specifies that backer commission is to be taken out of ltcOffered (otherwise backed commission will be paid on top of ltcOffered)', action='store_true')
 
 sp = subparsers.add_parser('complete_ltc_sell', help='complete an ltc exchange by fulfilling a pending exchange payment')
 sp.add_argument('--pendingExchangeID', required=True, help='the id of the pending exchange payment to fulfill')
@@ -291,7 +287,12 @@ def Main(startBlockIndex, startBlockHash, useTestNet, commandLineArgs=sys.argv[1
 			backer = state._ltcSellBackers[backerID]
 			transactionType = 'BackedLTCSellOffer'
 			outputs = ('sellerReceive',)
-			details['ltcOfferedPlusCommission'] = Amounts.FromString(args.ltcOffered)
+			ltc = Amounts.FromString(args.ltcOffered)
+			if args.includesCommission:
+				details['ltcOfferedPlusCommission'] = ltc
+			else:
+				ltcCommission = ltc * backer.commission // Amounts.percentDivisor
+				details['ltcOfferedPlusCommission'] = ltc + ltcCommission
 			details['backerIndex'] = int(args.backerID)
 			details['backerLTCReceiveAddress'] = backer.ltcReceiveAddress
 		outputPubKeyHashes = (wallet.addKeyPairAndReturnPubKeyHash(),)
