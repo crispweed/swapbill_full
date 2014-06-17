@@ -82,8 +82,6 @@ sp.add_argument('--transactionsBacked', required=True, help='the number of trans
 sp.add_argument('--blocksUntilExpiry', type=int, default=200, help='number of blocks for which the backing amount should remain committed')
 sp.add_argument('--commission', required=True, help='the rate of commission for backed transactions, as a decimal fraction (must be greater than 0.0 and less than 1.0)')
 
-subparsers.add_parser('collect', help='combine all current owned swapbill outputs into active account')
-
 subparsers.add_parser('get_receive_address', help='generate a new key pair for the swapbill wallet and display the corresponding public payment address')
 
 sp = subparsers.add_parser('get_balance', help='get current SwapBill balance')
