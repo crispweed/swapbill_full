@@ -4,7 +4,8 @@ from SwapBill import Host, Address # these just for exceptions, at time of writi
 from SwapBill.ExceptionReportedToUser import ExceptionReportedToUser
 
 def MakeTXID(i):
-	txid = '00' * 31 + '{:02X}'.format(i)
+	assert i < 65536
+	txid = '00' * 30 + '{:04X}'.format(i)
 	# make case consistent with hexlify!
 	txid = binascii.hexlify(binascii.unhexlify(txid.encode('ascii'))).decode('ascii')
 	return txid
@@ -132,6 +133,10 @@ class MockHost(object):
 		return found['amount'], pubKeyHashToBeSigned
 
 	def signAndSend(self, unsignedTransactionHex, privateKeys, maximumSignedSize):
+		unsignedSize = len(unsignedTransactionHex) / 2
+		signedSize = unsignedSize * 30 // 25 # arbitrary increase here to simulate an increase in size when signing transactions
+		if signedSize > maximumSignedSize:
+			raise Host.MaximumSignedSizeExceeded()
 		unsignedTransactionBytes = RawTransaction.FromHex(unsignedTransactionHex)
 		decoded, scriptPubKeys = RawTransaction.Decode(unsignedTransactionBytes)
 		sumOfInputs = 0
@@ -159,10 +164,6 @@ class MockHost(object):
 			assert decoded.outputAmount(vout) >= TransactionFee.dustLimit
 			self._unspent.append(toAdd)
 			outputAmounts.append(decoded.outputAmount(vout))
-		unsignedSize = len(unsignedTransactionHex) / 2
-		signedSize = unsignedSize * 30 // 25 # arbitrary increase here to simulate an increase in size when signing transactions
-		if signedSize > maximumSignedSize:
-			raise Host.MaximumSignedSizeExceeded()
 		requiredFee = TransactionFee.CalculateRequired_FromSizeAndOutputs(signedSize, outputAmounts)
 		paidFee = sumOfInputs - sum(outputAmounts)
 		assert paidFee >= requiredFee

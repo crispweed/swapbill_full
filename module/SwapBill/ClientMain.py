@@ -185,18 +185,14 @@ def Main(startBlockIndex, startBlockHash, useTestNet, commandLineArgs=sys.argv[1
 		change = host.getNewNonSwapBillAddress()
 		maximumSignedSize = TransactionFee.startingMaximumSize
 		transactionFee = TransactionFee.startingFee
-		try:
-			filledOutTX = BuildHostedTransaction.AddPaymentFeesAndChange(baseTX, baseTXInputsAmount, TransactionFee.dustLimit, transactionFee, unspent, change)
-			return transactionBuildLayer.sendTransaction(filledOutTX, maximumSignedSize)
-		except Host.MaximumSignedSizeExceeded:
-			print("Transaction fee increased.", file=out)
+		while True:
 			try:
-				maximumSignedSize += TransactionFee.sizeStep
-				transactionFee += TransactionFee.feeStep
 				filledOutTX = BuildHostedTransaction.AddPaymentFeesAndChange(baseTX, baseTXInputsAmount, TransactionFee.dustLimit, transactionFee, unspent, change)
 				return transactionBuildLayer.sendTransaction(filledOutTX, maximumSignedSize)
 			except Host.MaximumSignedSizeExceeded:
-				raise ExceptionReportedToUser("Failed: Unexpected failure to meet transaction fee requirement. (Lots of dust inputs?)")
+				print("Transaction fee increased.", file=out)
+				maximumSignedSize += TransactionFee.sizeStep
+				transactionFee += TransactionFee.feeStep
 
 	def CheckAndSend_Common(transactionType, sourceAccounts, outputs, outputPubKeys, details):
 		change = host.getNewNonSwapBillAddress()

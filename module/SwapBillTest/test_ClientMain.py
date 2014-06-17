@@ -6,7 +6,7 @@ if PY3:
 else:
 	import StringIO as io
 from os import path
-from SwapBill import ClientMain, Amounts
+from SwapBill import ClientMain, Amounts, TransactionFee
 from SwapBillTest.MockHost import MockHost
 from SwapBill.Amounts import e
 from SwapBill.BuildHostedTransaction import InsufficientFunds
@@ -947,3 +947,30 @@ class Test(unittest.TestCase):
 		expectedBackerDetails['blocks until expiry'] -= 2
 		output, result = RunClient(host, ['get_ltc_sell_backers'])
 		self.assertListEqual(result, [('ltc sell backer index', 0, expectedBackerDetails)])
+
+	def test_10_unspent(self):
+		host = InitHost()
+		for i in range(10):
+			host._addUnspent(1*e(6))
+		host._addUnspent(TransactionFee.dustLimit * 2)
+		burn = RunClient(host, ['burn', '--amount', 1*e(7)])
+		output, result = RunClient(host, ['get_balance'])
+		self.assertDictEqual(result, {'balance': '0.1'})
+
+	def test_100_unspent(self):
+		host = InitHost()
+		for i in range(100):
+			host._addUnspent(1*e(6))
+		host._addUnspent(TransactionFee.dustLimit * 10)
+		burn = RunClient(host, ['burn', '--amount', 1*e(8)])
+		output, result = RunClient(host, ['get_balance'])
+		self.assertDictEqual(result, {'balance': '1'})
+
+	#def test_1000_unspent(self):
+		#host = InitHost()
+		#for i in range(1000):
+			#host._addUnspent(1*e(6))
+		#host._addUnspent(TransactionFee.dustLimit * 100) # very large transaction!
+		#burn = RunClient(host, ['burn', '--amount', 1*e(9)])
+		#output, result = RunClient(host, ['get_balance'])
+		#self.assertDictEqual(result, {'balance': '10'})
