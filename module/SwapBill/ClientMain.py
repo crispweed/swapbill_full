@@ -50,21 +50,21 @@ parser.add_argument('--forceRescan', help='force a full block chain rescan', act
 subparsers = parser.add_subparsers(dest='action', help='the action to be taken')
 
 sp = subparsers.add_parser('burn', help='destroy litecoin to create swapbill')
-sp.add_argument('--amount', required=True, help='amount of LTC to be destroyed, in decimal (one satoshi is 0.00000001)')
+sp.add_argument('--amount', required=True, help='amount of litecoin to be destroyed, as a decimal fraction (one satoshi is 0.00000001)')
 
 sp = subparsers.add_parser('pay', help='make a swapbill payment')
-sp.add_argument('--amount', required=True, help='amount of swapbill to be paid, in decimal (one satoshi is 0.00000001)')
+sp.add_argument('--amount', required=True, help='amount of swapbill to be paid, as a decimal fraction (one satoshi is 0.00000001)')
 sp.add_argument('--toAddress', required=True, help='pay to this address')
 sp.add_argument('--blocksUntilExpiry', type=int, default=8, help='if the transaction takes longer than this to go through then the transaction expires (in which case no payment is made and the full amount is returned as change)')
 
 sp = subparsers.add_parser('post_ltc_buy', help='make an offer to buy litecoin with swapbill')
-sp.add_argument('--swapBillOffered', required=True, help='amount of swapbill offered, in decimal (one satoshi is 0.00000001)')
+sp.add_argument('--swapBillOffered', required=True, help='amount of swapbill offered, as a decimal fraction (one satoshi is 0.00000001)')
 sp.add_argument('--blocksUntilExpiry', type=int, default=8, help='after this number of blocks the offer expires (and swapbill remaining in any unmatched part of the offer is returned)')
-sp.add_argument('--exchangeRate', required=True, help='the exchange rate SWP/LTC as a decimal fraction (e.g. 0.5 means one LTC for two swapbill), must be greater than 0.0 and less than 1.0')
+sp.add_argument('--exchangeRate', required=True, help='the exchange rate LTC/SWP as a decimal fraction (e.g. 0.5 means one LTC for two swapbill), must be greater than 0.0 and less than 1.0')
 
 sp = subparsers.add_parser('post_ltc_sell', help='make an offer to sell litecoin for swapbill')
-sp.add_argument('--ltcOffered', required=True, help='amount of ltc offered, in decimal (one satoshi is 0.00000001)')
-sp.add_argument('--exchangeRate', required=True, help='the exchange rate SWP/LTC as a decimal fraction (e.g. 0.5 means one LTC for two swapbill), must be greater than 0.0 and less than 1.0')
+sp.add_argument('--ltcOffered', required=True, help='amount of ltc offered, as a decimal fraction (one satoshi is 0.00000001)')
+sp.add_argument('--exchangeRate', required=True, help='the exchange rate LTC/SWP as a decimal fraction (e.g. 0.5 means one LTC for two swapbill), must be greater than 0.0 and less than 1.0')
 sp.add_argument('--backerID', help='the id of the ltc sell backer to be used for the exchange, if a backed sell is desired')
 sp.add_argument('--blocksUntilExpiry', type=int, default=2, help="(doesn't apply to backed sells) after this number of blocks the offer expires (and swapbill remaining in any unmatched part of the offer is returned)")
 sp.add_argument('--includesCommission', help='(only applies to backed sells) specifies that backer commission is to be taken out of ltcOffered (otherwise backed commission will be paid on top of ltcOffered)', action='store_true')
@@ -73,7 +73,7 @@ sp = subparsers.add_parser('complete_ltc_sell', help='complete an ltc exchange b
 sp.add_argument('--pendingExchangeID', required=True, help='the id of the pending exchange payment to fulfill')
 
 sp = subparsers.add_parser('back_ltc_sells', help='commit swapbill to back ltc exchanges')
-sp.add_argument('--backingSwapBill', required=True, help='amount of swapbill to commit, in decimal (one satoshi is 0.00000001)')
+sp.add_argument('--backingSwapBill', required=True, help='amount of swapbill to commit, as a decimal fraction (one satoshi is 0.00000001)')
 sp.add_argument('--transactionsBacked', required=True, help='the number of transactions you want to back, which then implies a maximum backing amount per transaction')
 sp.add_argument('--blocksUntilExpiry', type=int, default=200, help='number of blocks for which the backing amount should remain committed')
 sp.add_argument('--commission', required=True, help='the rate of commission for backed transactions, as a decimal fraction (must be greater than 0.0 and less than 1.0)')
