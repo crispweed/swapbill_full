@@ -99,5 +99,10 @@ class Test(unittest.TestCase):
 		self.assertFalse(RawTransaction.UnexpectedFormat_Fast(txBytes, b'SWB'))
 		self.assertTrue(RawTransaction.UnexpectedFormat_Fast(txBytes, b'SWP'))
 
-		#decoded = RawTransaction.Decode(txBytes)
-		#self.assertDictEqual(decoded, {})
+	def test_transactions_in_block(self):
+		# (root block)
+		blockHex = '010000000000000000000000000000000000000000000000000000000000000000000000d9ced4ed1130f7b7faad9be25323ffafa33232a17c3edf6cfd97bee6bafbdd97f6028c4ef0ff0f1e38c3f6160101000000010000000000000000000000000000000000000000000000000000000000000000ffffffff4804ffff001d0104404e592054696d65732030352f4f63742f32303131205374657665204a6f62732c204170706c65e280997320566973696f6e6172792c2044696573206174203536ffffffff0100f2052a010000004341040184710fa689ad5023690c80f3a49c8f13f8d45b8c857fbcbc8bc4a8e4d3eb4b10f4d4604fa08dce601aaf0f470216fe1b51850b4acf21b179c45070ac7b03a9ac00000000'
+		blockData = RawTransaction.FromHex(blockHex)
+		transactions = RawTransaction.GetTransactionsInBlock(blockData)
+		# looks like this block has some text encoded into it..
+		self.assertListEqual(transactions, [b'\x01\x00\x00\x00\x01\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\xff\xff\xff\xffH\x04\xff\xff\x00\x1d\x01\x04@NY Times 05/Oct/2011 Steve Jobs, Apple\xe2\x80\x99s Visionary, Dies at 56\xff\xff\xff\xff\x01\x00\xf2\x05*\x01\x00\x00\x00CA\x04\x01\x84q\x0f\xa6\x89\xadP#i\x0c\x80\xf3\xa4\x9c\x8f\x13\xf8\xd4[\x8c\x85\x7f\xbc\xbc\x8b\xc4\xa8\xe4\xd3\xebK\x10\xf4\xd4`O\xa0\x8d\xce`\x1a\xaf\x0fG\x02\x16\xfe\x1bQ\x85\x0bJ\xcf!\xb1y\xc4Pp\xac{\x03\xa9\xac\x00\x00\x00\x00'])

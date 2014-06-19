@@ -1,5 +1,5 @@
 from __future__ import print_function
-import unittest, sys, shutil, os, random
+import unittest, sys, shutil, os, random, binascii
 PY3 = sys.version_info.major > 2
 if PY3:
 	import io
@@ -143,10 +143,12 @@ class Test(unittest.TestCase):
 		RunClient(host, ['burn', '--amount', 4*e(7)])
 		RunClient(host, ['pay', '--amount', 2*e(7), '--toAddress', payTargetAddress])
 		corruptedMemPool = []
-		for txID, txHex in host._memPool:
+		for txID, txData in host._memPool:
+			txHex = binascii.hexlify(txData).decode('ascii')
 			assert txHex.count('5342') == 1
 			corruptedTXHex = txHex.replace('5342', '5343')
-			corruptedMemPool.append((txID, corruptedTXHex))
+			corruptedTXData = binascii.unhexlify(corruptedTXHex.encode('ascii'))
+			corruptedMemPool.append((txID, corruptedTXData))
 		host._memPool = corruptedMemPool
 		host.holdNewTransactions = False
 		info = GetStateInfo(host)
