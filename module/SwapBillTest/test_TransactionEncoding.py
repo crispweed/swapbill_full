@@ -1,6 +1,6 @@
 from __future__ import print_function
 import unittest, binascii
-from SwapBill import TransactionEncoding
+from SwapBill import TransactionEncoding, Util
 from SwapBill.ExceptionReportedToUser import ExceptionReportedToUser
 
 def FromStateTransactionWrapper(originalFunction):
@@ -44,7 +44,7 @@ class Test(unittest.TestCase):
 		result = TransactionEncoding._encodeInt(value, numberOfBytes)
 		self.assertTrue(type(result) is type(b''))
 		self.assertEqual(len(result), numberOfBytes)
-		decoded = TransactionEncoding._decodeInt(result)
+		decoded = Util.intFromBytes(result) # this got moved into Util, reorganise tests?
 		self.assertEqual(decoded, value)
 		return result
 

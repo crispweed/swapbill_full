@@ -1,6 +1,6 @@
 from __future__ import print_function
 import struct, binascii
-from SwapBill import Address, HostTransaction, ControlAddressPrefix, Amounts
+from SwapBill import Address, HostTransaction, ControlAddressPrefix, Amounts, Util
 from SwapBill.ExceptionReportedToUser import ExceptionReportedToUser
 
 class UnsupportedTransaction(Exception):
@@ -64,15 +64,6 @@ def _mappingFromTypeCode(typeCode):
 		return _unfundedMappingByTypeCode[typeCode]
 	raise UnsupportedTransaction()
 
-def _decodeInt(data):
-	multiplier = 1
-	result = 0
-	for i in range(len(data)):
-		byteValue = struct.unpack('<B', data[i:i + 1])[0]
-		result += byteValue * multiplier
-		multiplier = multiplier << 8
-	return result
-
 def _encodeInt(value, numberOfBytes):
 	if value < 0:
 		raise ExceptionReportedToUser('Negative values are not allowed for transaction parameters.')
@@ -91,7 +82,7 @@ def ToStateTransaction(tx):
 	controlAddressData = tx.outputPubKeyHash(0)
 	assert controlAddressData.startswith(ControlAddressPrefix.prefix)
 	pos = len(ControlAddressPrefix.prefix)
-	typeCode = _decodeInt(controlAddressData[pos:pos+1])
+	typeCode = Util.intFromBytes(controlAddressData[pos:pos+1])
 	mapping = _mappingFromTypeCode(typeCode)
 	funded = (len(mapping[2]) > 0)
 	transactionType = mapping[0]
@@ -106,7 +97,7 @@ def ToStateTransaction(tx):
 			if data != struct.pack('<B', 0) * numberOfBytes:
 				raise NotValidSwapBillTransaction
 		elif valueMapping is not None:
-			value = _decodeInt(data)
+			value = Util.intFromBytes(data)
 			details[valueMapping] = value
 		pos += numberOfBytes
 	assert pos == 20

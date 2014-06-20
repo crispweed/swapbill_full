@@ -4,11 +4,35 @@ from SwapBill import RawTransaction, HostTransaction, Address
 from SwapBill.RawTransaction import NotSwapBillTransaction
 
 class Test(unittest.TestCase):
+	def doVarIntTest(self, value, expectedEncoding):
+		encoded = RawTransaction._encodeVarInt(value)
+		self.assertEqual(encoded, expectedEncoding)
+		newPos, decodedValue = RawTransaction._decodeVarInt(encoded, 0)
+		self.assertEqual(newPos, len(encoded))
+		self.assertEqual(value, decodedValue)
 	def test_unit_internal(self):
-		encoded = RawTransaction._encodeVarInt(298)
-		newPos, value = RawTransaction._decodeVarInt(encoded, 0)
-		assert newPos == len(encoded)
-		assert value == 298
+		self.doVarIntTest(0, b'\x00')
+		self.doVarIntTest(1, b'\x01')
+		self.doVarIntTest(128, b'\x80')
+		self.doVarIntTest(0xfc, b'\xfc')
+		self.doVarIntTest(0xfd, b'\xfd\xfd\x00')
+		self.doVarIntTest(0xfe, b'\xfd\xfe\x00')
+		self.doVarIntTest(0xff, b'\xfd\xff\x00')
+		self.doVarIntTest(0x100, b'\xfd\x00\x01')
+		self.doVarIntTest(298, b'\xfd*\x01')
+		self.doVarIntTest(0xfffe, b'\xfd\xfe\xff')
+		self.doVarIntTest(0xffff, b'\xfd\xff\xff')
+		self.doVarIntTest(0x10000, b'\xfe\x00\x00\x01\x00')
+		self.doVarIntTest(0x10001, b'\xfe\x01\x00\x01\x00')
+		self.doVarIntTest(0x12345678, b'\xfe\x78\x56\x34\x12')
+		self.doVarIntTest(0xfffffffe, b'\xfe\xfe\xff\xff\xff')
+		self.doVarIntTest(0xffffffff, b'\xfe\xff\xff\xff\xff')
+		self.doVarIntTest(0x100000000, b'\xff\x00\x00\x00\x00\x01\x00\x00\x00')
+		self.doVarIntTest(0x123456789abcdef0, b'\xff\xf0\xde\xbc\x9a\x78\x56\x34\x12')
+		self.doVarIntTest(0xfffffffffffffffe, b'\xff\xfe\xff\xff\xff\xff\xff\xff\xff')
+		self.doVarIntTest(0xffffffffffffffff, b'\xff\xff\xff\xff\xff\xff\xff\xff\xff')
+		# larger numbers shouldn't be passed as input, so we don't really care what exception for the following
+		self.assertRaises(Exception, self.doVarIntTest, 0xffffffffffffffff+1, b'\xff\xff\xff\xff\xff\xff\xff\xff\xff')
 
 	def test(self):
 		inputs = [("b46c0b9cab086fd3ffbe69796e0c0416c14e4b5f416fe7ec349848b08ded7986", 0)]

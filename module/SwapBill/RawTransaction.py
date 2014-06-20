@@ -1,5 +1,5 @@
 import struct, binascii
-from SwapBill import HostTransaction
+from SwapBill import HostTransaction, Util
 
 class NotSwapBillTransaction(Exception):
 	pass
@@ -30,26 +30,17 @@ def _encodeVarInt(i):
 	else:
 		return b'\xff' + struct.pack("<Q", i)
 
-def _decodeVarInt(data, startPos):
-	assert type(data) == type(b'')
-	if startPos >= len(data):
+def _decodeVarInt(data, pos):
+	if pos >= len(data):
 		raise _RanOutOfData()
-	firstByte = data[startPos:startPos + 1]
-	if firstByte == b'\xff':
-		if startPos + 9 > len(data):
-			raise _RanOutOfData()
-		return startPos + 9, struct.unpack("<Q", data[startPos + 1:startPos + 9])[0]
-	if firstByte == b'\xfe':
-		if startPos + 5 > len(data):
-			raise _RanOutOfData()
-		return startPos + 5, struct.unpack("<L", data[startPos + 1:startPos + 5])[0]
-	if firstByte == b'\xfd':
-		if startPos + 3 > len(data):
-			raise _RanOutOfData()
-		return startPos + 3, struct.unpack("<H", data[startPos + 1:startPos + 3])[0]
-	if startPos + 1 > len(data):
+	result = Util.intFromBytes(data[pos:pos + 1])
+	pos += 1
+	if result < 253:
+		return pos, result
+	byteSize = 2 ** (result - 252)
+	if pos + byteSize > len(data):
 		raise _RanOutOfData()
-	return startPos + 1, struct.unpack("<B", data[startPos:startPos + 1])[0]
+	return pos + byteSize, Util.intFromBytes(data[pos:pos + byteSize])
 
 def _opPush(i):
 	if i < 0x4c:
