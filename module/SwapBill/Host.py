@@ -1,5 +1,7 @@
 from __future__ import print_function
-import os
+import os, sys
+if sys.version > '3':
+	long = int
 from os import path
 from SwapBill import RawTransaction, Address, Amounts, RPC
 from SwapBill.ExceptionReportedToUser import ExceptionReportedToUser
@@ -38,7 +40,11 @@ class Host(object):
 			for key in ('txid', 'vout', 'scriptPubKey'):
 				filtered[key] = output[key]
 			filtered['address'] = Address.ToPubKeyHash(self._addressVersion, output['address'])
-			filtered['amount'] = Amounts.ToSatoshis(output['amount'])
+			amount_FloatFromJSON = output['amount']
+			amount_TenthsOfSatoshis = long(amount_FloatFromJSON * 1e9)
+			# round to nearest, after conversion to integer
+			amount_Satoshis = (amount_TenthsOfSatoshis + 5) // 10
+			filtered['amount'] = amount_Satoshis
 			result.append(filtered)
 		return result
 
