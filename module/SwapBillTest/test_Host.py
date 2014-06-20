@@ -33,6 +33,25 @@ class Test(unittest.TestCase):
 		unspent = host.getUnspent()
 		self.assertEqual(unspent, [{'txid': 'c4d9603031f72b948e434f09c6d7c95d2a031ee18534b41760d8f12ed54948a5', 'scriptPubKey': '76a914ea9273c05d44d57317274f252df2b7605c5e1d7e88ac', 'address': b"\xea\x92s\xc0]D\xd5s\x17'O%-\xf2\xb7`\\^\x1d~", 'vout': 2, 'amount': 89999800000}, {'txid': 'f0205c8be59f924e79d1c02d91342dfcc791a0e9acc7c780b38e9c1235c6d896', 'scriptPubKey': '76a914707c085200b226a7a39080c2a58468debe0b8e6f88ac', 'address': b'p|\x08R\x00\xb2&\xa7\xa3\x90\x80\xc2\xa5\x84h\xde\xbe\x0b\x8eo', 'vout': 1, 'amount': 100000000000}])
 
+	def doConvertTest(self, amountJSONFloat, expectedSatoshis):
+		rpcHost = MockRPC.Host()
+		host = InitHost(rpcHost);
+		expectedQuery = ('listunspent',)
+		queryResult = [{'scriptPubKey': '76a914ea9273c05d44d57317274f252df2b7605c5e1d7e88ac', 'confirmations': 47, 'account': '', 'txid': 'c4d9603031f72b948e434f09c6d7c95d2a031ee18534b41760d8f12ed54948a5', 'address': 'n2uFrchnqXnEfcX8ewoGZyHQNCNp8cxcPk', 'vout': 2, 'amount': 899.998}, {'scriptPubKey': '76a914707c085200b226a7a39080c2a58468debe0b8e6f88ac', 'confirmations': 48, 'account': '', 'txid': 'f0205c8be59f924e79d1c02d91342dfcc791a0e9acc7c780b38e9c1235c6d896', 'address': 'mqmiZU7cFg4czRPiU55wfQEBgPmnRzZ7kW', 'vout': 1, 'amount': amountJSONFloat}]
+		rpcHost.queue.append((expectedQuery, queryResult))
+		unspent = host.getUnspent()
+		self.assertEqual(unspent, [{'txid': 'c4d9603031f72b948e434f09c6d7c95d2a031ee18534b41760d8f12ed54948a5', 'scriptPubKey': '76a914ea9273c05d44d57317274f252df2b7605c5e1d7e88ac', 'address': b"\xea\x92s\xc0]D\xd5s\x17'O%-\xf2\xb7`\\^\x1d~", 'vout': 2, 'amount': 89999800000}, {'txid': 'f0205c8be59f924e79d1c02d91342dfcc791a0e9acc7c780b38e9c1235c6d896', 'scriptPubKey': '76a914707c085200b226a7a39080c2a58468debe0b8e6f88ac', 'address': b'p|\x08R\x00\xb2&\xa7\xa3\x90\x80\xc2\xa5\x84h\xde\xbe\x0b\x8eo', 'vout': 1, 'amount': expectedSatoshis}])
+	def test_get_unspent_float_convert(self):
+		self.doConvertTest(8.83, 883000000)
+		self.doConvertTest(0.00000001, 1)
+		self.doConvertTest(0.00000002, 2)
+		self.doConvertTest(0.00000003, 3)
+		self.doConvertTest(10000.00000001, 1000000000001)
+		self.doConvertTest(900000.00000001, 90000000000001)
+		self.doConvertTest(9000000.00000001, 900000000000001)
+		# *** ran out of float precision here, by the looks of things, when I tried this
+		#self.doConvertTest(90000000.00000001, 9000000000000001)
+
 	def test_new_address(self):
 		rpcHost = MockRPC.Host()
 		host = InitHost(rpcHost);
