@@ -94,11 +94,15 @@ def ToStateTransaction(tx):
 	funded = (len(mapping[2]) > 0)
 	transactionType = mapping[0]
 	details = {}
+	nextOutput = 1
 	if type(mapping[1]) is tuple:
 		controlAddressMapping = mapping[1]
 		for i in range(len(controlAddressMapping) // 2):
 			valueMapping = controlAddressMapping[i * 2]
 			numberOfBytes = controlAddressMapping[i * 2 + 1]
+			if pos + numberOfBytes > 20:
+				controlAddressData += tx.outputPubKeyHash(nextOutput)
+				nextOutput += 1
 			data = controlAddressData[pos:pos + numberOfBytes]
 			value = Util.intFromBytes(data)
 			details[valueMapping] = value
@@ -117,13 +121,15 @@ def ToStateTransaction(tx):
 			sourceAccounts.append((tx.inputTXID(i), tx.inputVOut(i)))
 	outputs = mapping[2]
 	destinations = mapping[3]
+	nextOutput += len(outputs)
 	for i in range(len(destinations)):
 		addressMapping, amountMapping = destinations[i]
 		assert addressMapping is not None
 		if addressMapping is not None:
-			details[addressMapping] = tx.outputPubKeyHash(1 + len(outputs) + i)
+			details[addressMapping] = tx.outputPubKeyHash(nextOutput)
 		if amountMapping is not None:
-			details[amountMapping] = tx.outputAmount(1 + len(outputs) + i)
+			details[amountMapping] = tx.outputAmount(nextOutput)
+		nextOutput += 1
 	return transactionType, sourceAccounts, outputs, details
 
 def _checkedAddOutputWithValue(tx, pubKeyHash, amount):
@@ -146,21 +152,23 @@ def FromStateTransaction(transactionType, sourceAccounts, outputs, outputPubKeyH
 			tx.addInput(txID, vout)
 	details[None] = 0
 	details[0] = 0
-	controlAddressData = ControlAddressPrefix.prefix + _encodeInt(typeCode, 1)
-	controlAddressAmount = 0
+	controlData = ControlAddressPrefix.prefix + _encodeInt(typeCode, 1)
+	controlAmount = 0
 	if type(mapping[1]) is tuple:
 		controlAddressMapping = mapping[1]
 		for i in range(len(controlAddressMapping) // 2):
 			valueMapping = controlAddressMapping[i * 2]
 			numberOfBytes = controlAddressMapping[i * 2 + 1]
-			controlAddressData += _encodeInt(details[valueMapping], numberOfBytes)
-		assert len(controlAddressData) <= 20
-		controlAddressAmount = 0
+			controlData += _encodeInt(details[valueMapping], numberOfBytes)
+			if len(controlData) > 20:
+				_checkedAddOutputWithValue(tx, controlData[:20], 0)
+				controlData = controlData[20:]
+		assert len(controlData) <= 20
+		controlAmount = 0
 	else:
-		amountMapping = mapping[1]
-		controlAddressAmount = details[amountMapping]
-	controlAddressData += (20 - len(controlAddressData)) * struct.pack('<B', 0)
-	_checkedAddOutputWithValue(tx, controlAddressData, controlAddressAmount)
+		controlAmount = details[mapping[1]]
+	controlData += (20 - len(controlData)) * struct.pack('<B', 0)
+	_checkedAddOutputWithValue(tx, controlData, controlAmount)
 	expectedOutputs = mapping[2]
 	assert expectedOutputs == outputs
 	for pubKeyHash in outputPubKeyHashes:
