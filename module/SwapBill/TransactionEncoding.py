@@ -17,16 +17,16 @@ _fundedMappingByTypeCode = (
      ('destination',), ()
     ),
     ('Pay',
-     ('amount', 6, 'maxBlock', 4, None, 7),
+     ('amount', 6, 'maxBlock', 4),
      ('change','destination'), ()
     ),
     ('LTCBuyOffer',
-     ('swapBillOffered', 6, 'maxBlock', 4, 'exchangeRate', 4, None, 3),
+     ('swapBillOffered', 6, 'maxBlock', 4, 'exchangeRate', 4),
      ('ltcBuy',),
      (('receivingAddress', None),)
 	),
     ('LTCSellOffer',
-     ('ltcOffered', 6, 'maxBlock', 4, 'exchangeRate', 4, None, 3),
+     ('ltcOffered', 6, 'maxBlock', 4, 'exchangeRate', 4),
      ('ltcSell',),
      ()
 	),
@@ -36,17 +36,17 @@ _fundedMappingByTypeCode = (
      (('ltcReceiveAddress', None),)
 	),
     ('BackedLTCSellOffer',
-     ('exchangeRate', 4, 'backerIndex', 6, None, 7),
+     ('exchangeRate', 4, 'backerIndex', 6),
      ('sellerReceive',),
      (('backerLTCReceiveAddress', 'ltcOfferedPlusCommission'),)
 	),
 	)
 
-_forwardCompatibilityMapping = ('ForwardToFutureNetworkVersion', ('amount', 6, 'maxBlock', 4, None, 7), ('change',), ())
+_forwardCompatibilityMapping = ('ForwardToFutureNetworkVersion', ('amount', 6, 'maxBlock', 4), ('change',), ())
 
 _unfundedMappingByTypeCode = (
     ('LTCExchangeCompletion',
-     ('pendingExchangeIndex', 6, None, 11),
+     ('pendingExchangeIndex', 6),
      (),
      (('destinationAddress', 'destinationAmount'),)
     ),
@@ -100,11 +100,10 @@ def ToStateTransaction(tx):
 			valueMapping = controlAddressMapping[i * 2]
 			numberOfBytes = controlAddressMapping[i * 2 + 1]
 			data = controlAddressData[pos:pos + numberOfBytes]
-			if valueMapping is not None:
-				value = Util.intFromBytes(data)
-				details[valueMapping] = value
+			value = Util.intFromBytes(data)
+			details[valueMapping] = value
 			pos += numberOfBytes
-		assert pos == 20
+		assert pos <= 20
 	else:
 		data = controlAddressData[pos:20]
 		if data != struct.pack('<B', 0) * len(data):
@@ -148,18 +147,20 @@ def FromStateTransaction(transactionType, sourceAccounts, outputs, outputPubKeyH
 	details[None] = 0
 	details[0] = 0
 	controlAddressData = ControlAddressPrefix.prefix + _encodeInt(typeCode, 1)
+	controlAddressAmount = 0
 	if type(mapping[1]) is tuple:
 		controlAddressMapping = mapping[1]
 		for i in range(len(controlAddressMapping) // 2):
 			valueMapping = controlAddressMapping[i * 2]
 			numberOfBytes = controlAddressMapping[i * 2 + 1]
 			controlAddressData += _encodeInt(details[valueMapping], numberOfBytes)
-		assert len(controlAddressData) == 20
-		_checkedAddOutputWithValue(tx, controlAddressData, 0)
+		assert len(controlAddressData) <= 20
+		controlAddressAmount = 0
 	else:
-		controlAddressData += (20 - len(controlAddressData)) * struct.pack('<B', 0)
 		amountMapping = mapping[1]
-		_checkedAddOutputWithValue(tx, controlAddressData, details[amountMapping])
+		controlAddressAmount = details[amountMapping]
+	controlAddressData += (20 - len(controlAddressData)) * struct.pack('<B', 0)
+	_checkedAddOutputWithValue(tx, controlAddressData, controlAddressAmount)
 	expectedOutputs = mapping[2]
 	assert expectedOutputs == outputs
 	for pubKeyHash in outputPubKeyHashes:
