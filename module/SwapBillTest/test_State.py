@@ -1186,3 +1186,54 @@ class Test(unittest.TestCase):
 		self.Advance(1)
 		self.assertEqual(len(state._pendingPays), 0)
 		self.assertDictEqual(state._balances.balances, {change:22*e(7)})
+		active = change
+		# put the transaction through again
+		details['maxBlock'] = 151
+		outputs = self.Apply_AssertSucceeds(state, 'PayOnProofOfReceipt', sourceAccounts=[active], **details)
+		change = outputs['change']
+		destination = outputs['destination']
+		self.assertDictEqual(state._balances.balances, {change:0, destination:0})
+		self.assertEqual(len(state._pendingPays), 1)
+		#print(state._pendingPays[1].__dict__.__repr__())
+		expectedDetails['expiry'] = 251
+		expectedDetails['confirmExpiry'] = 201
+		expectedDetails['destinationAccount'] = destination
+		expectedDetails['refundAccount'] = change
+		self.assertDictEqual(state._pendingPays[1].__dict__, expectedDetails)
+		# this time it is confirmed
+		#..
+
+	def test_PayOnProofOfReceipt_Confirmed(self):
+		state = State.State(100, 'starthash')
+		self.state = state
+		active = self.Burn(22*e(7))
+		details = {
+		    'amount':22*e(7),
+		    'maxBlock':100,
+		    'confirmAddress':'confirmPKH',
+		    'cancelAddress':'cancelPKH'
+		}
+		outputs = self.Apply_AssertSucceeds(state, 'PayOnProofOfReceipt', sourceAccounts=[active], **details)
+		change = outputs['change']
+		destination = outputs['destination']
+		self.assertDictEqual(state._balances.balances, {change:0, destination:0})
+		self.assertEqual(len(state._pendingPays), 1)
+		expectedDetails = {
+			'amount': 22*e(7),
+			'cancelHash': 'cancelPKH',
+		    'confirmExpiry': 150,
+		    'confirmHash': 'confirmPKH',
+		    'confirmed': False,
+		    'destinationAccount': destination,
+		    'expiry': 200,
+		    'refundAccount': change
+		}
+		self.assertDictEqual(state._pendingPays[0].__dict__, expectedDetails)
+		# advance to just before expiry
+		self.Advance(50)
+		self.assertEqual(len(state._pendingPays), 1)
+		self.assertDictEqual(state._pendingPays[0].__dict__, expectedDetails)
+		# expiry without confirmation or cancellation
+		self.Advance(1)
+		self.assertEqual(len(state._pendingPays), 0)
+		self.assertDictEqual(state._balances.balances, {change:22*e(7)})
