@@ -125,12 +125,33 @@ class Test(unittest.TestCase):
 		self.assertDictEqual(tx.__dict__, {'_inputs': [('sourceTXID', 7)], '_outputs': [(b'SB\x04 \x00\x00\x00\x00\x00\x04\x00\x00{\x00\x00\x00\xff\xff\xff\x0f', 0), ('ltcSellBackerPKH', 0), ('receivePKH', 0)]})
 		self.checkIgnoredBytes(tx, 0)
 
-	def test_bad_PayOnProofOfReceipt(self):
+	def test_PayOnProofOfReceipt(self):
 		details = {'amount':10, 'maxBlock':123, 'confirmAddress':'confirmPKH', 'cancelAddress':'cancelPKH'}
 		# bad output spec
 		self.assertRaises(AssertionError, TransactionEncoding.FromStateTransaction, 'PayOnProofOfReceipt', [('sourceTXID',4)], ('changeZZ','destination'), ('changePKH', 'destinationPKH'), details)
-		# control transaction
-		TransactionEncoding.FromStateTransaction('PayOnProofOfReceipt', [('sourceTXID',4)], ('change','destination'), ('changePKH', 'destinationPKH'), details)
+		self.assertRaises(AssertionError, TransactionEncoding.FromStateTransaction, 'PayOnProofOfReceipt', [('sourceTXID',4)], ('change','destinationZZ'), ('changePKH', 'destinationPKH'), details)
+		# missing details
+		details.pop('amount')
+		self.assertRaises(KeyError, TransactionEncoding.FromStateTransaction, 'PayOnProofOfReceipt', [('sourceTXID',4)], ('change','destination'), ('changePKH', 'destinationPKH'), details)
+		details['amount'] = 10
+		details.pop('maxBlock')
+		self.assertRaises(KeyError, TransactionEncoding.FromStateTransaction, 'PayOnProofOfReceipt', [('sourceTXID',4)], ('change','destination'), ('changePKH', 'destinationPKH'), details)
+		details['maxBlock'] = 123
+		details.pop('confirmAddress')
+		self.assertRaises(KeyError, TransactionEncoding.FromStateTransaction, 'PayOnProofOfReceipt', [('sourceTXID',4)], ('change','destination'), ('changePKH', 'destinationPKH'), details)
+		details['confirmAddress'] = 'confirmPKH'
+		details.pop('cancelAddress')
+		self.assertRaises(KeyError, TransactionEncoding.FromStateTransaction, 'PayOnProofOfReceipt', [('sourceTXID',4)], ('change','destination'), ('changePKH', 'destinationPKH'), details)
+		details['cancelAddress'] = 'cancelPKH'
+		# successful control transaction
+		tx = TransactionEncoding.FromStateTransaction('PayOnProofOfReceipt', [('sourceTXID',4)], ('change','destination'), ('changePKH', 'destinationPKH'), details)
+		#print(tx.__dict__.__repr__())
+		expectedDict = {
+		    '_inputs': [('sourceTXID', 4)],
+		    '_outputs': [(b'SB\x06\n\x00\x00\x00\x00\x00{\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00', 0), ('changePKH', 0), ('destinationPKH', 0), ('confirmPKH', 0), ('cancelPKH', 0)]
+		}
+		self.assertDictEqual(tx.__dict__, expectedDict)
+		self.checkIgnoredBytes(tx, 7)
 
 	def test_forwarding(self):
 		# cannot encode forward to future network version transactions explicitly from state transactions
