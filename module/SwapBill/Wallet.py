@@ -2,8 +2,11 @@ from __future__ import print_function
 import ecdsa, hashlib, os
 from SwapBill import Address
 
-#def PublicKeyMatchesHash(publicKey, pubKeyHash):
-
+def PublicKeyToPubKeyHash(publicKey):
+	assert type(publicKey) is type(b'')
+	ripemd160 = hashlib.new('ripemd160')
+	ripemd160.update(hashlib.sha256(b'\x04' + publicKey).digest())
+	return ripemd160.digest()
 
 class DefaultKeyGenerator(object):
 	def generatePrivateKey(self):
@@ -12,9 +15,7 @@ class DefaultKeyGenerator(object):
 		sk = ecdsa.SigningKey.from_string(privateKey, curve=ecdsa.SECP256k1)
 		vk = sk.verifying_key
 		publicKey = sk.verifying_key.to_string()
-		ripemd160 = hashlib.new('ripemd160')
-		ripemd160.update(hashlib.sha256(b'\x04' + publicKey).digest())
-		return ripemd160.digest()
+		return PublicKeyToPubKeyHash(publicKey)
 
 class Wallet(object):
 	def __init__(self, fileName, privateKeyAddressVersion, keyGenerator=None):

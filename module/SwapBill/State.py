@@ -1,6 +1,6 @@
 from __future__ import print_function
 import binascii
-from SwapBill import TradeOfferHeap, TradeOffer, Balances, Amounts
+from SwapBill import TradeOfferHeap, TradeOffer, Balances, Amounts, Wallet
 from SwapBill.HardCodedProtocolConstraints import Constraints
 from SwapBill.Amounts import e
 
@@ -413,16 +413,30 @@ class State(object):
 		self._balances.removeRef(exchange.sellerAccount)
 		self._pendingExchanges.pop(pendingExchangeIndex)
 
-	#def _unfundedTransaction_ProofOfReceipt(self, txID, pendingPayIndex, publicKey):
-		#assert outputs == ()
-		#if not pendingPayIndex in self._pays:
-			#raise TransactionFailsAgainstCurrentState('no pending payment with the specified index')
-		#pay = self.pendingPayIndex[pendingPayIndex]
+	def _unfundedTransaction_ProofOfReceipt(self, txID, pendingPayIndex, publicKey, outputs):
+		assert outputs == ()
+		if not pendingPayIndex in self._pendingPays:
+			raise TransactionFailsAgainstCurrentState('no pending payment with the specified index')
+		pay = self._pendingPays[pendingPayIndex]
+		if Wallet.PublicKeyToPubKeyHash(publicKey) != pay.confirmHash:
+			raise TransactionFailsAgainstCurrentState('the supplied public key does not match the public key hash associated with the pending payment')
+		if txID is None:
+			return
+		pay.confirmed = True
 
-		#if txID is None:
-			#return
-
-
+	def _unfundedTransaction_ProofOfCancellation(self, txID, pendingPayIndex, publicKey, outputs):
+		assert outputs == ()
+		if not pendingPayIndex in self._pendingPays:
+			raise TransactionFailsAgainstCurrentState('no pending payment with the specified index')
+		pay = self._pendingPays[pendingPayIndex]
+		if Wallet.PublicKeyToPubKeyHash(publicKey) != pay.cancelHash:
+			raise TransactionFailsAgainstCurrentState('the supplied public key does not match the public key hash associated with the pending payment')
+		if txID is None:
+			return
+		self._balances.addTo_Forwarded(pendingPay.refundAccount, pendingPay.amount)
+		self._balances.removeRef(pendingPay.refundAccount)
+		self._balances.removeRef(pendingPay.destinationAccount)
+		self._pendingPays.pop(pendingPayIndex)
 
 	def checkFundedTransaction(self, transactionType, sourceAccounts, transactionDetails, outputs):
 		try:
