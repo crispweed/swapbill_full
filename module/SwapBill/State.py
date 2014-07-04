@@ -22,6 +22,8 @@ class InvalidTransactionType(Exception):
 
 class LTCSellBacker(object):
 	pass
+class PendingPay(object):
+	pass
 
 class State(object):
 	def __init__(self, startBlockIndex, startBlockHash):
@@ -37,6 +39,8 @@ class State(object):
 		self._pendingExchanges = {}
 		self._nextBackerIndex = 0
 		self._ltcSellBackers = {}
+		self._nextPendingPayIndex = 0
+		self._pendingPays = {}
 
 	def startBlockMatches(self, startBlockHash):
 		return self._startBlockHash == startBlockHash
@@ -81,6 +85,22 @@ class State(object):
 				self._balances.addTo_Forwarded(backer.refundAccount, backer.backingAmount)
 				self._balances.addStateChange(backer.refundAccount)
 				self._balances.removeRef(backer.refundAccount)
+				toDelete.append(key)
+		for key in toDelete:
+				self._ltcSellBackers.pop(key)
+		toDelete = []
+		for key in self._pendingPays:
+			pendingPay = self._pendingPays[key]
+			if not pendingPay.confirmed and pendingPay.confirmExpiry == self._currentBlockIndex:
+				self._balances.addTo_Forwarded(pendingPay.changeAccount, pendingPay.amount)
+				self._balances.removeRef(pendingPay.changeAccount)
+				self._balances.removeRef(pendingPay.destinationAccount)
+				toDelete.append(key)
+			elif pendingPay.expiry == self._currentBlockIndex:
+				assert pendingPay.confirmed
+				self._balances.addTo_Forwarded(pendingPay.destinationAccount, pendingPay.amount)
+				self._balances.removeRef(pendingPay.changeAccount)
+				self._balances.removeRef(pendingPay.destinationAccount)
 				toDelete.append(key)
 		for key in toDelete:
 				self._ltcSellBackers.pop(key)
@@ -318,25 +338,35 @@ class State(object):
 		self._newSellOffer(sell)
 		return swapBillInput
 
-#('PayOnProofOfReceipt',
-#('amount', 6, 'maxBlock', 4),
-#('change','destination'),
-#(('receiptAddress', 0), ('cancelAddress', 0))
-
-	#def _fundedTransaction_PayOnProofOfReceipt(self, txID, swapBillInput, amount, maxBlock, receiptAddress, cancelAddress, outputs):
-		#assert outputs == ('change', 'destination')
-		#if amount < Constraints.minimumSwapBillBalance:
-			#raise BadlyFormedTransaction('amount is below minimum balance')
-		#if maxBlock < self._currentBlockIndex:
-			#raise TransactionFailsAgainstCurrentState('max block for transaction has been exceeded')
-		#change = swapBillInput - amount
-		#self._checkChange(change)
-		#if txID is None:
-			#return
-
-		#self._balances.add((txID, 2), amount)
-
-		#return change
+	def _fundedTransaction_PayOnProofOfReceipt(self, txID, swapBillInput, amount, maxBlock, confirmAddress, cancelAddress, outputs):
+		assert outputs == ('change', 'destination')
+		if amount < Constraints.minimumSwapBillBalance:
+			raise BadlyFormedTransaction('amount is below minimum balance')
+		if maxBlock < self._currentBlockIndex:
+			raise TransactionFailsAgainstCurrentState('max block for transaction has been exceeded')
+		change = swapBillInput - amount
+		self._checkChange(change)
+		if txID is None:
+			return
+		changeAccount = (txID, 1) # already created
+		destinationAccount = (txID, 2)
+		self._balances.add(destinationAccount, 0)
+		self._balances.addFirstRef(changeAccount)
+		self._balances.addFirstRef(destinationAccount)
+		pendingPay = PendingPay()
+		pendingPay.amount = amount
+		pendingPay.destinationAccount = destination
+		pendingPay.refundAccount = change
+		pendingPay.confirmed = False
+		pendingPay.confirmExpiry = self._currentBlockIndex + Constraints.blocksForProofOfReceiptConfirm
+		pendingPay.expiry = self._currentBlockIndex + Constraints.blocksForProofOfReceiptCancel
+		assert pendingPay.expiry > pendingPay.confirmExpiry
+		pendingPay.confirmHash = confirmAddress
+		pendingPay.cancelHash = cancelAddress
+		key = self._nextPendingPayIndex
+		self._nextPendingPayIndex += 1
+		self._pendingPays[key] = pendingPay
+		return change
 
 	def _fundedTransaction_ForwardToFutureNetworkVersion(self, txID, swapBillInput, amount, maxBlock, outputs):
 		assert outputs == ('change',)

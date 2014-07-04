@@ -22,6 +22,8 @@ def totalAccountedFor(state):
 	for key in state._ltcSellBackers:
 		backer = state._ltcSellBackers[key]
 		result += backer.backingAmount
+	for key in state._pendingPays:
+		result += state._pendingPays[key].amount
 	result += state._totalForwarded
 	return result
 
