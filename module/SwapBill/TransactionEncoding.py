@@ -180,9 +180,12 @@ def FromStateTransaction(transactionType, sourceAccounts, outputs, outputPubKeyH
 			numberOfBytes = controlAddressMapping[i * 2 + 1]
 			if valueMapping.endswith(_bytesSuffix):
 				valueMapping = valueMapping[:-len(_bytesSuffix)]
+				data = details[valueMapping]
+				assert len(data) == numberOfBytes
 				controlData += details[valueMapping]
 			else:
-				controlData += _encodeInt(details[valueMapping], numberOfBytes)
+				data = details[valueMapping]
+				controlData += _encodeInt(data, numberOfBytes)
 			while len(controlData) > 20:
 				_checkedAddOutputWithValue(tx, controlData[:20], 0)
 				controlData = controlData[20:]

@@ -170,6 +170,10 @@ class Test(unittest.TestCase):
 		details.pop('publicKey')
 		self.assertRaises(KeyError, TransactionEncoding.FromStateTransaction, transactionType, None, (), (), details)
 		details['publicKey'] = keyData
+		# supplied key data too short
+		details['publicKey'] = keyData[:-1]
+		self.assertRaises(AssertionError, TransactionEncoding.FromStateTransaction, transactionType, None, (), (), details)
+		details['publicKey'] = keyData
 		# successful control transaction
 		tx = TransactionEncoding.FromStateTransaction(transactionType, None, (), (), details)
 		#print(tx.__dict__.__repr__())
