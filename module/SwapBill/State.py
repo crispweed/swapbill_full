@@ -356,7 +356,7 @@ class State(object):
 		pendingPay = PendingPay()
 		pendingPay.amount = amount
 		pendingPay.destinationAccount = destinationAccount
-		pendingPay.refundAccount = change
+		pendingPay.refundAccount = changeAccount
 		pendingPay.confirmed = False
 		pendingPay.confirmExpiry = self._currentBlockIndex + Constraints.blocksForProofOfReceiptConfirm
 		pendingPay.expiry = self._currentBlockIndex + Constraints.blocksForProofOfReceiptCancel

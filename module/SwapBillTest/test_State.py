@@ -1162,4 +1162,14 @@ class Test(unittest.TestCase):
 		destination = outputs['destination']
 		self.assertDictEqual(state._balances.balances, {change:0, destination:0})
 		self.assertEqual(len(state._pendingPays), 1)
-
+		expectedDetails = {
+			'amount': 22*e(7),
+			'cancelHash': 'cancelPKH',
+		    'confirmExpiry': 150,
+		    'confirmHash': 'confirmPKH',
+		    'confirmed': False,
+		    'destinationAccount': destination,
+		    'expiry': 200,
+		    'refundAccount': change
+		}
+		self.assertDictEqual(state._pendingPays[0].__dict__, expectedDetails)
