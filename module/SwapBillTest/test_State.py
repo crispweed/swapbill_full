@@ -31,6 +31,7 @@ class Test(unittest.TestCase):
 	outputsLookup = {
 	    'Burn':('destination',),
 	    'Pay':('change','destination'),
+	    'PayOnProofOfReceipt':('change','destination'),
 	    'LTCBuyOffer':('ltcBuy',),
 	    'LTCSellOffer':('ltcSell',),
 	    'BackLTCSells':('ltcSellBacker',),
@@ -1134,25 +1135,24 @@ class Test(unittest.TestCase):
 		self.assertEqual(state._balances.balances, expectedBalances)
 		self.assertDictEqual(state._ltcSellBackers[0].__dict__, expectedBackerState)
 
-	#def test_match_failure_regression(self):
-		#state = State.State(100, 'mockhash')
-		#self.state = state
-		#burn = self.Burn(28*e(6))
-		#buyer = self.BuyOffer(state, burn, 'receiveLTC1', swapBillOffered=14*e(6), exchangeRate=4026531840)
-		#buyer = self.BuyOffer(state, buyer, 'receiveLTC2', swapBillOffered=14*e(6), exchangeRate=4026531840)
-		#self.assertEqual(state._ltcBuys.size(), 2)
-		#burn = self.Burn(3*e(7))
-		#seller = self.SellOffer(state, burn, ltcOffered=9696969, exchangeRate=4026531840)
-		## can't match either buy because remainder would be too small
-		#self.assertEqual(state._ltcBuys.size(), 2)
-		#self.assertEqual(state._ltcSells.size(), 1)
-
-		#self.assertEqual(state._balances.balances, {receiveB: 1*e(7)-625000-1})
-		#burnA = self.Burn(1*e(7)+1)
-		## no match, but seed amount locked up in sell offer is refunded
-		#self.assertEqual(state._balances.balances, {receiveB:1*e(7)-625000, refundA:1})
-		#self.assertEqual(len(state._pendingExchanges), 1)
-		#self.Completion(state, 0, 'receiveLTC', 1*e(7) // 2)
-		#self.assertEqual(len(state._pendingExchanges), 0)
-		#self.assertEqual(state._balances.balances, {receiveB:1*e(7)+1*e(7), refundA:1})
-		#self.assertEqual(totalAccountedFor(state), state._totalCreated)
+	def test_PayOnProofOfReceipt_failures(self):
+		state = State.State(100, 'starthash')
+		self.state = state
+		active = self.Burn(22*e(7))
+		details = {
+		    'amount':22*e(7),
+		    'maxBlock':100,
+		    'confirmAddress':'confirmPKH',
+		    'cancelAddress':'cancelPKH'
+		}
+		# amount too low
+		details['amount'] = 1
+		active = self.Apply_AssertFails(state, 'PayOnProofOfReceipt', expectedError='amount is below minimum balance', sourceAccounts=[active], **details)
+		details['amount'] = 0
+		active = self.Apply_AssertFails(state, 'PayOnProofOfReceipt', expectedError='amount is below minimum balance', sourceAccounts=[active], **details)
+		details['amount'] = 22*e(7)
+		# max block exceeded
+		details['maxBlock'] = 99
+		active = self.Apply_AssertFails(state, 'PayOnProofOfReceipt', expectedError='max block for transaction has been exceeded', sourceAccounts=[active], **details)
+		details['amount'] = 100
+		self.assertEqual(state._balances.balances, {active:22*e(7)})
