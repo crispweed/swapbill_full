@@ -10,6 +10,9 @@ def FromStateTransactionWrapper(originalFunction):
 		assert transactionType_Check == transactionType
 		assert sourceAccounts_Check == sourceAccounts
 		assert outputs_Check == outputs
+		if details_Check != originalDetails:
+			print('originalDetails:', originalDetails)
+			print('details_Check:', details_Check)
 		assert details_Check == originalDetails
 		return tx
 	return Wrapper
@@ -17,11 +20,11 @@ TransactionEncoding.FromStateTransaction = FromStateTransactionWrapper(Transacti
 
 class Test(unittest.TestCase):
 
-	def checkIgnoredBytes(self, tx, numberOfIgnoredBytes):
+	def checkIgnoredBytes(self, tx, numberOfIgnoredBytes, lastDataOutput=0):
 		transactionType, sourceAccounts, outputs, details = TransactionEncoding.ToStateTransaction(tx)
 		for fillByte in (b'\xff', b'\x00', b'\x80'):
 			if numberOfIgnoredBytes > 0:
-				tx._outputs[0] = (tx._outputs[0][0][:-numberOfIgnoredBytes] + fillByte * numberOfIgnoredBytes, tx._outputs[0][1])
+				tx._outputs[lastDataOutput] = (tx._outputs[lastDataOutput][0][:-numberOfIgnoredBytes] + fillByte * numberOfIgnoredBytes, tx._outputs[lastDataOutput][1])
 				transactionType_Check, sourceAccounts_Check, outputs_Check, details_Check = TransactionEncoding.ToStateTransaction(tx)
 				self.assertEqual(transactionType, transactionType_Check)
 				self.assertEqual(sourceAccounts, sourceAccounts_Check)
@@ -29,7 +32,7 @@ class Test(unittest.TestCase):
 				self.assertDictEqual(details, details_Check)
 		try:
 			for fillByte in (b'\xff', b'\x00', b'\x80'):
-				tx._outputs[0] = (tx._outputs[0][0][:-(numberOfIgnoredBytes + 1)] + fillByte * (numberOfIgnoredBytes + 1), tx._outputs[0][1])
+				tx._outputs[lastDataOutput] = (tx._outputs[lastDataOutput][0][:-(numberOfIgnoredBytes + 1)] + fillByte * (numberOfIgnoredBytes + 1), tx._outputs[lastDataOutput][1])
 				transactionType_Check, sourceAccounts_Check, outputs_Check, details_Check = TransactionEncoding.ToStateTransaction(tx)
 				self.assertEqual(transactionType, transactionType_Check)
 				self.assertEqual(sourceAccounts, sourceAccounts_Check)
@@ -152,6 +155,40 @@ class Test(unittest.TestCase):
 		}
 		self.assertDictEqual(tx.__dict__, expectedDict)
 		self.checkIgnoredBytes(tx, 7)
+
+	def doTestProofOfWhatever(self, transactionType, typeCode):
+		keyData = (b'\x12\x34' + b'\x00'*28 + b'\x56\x78' + b'\x00'*30 + b'\x9a\xbc')
+		details = {'pendingPayIndex':7, 'publicKey':keyData}
+		# source accounts not None
+		self.assertRaises(AssertionError, TransactionEncoding.FromStateTransaction, transactionType, [], (), (), details)
+		# bad output spec
+		self.assertRaises(AssertionError, TransactionEncoding.FromStateTransaction, transactionType, None, ('someOutput',), ('someOutputPKH',), details)
+		# missing details
+		details.pop('pendingPayIndex')
+		self.assertRaises(KeyError, TransactionEncoding.FromStateTransaction, transactionType, None, (), (), details)
+		details['pendingPayIndex'] = 7
+		details.pop('publicKey')
+		self.assertRaises(KeyError, TransactionEncoding.FromStateTransaction, transactionType, None, (), (), details)
+		details['publicKey'] = keyData
+		# successful control transaction
+		tx = TransactionEncoding.FromStateTransaction(transactionType, None, (), (), details)
+		#print(tx.__dict__.__repr__())
+		expectedDict = {
+		    '_inputs': [],
+		    '_outputs': [
+		        (b'SB' + typeCode + b'\x07\x00\x00\x00\x00\x00' + keyData[:11], 0),
+		        (keyData[11:31], 0),
+		        (keyData[31:51], 0),
+		        (keyData[51:64] + b'\x00\x00\x00\x00\x00\x00\x00', 0)
+		    ]
+		}
+		self.assertDictEqual(tx.__dict__, expectedDict)
+		self.checkIgnoredBytes(tx, 7, lastDataOutput=3)
+
+	def test_ProofOfReceipt(self):
+		self.doTestProofOfWhatever('ProofOfReceipt', b'\x81')
+	def test_ProofOfCancellation(self):
+		self.doTestProofOfWhatever('ProofOfCancellation', b'\x82')
 
 	def test_forwarding(self):
 		# cannot encode forward to future network version transactions explicitly from state transactions

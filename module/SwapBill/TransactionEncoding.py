@@ -128,7 +128,7 @@ def ToStateTransaction(tx):
 				value = Util.intFromBytes(data)
 			details[valueMapping] = value
 			pos += numberOfBytes
-		assert pos <= 20
+		assert pos <= len(controlAddressData)
 	else:
 		data = controlAddressData[pos:20]
 		if data != struct.pack('<B', 0) * len(data):
