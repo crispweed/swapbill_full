@@ -125,6 +125,13 @@ class Test(unittest.TestCase):
 		self.assertDictEqual(tx.__dict__, {'_inputs': [('sourceTXID', 7)], '_outputs': [(b'SB\x04 \x00\x00\x00\x00\x00\x04\x00\x00{\x00\x00\x00\xff\xff\xff\x0f', 0), ('ltcSellBackerPKH', 0), ('receivePKH', 0)]})
 		self.checkIgnoredBytes(tx, 0)
 
+	def test_bad_PayOnProofOfReceipt(self):
+		details = {'amount':10, 'maxBlock':123, 'confirmAddress':'confirmPKH', 'cancelAddress':'cancelPKH'}
+		# bad output spec
+		self.assertRaises(AssertionError, TransactionEncoding.FromStateTransaction, 'PayOnProofOfReceipt', [('sourceTXID',4)], ('changeZZ','destination'), ('changePKH', 'destinationPKH'), details)
+		# control transaction
+		TransactionEncoding.FromStateTransaction('PayOnProofOfReceipt', [('sourceTXID',4)], ('change','destination'), ('changePKH', 'destinationPKH'), details)
+
 	def test_forwarding(self):
 		# cannot encode forward to future network version transactions explicitly from state transactions
 		self.assertRaisesRegexp(Exception, "('Unknown transaction type string', 'ForwardToFutureNetworkVersion')", TransactionEncoding.FromStateTransaction, 'ForwardToFutureNetworkVersion', [('sourceTXID',4)], ('change',), ('changePKH',), {'amount':999, 'maxBlock':100})
@@ -166,3 +173,4 @@ class Test(unittest.TestCase):
 		tx = TransactionEncoding.FromStateTransaction('LTCExchangeCompletion', None, (), (), details)
 		details['destinationAmount'] += 1
 		self.assertRaisesRegexp(ExceptionReportedToUser, 'Control address output amount exceeds supported range', TransactionEncoding.FromStateTransaction, 'LTCExchangeCompletion', None, (), (), details)
+

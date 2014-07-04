@@ -43,7 +43,7 @@ _fundedMappingByTypeCode = (
     ('PayOnProofOfReceipt',
      ('amount', 6, 'maxBlock', 4),
      ('change','destination'),
-     (('confirmAddress', 0), ('cancelAddress', 0))
+     (('confirmAddress', None), ('cancelAddress', None))
     ),
 	)
 
