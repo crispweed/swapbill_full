@@ -57,6 +57,13 @@ sp.add_argument('--amount', required=True, help='amount of swapbill to be paid, 
 sp.add_argument('--toAddress', required=True, help='pay to this address')
 sp.add_argument('--blocksUntilExpiry', type=int, default=8, help='if the transaction takes longer than this to go through then the transaction expires (in which case no payment is made and the full amount is returned as change)')
 
+sp = subparsers.add_parser('pay', help='make a swapbill payment')
+sp.add_argument('--amount', required=True, help='amount of swapbill to be paid, as a decimal fraction (one satoshi is 0.00000001)')
+sp.add_argument('--toAddress', required=True, help='pay to this address')
+sp.add_argument('--blocksUntilExpiry', type=int, default=8, help='if the transaction takes longer than this to go through then the transaction expires (in which case no payment is made and the full amount is returned as change)')
+sp.add_argument('--onProofOfReceiptTo', help='pay if receiving party can prove payment to this address (pubKeyHash expressed as litecoin address)')
+sp.add_argument('--cancellationAddress', help='cancellation address for proof of payment (pubKeyHash expressed as litecoin address)')
+
 sp = subparsers.add_parser('post_ltc_buy', help='make an offer to buy litecoin with swapbill')
 sp.add_argument('--swapBillOffered', required=True, help='amount of swapbill offered, as a decimal fraction (one satoshi is 0.00000001)')
 sp.add_argument('--blocksUntilExpiry', type=int, default=8, help='after this number of blocks the offer expires (and swapbill remaining in any unmatched part of the offer is returned)')
@@ -71,6 +78,14 @@ sp.add_argument('--includesCommission', help='(only applies to backed sells) spe
 
 sp = subparsers.add_parser('complete_ltc_sell', help='complete an ltc exchange by fulfilling a pending exchange payment')
 sp.add_argument('--pendingExchangeID', required=True, help='the id of the pending exchange payment to fulfill')
+
+sp = subparsers.add_parser('provide_proof_of_receipt', help='provide proof that the conditions for a pending payment have been met')
+sp.add_argument('--pendingPaymentID', required=True, help='the id of the pending payment')
+sp.add_argument('--proofOfReceipt', required=True, help='hexadecimal data for proof of receipt')
+
+sp = subparsers.add_parser('provide_proof_of_cancellation', help='provide proof required for cancelling a pending payment')
+sp.add_argument('--pendingPaymentID', required=True, help='the id of the pending payment')
+sp.add_argument('--proofOfCancellation', required=True, help='hexadecimal data for proof of cancellation')
 
 sp = subparsers.add_parser('back_ltc_sells', help='commit swapbill to back ltc exchanges')
 sp.add_argument('--backingSwapBill', required=True, help='amount of swapbill to commit, as a decimal fraction (one satoshi is 0.00000001)')
@@ -93,6 +108,9 @@ sp = subparsers.add_parser('get_pending_exchanges', help='get current SwapBill p
 sp.add_argument('-i', '--includepending', help='include transactions that have been submitted but not yet confirmed (based on host memory pool)', action='store_true')
 
 sp = subparsers.add_parser('get_ltc_sell_backers', help='get information about funds currently commited to backing ltc sell operations')
+sp.add_argument('-i', '--includepending', help='include transactions that have been submitted but not yet confirmed (based on host memory pool)', action='store_true')
+
+sp = subparsers.add_parser('get_pending_payments', help='get information payments currently pending proof of receipt')
 sp.add_argument('-i', '--includepending', help='include transactions that have been submitted but not yet confirmed (based on host memory pool)', action='store_true')
 
 sp = subparsers.add_parser('get_state_info', help='get some general state information')
@@ -252,13 +270,23 @@ def Main(startBlockIndex, startBlockHash, useTestNet, commandLineArgs=sys.argv[1
 		return CheckAndSend_Funded(transactionType, outputs, outputPubKeyHashes, details)
 
 	elif args.action == 'pay':
-		transactionType = 'Pay'
 		outputs = ('change', 'destination')
 		outputPubKeyHashes = (wallet.addKeyPairAndReturnPubKeyHash(), CheckAndReturnPubKeyHash(args.toAddress))
 		details = {
 		    'amount':Amounts.FromString(args.amount),
 		    'maxBlock':state._currentBlockIndex + args.blocksUntilExpiry
 		}
+		if args.onProofOfReceiptTo is None:
+			# standard pay transaction
+			if args.cancellationAddress is not None:
+				raise ExceptionReportedToUser('cancellationAddress argument is not valid without onProofOfReceiptTo.')
+			transactionType = 'Pay'
+		else:
+			if args.cancellationAddress is None:
+				raise ExceptionReportedToUser('cancellationAddress argument must be supplied with onProofOfReceiptTo.')
+			transactionType = 'PayOnProofOfReceipt'
+			details['confirmAddress'] = CheckAndReturnPubKeyHash(args.onProofOfReceiptTo)
+			details['cancelAddress'] = CheckAndReturnPubKeyHash(args.cancellationAddress)
 		return CheckAndSend_Funded(transactionType, outputs, outputPubKeyHashes, details)
 
 	elif args.action == 'post_ltc_buy':
@@ -310,6 +338,35 @@ def Main(startBlockIndex, startBlockHash, useTestNet, commandLineArgs=sys.argv[1
 		    'destinationAmount':exchange.ltc
 		}
 		return CheckAndSend_UnFunded(transactionType, (), (), details)
+
+	elif args.action == 'provide_proof_of_receipt':
+		transactionType = 'ProofOfReceipt'
+		pendingPaymentID = int(args.pendingPaymentID)
+		if not pendingPaymentID in state._pendingPays:
+			raise ExceptionReportedToUser('No pending payment with the specified ID.')
+		pay = state._pendingPayments[pendingPaymentID]
+		proofHex = args.proofOfReceipt
+		proofBytes = binascii.unhexlify(proofHex.encode('ascii'))
+		details = {
+		    'pendingPayIndex':pendingPaymentID,
+		    'publicKey':proofBytes,
+		}
+		return CheckAndSend_UnFunded(transactionType, (), (), details)
+
+	elif args.action == 'provide_proof_of_cancellation':
+		transactionType = 'ProofOfCancellation'
+		pendingPaymentID = int(args.pendingPaymentID)
+		if not pendingPaymentID in state._pendingPays:
+			raise ExceptionReportedToUser('No pending payment with the specified ID.')
+		pay = state._pendingPayments[pendingPaymentID]
+		proofHex = args.proofOfCancellation
+		proofBytes = binascii.unhexlify(proofHex.encode('ascii'))
+		details = {
+		    'pendingPayIndex':pendingPaymentID,
+		    'publicKey':proofBytes,
+		}
+		return CheckAndSend_UnFunded(transactionType, (), (), details)
+
 
 	elif args.action == 'back_ltc_sells':
 		transactionType = 'BackLTCSells'
@@ -386,6 +443,20 @@ def Main(startBlockIndex, startBlockHash, useTestNet, commandLineArgs=sys.argv[1
 			d['blocks until expiry'] = backer.expiry - state._currentBlockIndex + 1
 			d['commission'] = Amounts.PercentToString(backer.commission)
 			result.append(('ltc sell backer index', key, d))
+		return result
+
+	elif args.action == 'get_pending_payments':
+		result = []
+		for key in state._pendingPays:
+			d = {}
+			pay = state._pendingPays[key]
+			d['paid by me'] = pay.refundAccount in ownedAccounts.tradeOfferChangeCounts
+			d['paid to me'] = pay.destinationAccount in ownedAccounts.tradeOfferChangeCounts
+			d['amount'] = Amounts.ToString(pay.amount)
+			d['confirmed'] = str(pay.confirmed)
+			d['confirmation period expires on block'] = str(pay.confirmExpiry)
+			d['cancellation period expires on block'] = str(pay.expiry)
+			result.append(('pending payment index', key, d))
 		return result
 
 	else:
