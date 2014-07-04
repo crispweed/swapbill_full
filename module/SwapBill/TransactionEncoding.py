@@ -148,15 +148,13 @@ def FromStateTransaction(transactionType, sourceAccounts, outputs, outputPubKeyH
 	assert len(outputs) == len(outputPubKeyHashes)
 	typeCode, mapping = _mappingFromTypeString(transactionType)
 	tx = HostTransaction.InMemoryTransaction()
-	originalDetails = details
-	details = originalDetails.copy()
+	#originalDetails = details
+	#details = originalDetails.copy()
 	funded = (len(mapping[2]) > 0)
 	assert funded == (sourceAccounts is not None)
 	if sourceAccounts is not None:
 		for txID, vout in sourceAccounts:
 			tx.addInput(txID, vout)
-	details[None] = 0
-	details[0] = 0
 	controlData = ControlAddressPrefix.prefix + _encodeInt(typeCode, 1)
 	controlAmount = 0
 	if type(mapping[1]) is tuple:
@@ -181,5 +179,6 @@ def FromStateTransaction(transactionType, sourceAccounts, outputs, outputPubKeyH
 	destinations = mapping[3]
 	for addressMapping, amountMapping in destinations:
 		assert addressMapping is not None
-		_checkedAddOutputWithValue(tx, details[addressMapping], details[amountMapping])
+		amount = 0 if amountMapping is None else details[amountMapping]
+		_checkedAddOutputWithValue(tx, details[addressMapping], amount)
 	return tx
