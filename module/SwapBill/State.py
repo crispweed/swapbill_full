@@ -92,18 +92,18 @@ class State(object):
 		for key in self._pendingPays:
 			pendingPay = self._pendingPays[key]
 			if not pendingPay.confirmed and pendingPay.confirmExpiry == self._currentBlockIndex:
-				self._balances.addTo_Forwarded(pendingPay.changeAccount, pendingPay.amount)
-				self._balances.removeRef(pendingPay.changeAccount)
+				self._balances.addTo_Forwarded(pendingPay.refundAccount, pendingPay.amount)
+				self._balances.removeRef(pendingPay.refundAccount)
 				self._balances.removeRef(pendingPay.destinationAccount)
 				toDelete.append(key)
 			elif pendingPay.expiry == self._currentBlockIndex:
 				assert pendingPay.confirmed
 				self._balances.addTo_Forwarded(pendingPay.destinationAccount, pendingPay.amount)
-				self._balances.removeRef(pendingPay.changeAccount)
+				self._balances.removeRef(pendingPay.refundAccount)
 				self._balances.removeRef(pendingPay.destinationAccount)
 				toDelete.append(key)
 		for key in toDelete:
-				self._ltcSellBackers.pop(key)
+				self._pendingPays.pop(key)
 		self._currentBlockIndex += 1
 
 	def _matchOffersAndAddExchange(self, buy, sell):

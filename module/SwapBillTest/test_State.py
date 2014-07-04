@@ -60,6 +60,10 @@ class Test(unittest.TestCase):
 		self.state.applyFundedTransaction(transactionType='Burn', txID=txID, outputs=('destination',), transactionDetails={'amount':amount}, sourceAccounts=[])
 		return (txID, 1)
 
+	def Advance(self, numberOfBlocks):
+		for i in range(numberOfBlocks):
+			self.state.advanceToNextBlock()
+
 	def Apply_AssertSucceeds(self, state, transactionType, sourceAccounts=None, **details):
 		outputs = self.outputsLookup[transactionType]
 		# following should not throw if succeeds
@@ -1157,6 +1161,7 @@ class Test(unittest.TestCase):
 		details['maxBlock'] = 100
 		self.assertDictEqual(state._balances.balances, {active:22*e(7)})
 		self.assertFalse(state._pendingPays)
+		# good transaction
 		outputs = self.Apply_AssertSucceeds(state, 'PayOnProofOfReceipt', sourceAccounts=[active], **details)
 		change = outputs['change']
 		destination = outputs['destination']
@@ -1173,3 +1178,11 @@ class Test(unittest.TestCase):
 		    'refundAccount': change
 		}
 		self.assertDictEqual(state._pendingPays[0].__dict__, expectedDetails)
+		# advance to just before expiry
+		self.Advance(50)
+		self.assertEqual(len(state._pendingPays), 1)
+		self.assertDictEqual(state._pendingPays[0].__dict__, expectedDetails)
+		# expiry without confirmation or cancellation
+		self.Advance(1)
+		self.assertEqual(len(state._pendingPays), 0)
+		self.assertDictEqual(state._balances.balances, {change:22*e(7)})
