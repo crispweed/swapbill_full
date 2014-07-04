@@ -2,6 +2,9 @@ from __future__ import print_function
 import ecdsa, hashlib, os
 from SwapBill import Address
 
+#def PublicKeyMatchesHash(publicKey, pubKeyHash):
+
+
 class DefaultKeyGenerator(object):
 	def generatePrivateKey(self):
 		return os.urandom(32)

@@ -55,7 +55,19 @@ _unfundedMappingByTypeCode = (
      (),
      (('destinationAddress', 'destinationAmount'),)
     ),
+    ('ProofOfReceipt',
+     ('pendingPayIndex', 6, 'publicKey:Bytes', 64),
+     (),
+     ()
+    ),
+    ('ProofOfCancellation',
+     ('pendingPayIndex', 6, 'publicKey:Bytes', 64),
+     (),
+     ()
+    ),
 	)
+
+_bytesSuffix = ':Bytes'
 
 def _mappingFromTypeString(transactionType):
 	for i in range(len(_fundedMappingByTypeCode)):
@@ -105,11 +117,15 @@ def ToStateTransaction(tx):
 		for i in range(len(controlAddressMapping) // 2):
 			valueMapping = controlAddressMapping[i * 2]
 			numberOfBytes = controlAddressMapping[i * 2 + 1]
-			if pos + numberOfBytes > 20:
+			while pos + numberOfBytes > len(controlAddressData):
 				controlAddressData += tx.outputPubKeyHash(nextOutput)
 				nextOutput += 1
 			data = controlAddressData[pos:pos + numberOfBytes]
-			value = Util.intFromBytes(data)
+			if valueMapping.endswith(_bytesSuffix):
+				valueMapping = valueMapping[:-len(_bytesSuffix)]
+				value = data
+			else:
+				value = Util.intFromBytes(data)
 			details[valueMapping] = value
 			pos += numberOfBytes
 		assert pos <= 20
@@ -162,8 +178,12 @@ def FromStateTransaction(transactionType, sourceAccounts, outputs, outputPubKeyH
 		for i in range(len(controlAddressMapping) // 2):
 			valueMapping = controlAddressMapping[i * 2]
 			numberOfBytes = controlAddressMapping[i * 2 + 1]
-			controlData += _encodeInt(details[valueMapping], numberOfBytes)
-			if len(controlData) > 20:
+			if valueMapping.endswith(_bytesSuffix):
+				valueMapping = valueMapping[:-len(_bytesSuffix)]
+				controlData += details[valueMapping]
+			else:
+				controlData += _encodeInt(details[valueMapping], numberOfBytes)
+			while len(controlData) > 20:
 				_checkedAddOutputWithValue(tx, controlData[:20], 0)
 				controlData = controlData[20:]
 		assert len(controlData) <= 20

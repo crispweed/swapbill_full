@@ -413,6 +413,16 @@ class State(object):
 		self._balances.removeRef(exchange.sellerAccount)
 		self._pendingExchanges.pop(pendingExchangeIndex)
 
+	#def _unfundedTransaction_ProofOfReceipt(self, txID, pendingPayIndex, publicKey):
+		#assert outputs == ()
+		#if not pendingPayIndex in self._pays:
+			#raise TransactionFailsAgainstCurrentState('no pending payment with the specified index')
+		#pay = self.pendingPayIndex[pendingPayIndex]
+
+		#if txID is None:
+			#return
+
+
 
 	def checkFundedTransaction(self, transactionType, sourceAccounts, transactionDetails, outputs):
 		try:
