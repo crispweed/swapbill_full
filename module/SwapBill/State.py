@@ -433,9 +433,9 @@ class State(object):
 			raise TransactionFailsAgainstCurrentState('the supplied public key does not match the public key hash associated with the pending payment')
 		if txID is None:
 			return
-		self._balances.addTo_Forwarded(pendingPay.refundAccount, pendingPay.amount)
-		self._balances.removeRef(pendingPay.refundAccount)
-		self._balances.removeRef(pendingPay.destinationAccount)
+		self._balances.addTo_Forwarded(pay.refundAccount, pay.amount)
+		self._balances.removeRef(pay.refundAccount)
+		self._balances.removeRef(pay.destinationAccount)
 		self._pendingPays.pop(pendingPayIndex)
 
 	def checkFundedTransaction(self, transactionType, sourceAccounts, transactionDetails, outputs):

@@ -1232,5 +1232,61 @@ class Test(unittest.TestCase):
 		self.assertEqual(len(state._pendingPays), 0)
 		self.assertDictEqual(state._balances.balances, {destination:22*e(7)})
 
+	def test_PayOnProofOfReceipt_Cancelled(self):
+		state = State.State(100, 'starthash')
+		self.state = state
+		active = self.Burn(22*e(7))
+		confirmKey = b'\x82p6@\x0b\x02e\x86\xe2\xdd\xdcW\x1f\xe6?\xf3-\xaf\xba-N\x84s"\x1d\x04\xb0\xc3plM\xb5\xed\xfeT\xc35R]\x1e\x0c\xa6\x97t M\xd65\xb8\x9e\xd0\xad\x9a\xd7\x97\x8c\xae\x02p]\x1f\xa4\x16\x11'
+		confirmHash = b'\xc5\xfeF\x83\xb4\x01\xb6\xde\xa6\xcf\x8b\xd1\x85\xef\x8f\xb5\xc7\xa8\xaa\xa6'
+		cancelKey = b'C\xf4\x8a\x8f\x11\xeb\xdb\x8e\xe7\xbf\x8f-\xf4G\xe7\xad\xb2\xc1Y\x0c\xd4=3\xd7&\xf04\xe4\xc4#m\xc0\xb7\xba\x92\xf0\xe8l\x1a\xef\x92~\x01\xc7\xe2\x1c\x00?0\xd25a\xf6\x9e\x00rJ\x03\xd4@\xfe\x896\x1f'
+		cancelHash = b'\x04\xabqoi\xc9b\x0cEj\x84IQ\xc0@5B\x01m\x84'
+		details = {
+		    'amount':22*e(7),
+		    'maxBlock':100,
+		    'confirmAddress':confirmHash,
+		    'cancelAddress':cancelHash
+		}
+		outputs = self.Apply_AssertSucceeds(state, 'PayOnProofOfReceipt', sourceAccounts=[active], **details)
+		change = outputs['change']
+		destination = outputs['destination']
+		self.assertDictEqual(state._balances.balances, {change:0, destination:0})
+		self.assertEqual(len(state._pendingPays), 1)
+		expectedDetails = {
+			'amount': 22*e(7),
+			'cancelHash': cancelHash,
+		    'confirmExpiry': 150,
+		    'confirmHash': confirmHash,
+		    'confirmed': False,
+		    'destinationAccount': destination,
+		    'expiry': 200,
+		    'refundAccount': change
+		}
+		self.assertDictEqual(state._pendingPays[0].__dict__, expectedDetails)
+		# confirmed, first
+		proofDetails = {
+		    'pendingPayIndex':0,
+		    'publicKey':confirmKey,
+		}
+		self.Apply_AssertSucceeds(state, 'ProofOfReceipt', sourceAccounts=None, **proofDetails)
+		# the pending pay is still outstanding, but flagged as confirmed
+		self.assertEqual(len(state._pendingPays), 1)
+		expectedDetails['confirmed'] = True
+		self.assertDictEqual(state._pendingPays[0].__dict__, expectedDetails)
+		self.assertDictEqual(state._balances.balances, {change:0, destination:0})
+		# cancel transaction fail cases
+		proofDetails = {
+		    'pendingPayIndex':0,
+		    'publicKey':cancelKey,
+		}
+		proofDetails['pendingPayIndex'] = 333
+		self.Apply_AssertFails(state, 'ProofOfCancellation', expectedError='no pending payment with the specified index', sourceAccounts=None, **proofDetails)
+		proofDetails['pendingPayIndex'] = 0
+		proofDetails['publicKey'] = b'badKey'
+		self.Apply_AssertFails(state, 'ProofOfCancellation', expectedError='the supplied public key does not match the public key hash associated with the pending payment', sourceAccounts=None, **proofDetails)
+		proofDetails['publicKey'] = cancelKey
+		# but then cancel transaction goes through
+		self.Apply_AssertSucceeds(state, 'ProofOfCancellation', sourceAccounts=None, **proofDetails)
+		self.assertEqual(len(state._pendingPays), 0)
+		self.assertDictEqual(state._balances.balances, {change:22*e(7)})
 
 
