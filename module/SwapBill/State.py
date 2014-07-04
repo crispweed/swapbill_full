@@ -318,6 +318,26 @@ class State(object):
 		self._newSellOffer(sell)
 		return swapBillInput
 
+#('PayOnProofOfReceipt',
+#('amount', 6, 'maxBlock', 4),
+#('change','destination'),
+#(('receiptAddress', 0), ('cancelAddress', 0))
+
+	#def _fundedTransaction_PayOnProofOfReceipt(self, txID, swapBillInput, amount, maxBlock, receiptAddress, cancelAddress, outputs):
+		#assert outputs == ('change', 'destination')
+		#if amount < Constraints.minimumSwapBillBalance:
+			#raise BadlyFormedTransaction('amount is below minimum balance')
+		#if maxBlock < self._currentBlockIndex:
+			#raise TransactionFailsAgainstCurrentState('max block for transaction has been exceeded')
+		#change = swapBillInput - amount
+		#self._checkChange(change)
+		#if txID is None:
+			#return
+
+		#self._balances.add((txID, 2), amount)
+
+		#return change
+
 	def _fundedTransaction_ForwardToFutureNetworkVersion(self, txID, swapBillInput, amount, maxBlock, outputs):
 		assert outputs == ('change',)
 		if amount < Constraints.minimumSwapBillBalance:

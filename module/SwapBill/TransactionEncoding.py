@@ -40,6 +40,11 @@ _fundedMappingByTypeCode = (
      ('sellerReceive',),
      (('backerLTCReceiveAddress', 'ltcOfferedPlusCommission'),)
 	),
+    #('PayOnProofOfReceipt',
+     #('amount', 6, 'maxBlock', 4),
+     #('change','destination'),
+     #(('receiptAddress', 0), ('cancelAddress', 0))
+    #),
 	)
 
 _forwardCompatibilityMapping = ('ForwardToFutureNetworkVersion', ('amount', 6, 'maxBlock', 4), ('change',), ())
