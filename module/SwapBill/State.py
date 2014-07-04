@@ -355,7 +355,7 @@ class State(object):
 		self._balances.addFirstRef(destinationAccount)
 		pendingPay = PendingPay()
 		pendingPay.amount = amount
-		pendingPay.destinationAccount = destination
+		pendingPay.destinationAccount = destinationAccount
 		pendingPay.refundAccount = change
 		pendingPay.confirmed = False
 		pendingPay.confirmExpiry = self._currentBlockIndex + Constraints.blocksForProofOfReceiptConfirm

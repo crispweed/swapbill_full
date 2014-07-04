@@ -1135,7 +1135,7 @@ class Test(unittest.TestCase):
 		self.assertEqual(state._balances.balances, expectedBalances)
 		self.assertDictEqual(state._ltcSellBackers[0].__dict__, expectedBackerState)
 
-	def test_PayOnProofOfReceipt_failures(self):
+	def test_PayOnProofOfReceipt(self):
 		state = State.State(100, 'starthash')
 		self.state = state
 		active = self.Burn(22*e(7))
@@ -1154,5 +1154,12 @@ class Test(unittest.TestCase):
 		# max block exceeded
 		details['maxBlock'] = 99
 		active = self.Apply_AssertFails(state, 'PayOnProofOfReceipt', expectedError='max block for transaction has been exceeded', sourceAccounts=[active], **details)
-		details['amount'] = 100
-		self.assertEqual(state._balances.balances, {active:22*e(7)})
+		details['maxBlock'] = 100
+		self.assertDictEqual(state._balances.balances, {active:22*e(7)})
+		self.assertFalse(state._pendingPays)
+		outputs = self.Apply_AssertSucceeds(state, 'PayOnProofOfReceipt', sourceAccounts=[active], **details)
+		change = outputs['change']
+		destination = outputs['destination']
+		self.assertDictEqual(state._balances.balances, {change:0, destination:0})
+		self.assertEqual(len(state._pendingPays), 1)
+
