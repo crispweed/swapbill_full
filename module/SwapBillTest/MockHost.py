@@ -61,8 +61,12 @@ class MockHost(object):
 		toAdd['amount'] = amount
 		self._unspent.append(toAdd)
 
-	def _addTransaction(self, txid, unsignedTransactionHex):
-		self._memPool.append((txid, RawTransaction.FromHex(unsignedTransactionHex)))
+	def _addTransaction_Internal(self, txid, txHex):
+		self._memPool.append((txid, RawTransaction.FromHex(txHex)))
+	def _addThirdPartyTransaction(self, txHex):
+		self._nextTXID += 1
+		txid = MakeTXID(self._nextTXID)
+		self._addTransaction_Internal(txid, txHex)
 
 	def getBlockHashAtIndexOrNone(self, blockIndex):
 		if blockIndex >= self._nextBlock:
@@ -168,7 +172,7 @@ class MockHost(object):
 		paidFee = sumOfInputs - sum(outputAmounts)
 		assert paidFee >= requiredFee
 		assert paidFee == requiredFee # can overspend, in theory, but would like to then see the actual repeat case for this
-		self._addTransaction(txid, unsignedTransactionHex)
+		self._addTransaction_Internal(txid, unsignedTransactionHex)
 		return txid
 
 	def formatAddressForEndUser(self,  pubKeyHash):

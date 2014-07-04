@@ -493,8 +493,9 @@ class Test(unittest.TestCase):
 		host._addUnspent(100000000)
 		RunClient(host, ['burn', '--amount', 10000000])
 		# just some randon transaction taken off the litecoin testnet
+		# (txid 6bc0c859176a50540778c03b6c8f28268823a68cd1cd75d4afe2edbcf50ea8d1)
 		# so, inputs will not be valid for our fake blockchain, but we depend on that not being checked for the purpose of this test
-		host._addTransaction("6bc0c859176a50540778c03b6c8f28268823a68cd1cd75d4afe2edbcf50ea8d1", "0100000001566b10778dc28b7cc82e43794bfb26c47ab54a85e1f8e9c8dc04f261024b108c000000006b483045022100aaf6244b7df18296917f430dbb9fa42e159eb79eb3bad8e15a0dfbe84830e08c02206ff81a4cf2cdcd7910c67c13a0694064aec91ae6897d7382dc1e9400b2193bb5012103475fb57d448091d9ca790af2d6d9aca798393199aa70471f38dc359f9f30b50cffffffff0264000000000000001976a914e512a5846125405e009b6f22ac274289f69e185588acb83e5c02000000001976a9147cc3f7daeffe2cfb39630310fad6d0a9fbb4b6aa88ac00000000")
+		host._addThirdPartyTransaction("0100000001566b10778dc28b7cc82e43794bfb26c47ab54a85e1f8e9c8dc04f261024b108c000000006b483045022100aaf6244b7df18296917f430dbb9fa42e159eb79eb3bad8e15a0dfbe84830e08c02206ff81a4cf2cdcd7910c67c13a0694064aec91ae6897d7382dc1e9400b2193bb5012103475fb57d448091d9ca790af2d6d9aca798393199aa70471f38dc359f9f30b50cffffffff0264000000000000001976a914e512a5846125405e009b6f22ac274289f69e185588acb83e5c02000000001976a9147cc3f7daeffe2cfb39630310fad6d0a9fbb4b6aa88ac00000000")
 		info = GetStateInfo(host)
 		self.assertEqual(info['balances'], {'02:1':10000000})
 
@@ -989,3 +990,14 @@ class Test(unittest.TestCase):
 		#burn = RunClient(host, ['burn', '--amount', 1*e(9)])
 		#output, result = RunClient(host, ['get_balance'])
 		#self.assertDictEqual(result, {'balance': '10'})
+
+	def test_first_output_unexpected_script(self):
+		# regression for issue which broke v0.3 client synch
+		# litecoin testnet txid 1773e169b5464bb5ddece1dc5624ab14191cf800daf13f348c0deb2837965c21
+		# first output script type is not the swapbill 'standard' script type
+		# and sync was incorrectly applying the test for this after the transaction decode call
+		txHex = '01000000019bcc5e2f3545cb2311c322c37d0f9d76151152e5f9ec619bdd3ffa2d41fe6af5000000006a4730440220565c33fd0f4767c1b182fee131d015f0b0add681e7a2301ba25108734ae5299c02205c829ce88cabd3621b0186bab4b06136eb9136fb20d86ec7845c375f26f5c80c0121036b564092d5fee4c2a3935eddc7ebf09d34ccd81d9bccadbef65990c7305dea8effffffff02c00e16020000000017a914f134925c0e2ae1ae9621f0141b6dd0424d83c99187ce6dec21000000001976a914a3934b987fb4d7a310747e977863762429cea09588ac00000000'
+		host = InitHost()
+		host._addThirdPartyTransaction(txHex)
+		output, result = RunClient(host, ['get_balance'])
+		self.assertDictEqual(result, {'balance': '0'})
