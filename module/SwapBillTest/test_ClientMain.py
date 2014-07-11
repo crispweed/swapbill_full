@@ -1004,3 +1004,19 @@ class Test(unittest.TestCase):
 
 	def test_pay_on_proof_of_receipt(self):
 		host = InitHost()
+		host._addUnspent(11*e(7))
+		RunClient(host, ['burn', '--amount', 1*e(8)])
+		host._setOwner('recipient')
+		output, result = RunClient(host, ['get_receive_address'])
+		payTargetAddress = result['receive_address']
+		host._setOwner(host.defaultOwner)
+
+		confirmKey = b'\x82p6@\x0b\x02e\x86\xe2\xdd\xdcW\x1f\xe6?\xf3-\xaf\xba-N\x84s"\x1d\x04\xb0\xc3plM\xb5\xed\xfeT\xc35R]\x1e\x0c\xa6\x97t M\xd65\xb8\x9e\xd0\xad\x9a\xd7\x97\x8c\xae\x02p]\x1f\xa4\x16\x11'
+		confirmHash = b'\xc5\xfeF\x83\xb4\x01\xb6\xde\xa6\xcf\x8b\xd1\x85\xef\x8f\xb5\xc7\xa8\xaa\xa6'
+		confirmAddress = 'myZr2DGoRFgnB9xNswJc3kwL1PmAWDGKtk' # litecoin testnet address version
+
+		cancelKey = b'C\xf4\x8a\x8f\x11\xeb\xdb\x8e\xe7\xbf\x8f-\xf4G\xe7\xad\xb2\xc1Y\x0c\xd4=3\xd7&\xf04\xe4\xc4#m\xc0\xb7\xba\x92\xf0\xe8l\x1a\xef\x92~\x01\xc7\xe2\x1c\x00?0\xd25a\xf6\x9e\x00rJ\x03\xd4@\xfe\x896\x1f'
+		cancelHash = b'\x04\xabqoi\xc9b\x0cEj\x84IQ\xc0@5B\x01m\x84'
+		cancelAddress = 'mfweNtzS7WuBwJLbGeAvcA3GQSMvtFgHcL' # litecoin testnet address version
+
+		RunClient(host, ['pay', '--amount', 1*e(8), '--toAddress', payTargetAddress, '--onProofOfReceiptTo', confirmAddress, '--cancellationAddress', cancelAddress])

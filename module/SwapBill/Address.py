@@ -25,6 +25,15 @@ def ToPubKeyHash(addressVersion, address):
 		raise BadAddress('incorrect version byte:', data[:1], 'expected:', addressVersion)
 	return data[1:]
 
+def ToPubKeyHash_AnyVersion(address):
+	try:
+		data = Base58Check.Decode(address)
+	except Base58Check.CharacterNotPermittedInEncodedData as e:
+		raise BadAddress('invalid base58 character encountered')
+	except Base58Check.ChecksumDoesNotMatch as e:
+		raise BadAddress('checksum mismatch')
+	return data[1:]
+
 def PrivateKeyFromWIF(addressVersion, wif):
 	data = Base58Check.Decode(wif)
 	if data[:1] != addressVersion:

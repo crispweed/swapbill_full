@@ -61,8 +61,8 @@ sp = subparsers.add_parser('pay', help='make a swapbill payment')
 sp.add_argument('--amount', required=True, help='amount of swapbill to be paid, as a decimal fraction (one satoshi is 0.00000001)')
 sp.add_argument('--toAddress', required=True, help='pay to this address')
 sp.add_argument('--blocksUntilExpiry', type=int, default=8, help='if the transaction takes longer than this to go through then the transaction expires (in which case no payment is made and the full amount is returned as change)')
-sp.add_argument('--onProofOfReceiptTo', help='pay if receiving party can prove payment to this address (pubKeyHash expressed as litecoin address, cancellationAddress required)')
-sp.add_argument('--cancellationAddress', help='cancellation address for proof of payment (when paying on proof of receipt, pubKeyHash expressed as litecoin address)')
+sp.add_argument('--onProofOfReceiptTo', help='pay if receiving party can prove payment to this address (any address version, cancellationAddress required)')
+sp.add_argument('--cancellationAddress', help='cancellation address for proof of payment (any address version, when paying on proof of receipt)')
 
 sp = subparsers.add_parser('post_ltc_buy', help='make an offer to buy litecoin with swapbill')
 sp.add_argument('--swapBillOffered', required=True, help='amount of swapbill offered, as a decimal fraction (one satoshi is 0.00000001)')
@@ -285,8 +285,11 @@ def Main(startBlockIndex, startBlockHash, useTestNet, commandLineArgs=sys.argv[1
 			if args.cancellationAddress is None:
 				raise ExceptionReportedToUser('cancellationAddress argument must be supplied with onProofOfReceiptTo.')
 			transactionType = 'PayOnProofOfReceipt'
-			details['confirmAddress'] = CheckAndReturnPubKeyHash(args.onProofOfReceiptTo)
-			details['cancelAddress'] = CheckAndReturnPubKeyHash(args.cancellationAddress)
+			try:
+				details['confirmAddress'] = Address.ToPubKeyHash_AnyVersion(args.onProofOfReceiptTo)
+				details['cancelAddress'] = Address.ToPubKeyHash_AnyVersion(args.cancellationAddress)
+			except Address.BadAddress as e:
+				raise BadAddressArgument(address)
 		return CheckAndSend_Funded(transactionType, outputs, outputPubKeyHashes, details)
 
 	elif args.action == 'post_ltc_buy':

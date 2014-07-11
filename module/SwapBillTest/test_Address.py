@@ -4,9 +4,10 @@ from SwapBill import Address
 
 class Test(unittest.TestCase):
 	def CheckRoundTrip(self, pubKeyHash, version=b'\x6f'):
-		version = b'\x6f'
 		address = Address.FromPubKeyHash(version, pubKeyHash)
 		pubKeyHash2 = Address.ToPubKeyHash(version, address)
+		self.assertEqual(pubKeyHash, pubKeyHash2)
+		pubKeyHash2 = Address.ToPubKeyHash_AnyVersion(address)
 		self.assertEqual(pubKeyHash, pubKeyHash2)
 
 	def test(self):
