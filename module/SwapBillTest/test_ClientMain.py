@@ -892,7 +892,7 @@ class Test(unittest.TestCase):
 	def test_bad_commission(self):
 		host = InitHost()
 		host._addUnspent(5*e(12))
-		burn = RunClient(host, ['burn', '--amount', 1*e(12) + Constraints.minimumSwapBillBalance])
+		RunClient(host, ['burn', '--amount', 1*e(12) + Constraints.minimumSwapBillBalance])
 		self.assertRaisesRegexp(ExceptionReportedToUser, 'Bad decimal string [(]negative values are not permitted[)]', RunClient, host, ['back_ltc_sells', '--backingSwapBill', 1*e(12), '--transactionsBacked', '1000', '--blocksUntilExpiry', '20', '--commission', '-0.1'])
 		self.assertRaisesRegexp(ExceptionReportedToUser, 'Bad percentage string [(]value must be greater than 0.0 and less than 1.0[)]', RunClient, host, ['back_ltc_sells', '--backingSwapBill', 1*e(12), '--transactionsBacked', '1000', '--blocksUntilExpiry', '20', '--commission', '1.0'])
 		# zero commission not permitted
@@ -910,7 +910,7 @@ class Test(unittest.TestCase):
 	def test_bad_exchange_rate(self):
 		host = InitHost()
 		host._addUnspent(5*e(8))
-		burn = RunClient(host, ['burn', '--amount', 1*e(8)])
+		RunClient(host, ['burn', '--amount', 1*e(8)])
 		self.assertRaisesRegexp(ExceptionReportedToUser, 'Bad percentage string [(]value must be greater than 0.0 and less than 1.0[)]', RunClient, host, ['post_ltc_sell', '--ltcOffered', 3*e(7)//2, '--exchangeRate', '0.0'])
 		self.assertRaisesRegexp(ExceptionReportedToUser, 'Bad decimal string [(]negative values are not permitted[)]', RunClient, host, ['post_ltc_sell', '--ltcOffered', 3*e(7)//2, '--exchangeRate', '-0.5'])
 		self.assertRaisesRegexp(ExceptionReportedToUser, 'Bad percentage string [(]value must be greater than 0.0 and less than 1.0[)]', RunClient, host, ['post_ltc_sell', '--ltcOffered', 3*e(7)//2, '--exchangeRate', '1.0'])
@@ -923,7 +923,7 @@ class Test(unittest.TestCase):
 		ownerList = ['buyer', 'seller', 'backer']
 		host._addUnspent(5*e(12))
 		host._setOwner('buyer')
-		burn = RunClient(host, ['burn', '--amount', 6*e(9)])
+		RunClient(host, ['burn', '--amount', 6*e(9)])
 		RunClient(host, ['post_ltc_buy', '--swapBillOffered', 2*e(9), '--exchangeRate', '0.5', '--blocksUntilExpiry', '100'])
 		RunClient(host, ['post_ltc_buy', '--swapBillOffered', 4*e(9), '--exchangeRate', '0.5', '--blocksUntilExpiry', '100'])
 		info = GetStateInfo(host)
@@ -969,7 +969,7 @@ class Test(unittest.TestCase):
 		for i in range(10):
 			host._addUnspent(1*e(6))
 		host._addUnspent(TransactionFee.dustLimit * 2)
-		burn = RunClient(host, ['burn', '--amount', 1*e(7)])
+		RunClient(host, ['burn', '--amount', 1*e(7)])
 		output, result = RunClient(host, ['get_balance'])
 		self.assertDictEqual(result, {'balance': '0.1'})
 
@@ -978,7 +978,7 @@ class Test(unittest.TestCase):
 		for i in range(100):
 			host._addUnspent(1*e(6))
 		host._addUnspent(TransactionFee.dustLimit * 10)
-		burn = RunClient(host, ['burn', '--amount', 1*e(8)])
+		RunClient(host, ['burn', '--amount', 1*e(8)])
 		output, result = RunClient(host, ['get_balance'])
 		self.assertDictEqual(result, {'balance': '1'})
 
@@ -987,7 +987,7 @@ class Test(unittest.TestCase):
 		#for i in range(1000):
 			#host._addUnspent(1*e(6))
 		#host._addUnspent(TransactionFee.dustLimit * 100) # very large transaction!
-		#burn = RunClient(host, ['burn', '--amount', 1*e(9)])
+		#RunClient(host, ['burn', '--amount', 1*e(9)])
 		#output, result = RunClient(host, ['get_balance'])
 		#self.assertDictEqual(result, {'balance': '10'})
 
@@ -1001,3 +1001,6 @@ class Test(unittest.TestCase):
 		host._addThirdPartyTransaction(txHex)
 		output, result = RunClient(host, ['get_balance'])
 		self.assertDictEqual(result, {'balance': '0'})
+
+	def test_pay_on_proof_of_receipt(self):
+		host = InitHost()
