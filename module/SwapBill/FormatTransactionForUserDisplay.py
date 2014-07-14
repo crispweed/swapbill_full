@@ -1,9 +1,9 @@
 def Format(host, transactionType, outputs, outputPubKeys, details):
 	assert len(outputs) == len(outputPubKeys)
 	result = transactionType
-	for i in range(len(outputs)):
-		result += ', ' + outputs[i] + ' output address='
-		result += host.formatAddressForEndUser(outputPubKeys[i])
+	for address, pubKey in zip(outputs, outputPubKeys):
+		result += ', ' + address + ' output address='
+		result += host.formatAddressForEndUser(pubKey)
 	for key in sorted(details):
 		result += ', ' + key + '='
 		if key.endswith('Address'):

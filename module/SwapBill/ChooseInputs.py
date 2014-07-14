@@ -4,8 +4,8 @@ def ChooseInputs(maxInputs, unspentAmounts, amountRequired):
 	assert amountRequired > 0
 
 	sortedUnspent = []
-	for	i in range(len(unspentAmounts)):
-		sortedUnspent.append((unspentAmounts[i], i))
+	for	i, amount in enumerate(unspentAmounts):
+		sortedUnspent.append((amount, i))
 	sortedUnspent.sort()
 
 	if maxInputs > len(unspentAmounts):

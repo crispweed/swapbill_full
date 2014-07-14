@@ -6,14 +6,14 @@ class BadPrivateKeyWIF(Exception):
 	pass
 
 def FromPubKeyHash(addressVersion, data):
-	assert type(addressVersion) is type(b'.')
-	assert type(data) is type(b'.')
+	assert type(addressVersion) is type(b'')
+	assert type(data) is type(b'')
 	assert len(addressVersion) == 1
 	assert len(data) == 20
 	return Base58Check.Encode(addressVersion + data)
 
 def ToPubKeyHash(addressVersion, address):
-	assert type(addressVersion) is type(b'.')
+	assert type(addressVersion) is type(b'')
 	assert len(addressVersion) == 1
 	try:
 		data = Base58Check.Decode(address)
@@ -40,8 +40,8 @@ def PrivateKeyFromWIF(addressVersion, wif):
 		raise BadPrivateKeyWIF('incorrect version byte:', data[:1], 'expected:', addressVersion)
 	return data[1:]
 def PrivateKeyToWIF(data, addressVersion):
-	assert type(addressVersion) is type(b'.')
-	assert type(data) is type(b'.')
+	assert type(addressVersion) is type(b'')
+	assert type(data) is type(b'')
 	assert len(addressVersion) == 1
 	assert len(data) == 32
 	return Base58Check.Encode(addressVersion + data)

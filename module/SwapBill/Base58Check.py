@@ -1,6 +1,6 @@
 from __future__ import print_function
 import binascii
-import hashlib
+from hashlib import sha256
 
 class CharacterNotPermittedInEncodedData(Exception):
 	pass
@@ -10,7 +10,7 @@ class ChecksumDoesNotMatch(Exception):
 digits = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz'
 
 def CheckSum(data):
-	return hashlib.sha256(hashlib.sha256(data).digest()).digest()[:4]
+	return sha256(sha256(data).digest()).digest()[:4]
 
 def Encode(data):
 	assert type(data) is type(b'')

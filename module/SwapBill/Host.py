@@ -18,19 +18,12 @@ class Host(object):
 		self._privateKeyAddressVersion = privateKeyAddressVersion
 		self._cachedBlockHash = None
 		self._cachedBlockDataHash = None
-		#blockHashForBlockZero = self._rpcHost.call('getblockhash', 0)
-		#self._hasExtendTransactionsInBlockQuery = True
-		#try:
-			#transactionsInBlockZero = self._rpcHost.call('getrawtransactionsinblock', blockHashForBlockZero)
-		##except RPC.MethodNotFoundException:
-		#except RPC.RPCFailureException: # ** we get a different RPC error for this on Windows
-			#self._hasExtendTransactionsInBlockQuery = False
 		self._submittedTransactionsFileName = submittedTransactionsLogFileName
 
 # unspents, addresses, transaction encode and send
 
 	def getUnspent(self):
-		## lowest level getUnspent interface
+		# lowest level getUnspent interface
 		result = []
 		allUnspent = self._rpcHost.call('listunspent')
 		for output in allUnspent:
@@ -52,11 +45,7 @@ class Host(object):
 		return Address.ToPubKeyHash(self._addressVersion, self._rpcHost.call('getnewaddress'))
 
 	def signAndSend(self, unsignedTransactionHex, privateKeys, maximumSignedSize):
-		#print('\t\tunsignedTransactionHex =', unsignedTransactionHex.__repr__())
-		#print('\t\tprivateKeys =', privateKeys.__repr__())
-		#print('\t\tmaximumSignedSize =', maximumSignedSize.__repr__())
-		#return None
-		## lowest level transaction send interface
+		# lowest level transaction send interface
 		signingResult = self._rpcHost.call('signrawtransaction', unsignedTransactionHex)
 		if signingResult['complete'] != True:
 			privateKeys_WIF = []
@@ -107,16 +96,13 @@ class Host(object):
 		block = self._getBlock_Cached(blockHash)
 		return block.get('nextblockhash', None)
 	def getBlockTransactions(self, blockHash):
-		result = []
 		block = self._getBlock_Cached(blockHash)
 		transactionIDs = block['tx']
 		blockData = self._getBlockData_Cached(blockHash)
 		rawTransactions = RawTransaction.GetTransactionsInBlock(blockData)
 		assert len(rawTransactions) == len(transactionIDs)
 		assert len(transactionIDs) >= 1
-		for i in range(len(rawTransactions) - 1):
-			result.append((transactionIDs[i + 1], rawTransactions[i + 1]))
-		return result
+		return list(zip(transactionIDs, rawTransactions))[1:]
 
 	def getMemPoolTransactions(self):
 		mempool = self._rpcHost.call('getrawmempool')

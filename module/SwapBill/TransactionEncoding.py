@@ -70,12 +70,12 @@ _unfundedMappingByTypeCode = (
 _bytesSuffix = ':Bytes'
 
 def _mappingFromTypeString(transactionType):
-	for i in range(len(_fundedMappingByTypeCode)):
-		if transactionType == _fundedMappingByTypeCode[i][0]:
-			return i, _fundedMappingByTypeCode[i]
-	for i in range(len(_unfundedMappingByTypeCode)):
-		if transactionType == _unfundedMappingByTypeCode[i][0]:
-			return 128 + i, _unfundedMappingByTypeCode[i]
+	for i, entry in enumerate(_fundedMappingByTypeCode):
+		if transactionType == entry[0]:
+			return i, entry
+	for i, entry in enumerate(_unfundedMappingByTypeCode):
+		if transactionType == entry[0]:
+			return 128 + i, entry
 	raise Exception('Unknown transaction type string', transactionType)
 def _mappingFromTypeCode(typeCode):
 	if typeCode < len(_fundedMappingByTypeCode):
@@ -90,8 +90,6 @@ def _mappingFromTypeCode(typeCode):
 def _encodeInt(value, numberOfBytes):
 	if value < 0:
 		raise ExceptionReportedToUser('Negative values are not allowed for transaction parameters.')
-	#print('value:', value)
-	#print('numberOfBytes:', numberOfBytes)
 	result = b''
 	for i in range(numberOfBytes):
 		byteValue = value & 255
