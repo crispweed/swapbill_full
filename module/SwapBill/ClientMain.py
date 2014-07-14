@@ -258,6 +258,18 @@ def Main(startBlockIndex, startBlockHash, useTestNet, commandLineArgs=sys.argv[1
 		except Address.BadAddress as e:
 			raise BadAddressArgument(address)
 		return pubKeyHash
+	def CheckAndReturnPubKeyHash_AnyVersion(address):
+		try:
+			pubKeyHash = Address.ToPubKeyHash_AnyVersion(address)
+		except Address.BadAddress as e:
+			raise BadAddressArgument(address)
+		return pubKeyHash
+
+	def CheckedConvertFromHex(hexString):
+		try:
+			return binascii.unhexlify(hexString.encode('ascii'))
+		except binascii.Error:
+			raise ExceptionReportedToUser("Bad hex string '" + hexString + "'")
 
 	if args.action == 'burn':
 		amount = Amounts.FromString(args.amount)
@@ -285,11 +297,8 @@ def Main(startBlockIndex, startBlockHash, useTestNet, commandLineArgs=sys.argv[1
 			if args.cancellationAddress is None:
 				raise ExceptionReportedToUser('cancellationAddress argument must be supplied with onProofOfReceiptTo.')
 			transactionType = 'PayOnProofOfReceipt'
-			try:
-				details['confirmAddress'] = Address.ToPubKeyHash_AnyVersion(args.onProofOfReceiptTo)
-				details['cancelAddress'] = Address.ToPubKeyHash_AnyVersion(args.cancellationAddress)
-			except Address.BadAddress as e:
-				raise BadAddressArgument(address)
+			details['confirmAddress'] = CheckAndReturnPubKeyHash_AnyVersion(args.onProofOfReceiptTo)
+			details['cancelAddress'] = CheckAndReturnPubKeyHash_AnyVersion(args.cancellationAddress)
 		return CheckAndSend_Funded(transactionType, outputs, outputPubKeyHashes, details)
 
 	elif args.action == 'post_ltc_buy':
@@ -347,12 +356,10 @@ def Main(startBlockIndex, startBlockHash, useTestNet, commandLineArgs=sys.argv[1
 		pendingPaymentID = int(args.pendingPaymentID)
 		if not pendingPaymentID in state._pendingPays:
 			raise ExceptionReportedToUser('No pending payment with the specified ID.')
-		pay = state._pendingPayments[pendingPaymentID]
-		proofHex = args.proofOfReceipt
-		proofBytes = binascii.unhexlify(proofHex.encode('ascii'))
+		pay = state._pendingPays[pendingPaymentID]
 		details = {
 		    'pendingPayIndex':pendingPaymentID,
-		    'publicKey':proofBytes,
+		    'publicKey':CheckedConvertFromHex(args.proofOfReceipt),
 		}
 		return CheckAndSend_UnFunded(transactionType, (), (), details)
 
@@ -361,12 +368,10 @@ def Main(startBlockIndex, startBlockHash, useTestNet, commandLineArgs=sys.argv[1
 		pendingPaymentID = int(args.pendingPaymentID)
 		if not pendingPaymentID in state._pendingPays:
 			raise ExceptionReportedToUser('No pending payment with the specified ID.')
-		pay = state._pendingPayments[pendingPaymentID]
-		proofHex = args.proofOfCancellation
-		proofBytes = binascii.unhexlify(proofHex.encode('ascii'))
+		pay = state._pendingPays[pendingPaymentID]
 		details = {
 		    'pendingPayIndex':pendingPaymentID,
-		    'publicKey':proofBytes,
+		    'publicKey':CheckedConvertFromHex(args.proofOfCancellation),
 		}
 		return CheckAndSend_UnFunded(transactionType, (), (), details)
 

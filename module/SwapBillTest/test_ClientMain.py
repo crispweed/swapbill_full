@@ -1012,11 +1012,99 @@ class Test(unittest.TestCase):
 		host._setOwner(host.defaultOwner)
 
 		confirmKey = b'\x82p6@\x0b\x02e\x86\xe2\xdd\xdcW\x1f\xe6?\xf3-\xaf\xba-N\x84s"\x1d\x04\xb0\xc3plM\xb5\xed\xfeT\xc35R]\x1e\x0c\xa6\x97t M\xd65\xb8\x9e\xd0\xad\x9a\xd7\x97\x8c\xae\x02p]\x1f\xa4\x16\x11'
+		confirmKeyHex = '827036400b026586e2dddc571fe63ff32dafba2d4e8473221d04b0c3706c4db5edfe54c335525d1e0ca69774204dd635b89ed0ad9ad7978cae02705d1fa41611'
 		confirmHash = b'\xc5\xfeF\x83\xb4\x01\xb6\xde\xa6\xcf\x8b\xd1\x85\xef\x8f\xb5\xc7\xa8\xaa\xa6'
 		confirmAddress = 'myZr2DGoRFgnB9xNswJc3kwL1PmAWDGKtk' # litecoin testnet address version
 
 		cancelKey = b'C\xf4\x8a\x8f\x11\xeb\xdb\x8e\xe7\xbf\x8f-\xf4G\xe7\xad\xb2\xc1Y\x0c\xd4=3\xd7&\xf04\xe4\xc4#m\xc0\xb7\xba\x92\xf0\xe8l\x1a\xef\x92~\x01\xc7\xe2\x1c\x00?0\xd25a\xf6\x9e\x00rJ\x03\xd4@\xfe\x896\x1f'
+		cancelKeyHex = '43f48a8f11ebdb8ee7bf8f2df447e7adb2c1590cd43d33d726f034e4c4236dc0b7ba92f0e86c1aef927e01c7e21c003f30d23561f69e00724a03d440fe89361f'
 		cancelHash = b'\x04\xabqoi\xc9b\x0cEj\x84IQ\xc0@5B\x01m\x84'
 		cancelAddress = 'mfweNtzS7WuBwJLbGeAvcA3GQSMvtFgHcL' # litecoin testnet address version
 
+		# bad pay on proof of receipt invocations
+		self.assertRaisesRegexp(ClientMain.BadAddressArgument, 'An address argument is not valid [(]badConfirmAddress[)][.]', RunClient, host, ['pay', '--amount', 1*e(8), '--toAddress', payTargetAddress, '--onProofOfReceiptTo', 'badConfirmAddress', '--cancellationAddress', cancelAddress])
+		self.assertRaisesRegexp(ClientMain.BadAddressArgument, 'An address argument is not valid [(]badCancelAddress[)][.]', RunClient, host, ['pay', '--amount', 1*e(8), '--toAddress', payTargetAddress, '--onProofOfReceiptTo', confirmAddress, '--cancellationAddress', 'badCancelAddress'])
+		self.assertRaisesRegexp(ExceptionReportedToUser, 'cancellationAddress argument must be supplied with onProofOfReceiptTo[.]', RunClient, host, ['pay', '--amount', 1*e(8), '--toAddress', payTargetAddress, '--onProofOfReceiptTo', confirmAddress])
+		self.assertRaisesRegexp(ExceptionReportedToUser, 'cancellationAddress argument is not valid without onProofOfReceiptTo[.]', RunClient, host, ['pay', '--amount', 1*e(8), '--toAddress', payTargetAddress, '--cancellationAddress', 'badCancelAddress'])
+		# and then valid invocation, which should go through correctly
 		RunClient(host, ['pay', '--amount', 1*e(8), '--toAddress', payTargetAddress, '--onProofOfReceiptTo', confirmAddress, '--cancellationAddress', cancelAddress])
+
+		output, result = RunClient(host, ['get_balance'])
+		self.assertDictEqual(result, {'balance': '0'})
+		output, result = RunClient(host, ['get_pending_payments'])
+		expectedResult = [
+		    ('pending payment index', 0,
+		     {'confirmed': 'False', 'paid by me': True, 'cancellation period expires on block': '102', 'amount': '1', 'confirmation period expires on block': '52', 'paid to me': False})
+		]
+		self.assertEqual(result, expectedResult)
+
+		# bad provide proof invocations
+		self.assertRaisesRegexp(ExceptionReportedToUser, "Bad hex string 'badProof'", RunClient, host, ['provide_proof_of_receipt', '--pendingPaymentID', 0, '--proofOfReceipt', 'badProof'])
+		self.assertRaisesRegexp(ExceptionReportedToUser, "Bad hex string 'badProof'", RunClient, host, ['provide_proof_of_cancellation', '--pendingPaymentID', 0, '--proofOfCancellation', 'badProof'])
+		self.assertRaisesRegexp(ExceptionReportedToUser, "Transaction would not complete successfully against current state: the supplied public key does not match the public key hash associated with the pending payment", RunClient, host, ['provide_proof_of_receipt', '--pendingPaymentID', '0', '--proofOfReceipt', cancelKeyHex])
+		self.assertRaisesRegexp(ExceptionReportedToUser, "Transaction would not complete successfully against current state: the supplied public key does not match the public key hash associated with the pending payment", RunClient, host, ['provide_proof_of_cancellation', '--pendingPaymentID', '0', '--proofOfCancellation', confirmKeyHex])
+		self.assertRaisesRegexp(ExceptionReportedToUser, "No pending payment with the specified ID", RunClient, host, ['provide_proof_of_receipt', '--pendingPaymentID', '1', '--proofOfReceipt', confirmKeyHex])
+		self.assertRaisesRegexp(ExceptionReportedToUser, "No pending payment with the specified ID", RunClient, host, ['provide_proof_of_cancellation', '--pendingPaymentID', '1', '--proofOfCancellation', cancelKeyHex])
+
+		# valid invocation providing proof of cancellation
+		RunClient(host, ['provide_proof_of_cancellation', '--pendingPaymentID', 0, '--proofOfCancellation', cancelKeyHex])
+
+		# payment amount is refunded directly
+		output, result = RunClient(host, ['get_balance'])
+		self.assertDictEqual(result, {'balance': '1'})
+		output, result = RunClient(host, ['get_pending_payments'])
+		self.assertEqual(result, [])
+
+		# second pay transaction, same keys and proofs used for ease of testing
+		RunClient(host, ['pay', '--amount', 1*e(8), '--toAddress', payTargetAddress, '--onProofOfReceiptTo', confirmAddress, '--cancellationAddress', cancelAddress])
+
+		output, result = RunClient(host, ['get_balance'])
+		self.assertDictEqual(result, {'balance': '0'})
+		output, result = RunClient(host, ['get_pending_payments'])
+		expectedResult = [
+		    ('pending payment index', 1,
+		     {'confirmed': 'False', 'paid by me': True, 'cancellation period expires on block': '104', 'amount': '1', 'confirmation period expires on block': '54', 'paid to me': False})
+		]
+		self.assertEqual(result, expectedResult)
+
+		# valid invocation providing proof of receipt
+		RunClient(host, ['provide_proof_of_receipt', '--pendingPaymentID', '1', '--proofOfReceipt', confirmKeyHex])
+
+		# payment is marked as confirmed, but held until end of cancellation period
+		output, result = RunClient(host, ['get_balance'])
+		self.assertDictEqual(result, {'balance': '0'})
+		expectedResult[0][2]['confirmed'] = 'True'
+		output, result = RunClient(host, ['get_pending_payments'])
+		self.assertEqual(result, expectedResult)
+
+		self.assertEqual(host._nextBlock, 6)
+		host._advance(98)
+		# just before cancellation period expiry
+		output, result = RunClient(host, ['get_pending_payments'])
+		self.assertEqual(result, expectedResult)
+		output, result = RunClient(host, ['get_balance'])
+		self.assertDictEqual(result, {'balance': '0'})
+		host._setOwner('recipient')
+		output, result = RunClient(host, ['get_balance'])
+		self.assertDictEqual(result, {'balance': '0'})
+		host._setOwner(host.defaultOwner)
+		host._advance(1)
+		# and then should now have expired
+		output, result = RunClient(host, ['get_pending_payments'])
+		self.assertEqual(result, [])
+		output, result = RunClient(host, ['get_balance'])
+		self.assertDictEqual(result, {'balance': '0'})
+		# so recipient gets paid
+		host._setOwner('recipient')
+		output, result = RunClient(host, ['get_balance'])
+		self.assertDictEqual(result, {'balance': '1'})
+		host._setOwner(host.defaultOwner)
+
+
+		#sp = subparsers.add_parser('provide_proof_of_receipt', help='provide proof that the conditions for a pending payment have been met')
+		#sp.add_argument('--pendingPaymentID', required=True, help='the id of the pending payment')
+		#sp.add_argument('--proofOfReceipt', required=True, help='hexadecimal data for proof of receipt')
+
+		#sp = subparsers.add_parser('provide_proof_of_cancellation', help='provide proof required for cancelling a pending payment')
+		#sp.add_argument('--pendingPaymentID', required=True, help='the id of the pending payment')
+		#sp.add_argument('--proofOfCancellation', required=True, help='hexadecimal data for proof of cancellation')
