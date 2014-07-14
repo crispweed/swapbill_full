@@ -1100,11 +1100,6 @@ class Test(unittest.TestCase):
 		self.assertDictEqual(result, {'balance': '1'})
 		host._setOwner(host.defaultOwner)
 
-
-		#sp = subparsers.add_parser('provide_proof_of_receipt', help='provide proof that the conditions for a pending payment have been met')
-		#sp.add_argument('--pendingPaymentID', required=True, help='the id of the pending payment')
-		#sp.add_argument('--proofOfReceipt', required=True, help='hexadecimal data for proof of receipt')
-
-		#sp = subparsers.add_parser('provide_proof_of_cancellation', help='provide proof required for cancelling a pending payment')
-		#sp.add_argument('--pendingPaymentID', required=True, help='the id of the pending payment')
-		#sp.add_argument('--proofOfCancellation', required=True, help='hexadecimal data for proof of cancellation')
+		# TODO add tests for stuff like:
+		# - confirmed and then cancelled
+		# - attempted confirm after confirmation period expired
