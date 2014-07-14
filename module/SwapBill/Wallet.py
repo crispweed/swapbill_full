@@ -50,6 +50,6 @@ class Wallet(object):
 	def hasKeyPairForPubKeyHash(self, pubKeyHash):
 		return pubKeyHash in self._pubKeyHashes
 	def privateKeyForPubKeyHash(self, pubKeyHash):
-		for i in range(len(self._privateKeys)):
-			if self._pubKeyHashes[i] == pubKeyHash:
-				return self._privateKeys[i]
+		for storedHash, privateKey in zip(self._pubKeyHashes, self._privateKeys):
+			if storedHash == pubKeyHash:
+				return privateKey
