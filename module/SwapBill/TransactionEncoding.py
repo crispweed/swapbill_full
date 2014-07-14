@@ -141,11 +141,9 @@ def ToStateTransaction(tx):
 	outputs = mapping[2]
 	destinations = mapping[3]
 	nextOutput += len(outputs)
-	for i in range(len(destinations)):
-		addressMapping, amountMapping = destinations[i]
+	for addressMapping, amountMapping in destinations:
 		assert addressMapping is not None
-		if addressMapping is not None:
-			details[addressMapping] = tx.outputPubKeyHash(nextOutput)
+		details[addressMapping] = tx.outputPubKeyHash(nextOutput)
 		if amountMapping is not None:
 			details[amountMapping] = tx.outputAmount(nextOutput)
 		nextOutput += 1
@@ -173,9 +171,7 @@ def FromStateTransaction(transactionType, sourceAccounts, outputs, outputPubKeyH
 	controlAmount = 0
 	if type(mapping[1]) is tuple:
 		controlAddressMapping = mapping[1]
-		for i in range(len(controlAddressMapping) // 2):
-			valueMapping = controlAddressMapping[i * 2]
-			numberOfBytes = controlAddressMapping[i * 2 + 1]
+		for valueMapping, numberOfBytes in zip(controlAddressMapping[::2], controlAddressMapping[1::2]):
 			if valueMapping.endswith(_bytesSuffix):
 				valueMapping = valueMapping[:-len(_bytesSuffix)]
 				data = details[valueMapping]
