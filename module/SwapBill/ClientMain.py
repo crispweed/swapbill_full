@@ -268,7 +268,7 @@ def Main(startBlockIndex, startBlockHash, useTestNet, commandLineArgs=sys.argv[1
 	def CheckedConvertFromHex(hexString):
 		try:
 			return binascii.unhexlify(hexString.encode('ascii'))
-		except binascii.Error:
+		except (binascii.Error, TypeError):
 			raise ExceptionReportedToUser("Bad hex string '" + hexString + "'")
 
 	if args.action == 'burn':
