@@ -11,7 +11,7 @@ def Parse(fileBuffer):
 	for line in f:
 		assert type(line) is type(b''.decode())
 		stripped = line.strip()
-		if stripped.startswith('#'):
+		if stripped.startswith('#') or not stripped:
 			continue
 		parts = stripped.split('=')
 		assert len(parts) == 2
