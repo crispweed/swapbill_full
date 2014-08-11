@@ -98,6 +98,10 @@ class MockHost(object):
 	def _advance(self, numberOfBlocks):
 		self._nextBlock += numberOfBlocks
 
+	def getPrivateKeyAddressVersion(self):
+		# bitcoin private key address version
+		return b'\x80'
+
 	def getUnspent(self):
 		result = []
 		for entry in self._unspent:

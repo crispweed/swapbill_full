@@ -20,6 +20,7 @@ try:
 	from SwapBill.ExceptionReportedToUser import ExceptionReportedToUser
 	from SwapBill.State import InsufficientFundsForTransaction, BadlyFormedTransaction, TransactionFailsAgainstCurrentState
 	from SwapBill.HardCodedProtocolConstraints import Constraints
+	from SwapBill.HostFromPrefsByProtocol import HostFromPrefsByProtocol
 except ImportError as e:
 	message = str(e)
 	start = 'No module named '
@@ -116,7 +117,7 @@ sp.add_argument('-i', '--includepending', help='include transactions that have b
 sp = subparsers.add_parser('get_state_info', help='get some general state information')
 sp.add_argument('-i', '--includepending', help='include transactions that have been submitted but not yet confirmed (based on host memory pool)', action='store_true')
 
-def Main(startBlockIndex, startBlockHash, useTestNet, commandLineArgs=sys.argv[1:], host=None, keyGenerator=None, out=sys.stdout):
+def Main(startBlockIndex, startBlockHash, commandLineArgs=sys.argv[1:], host=None, keyGenerator=None, out=sys.stdout):
 	args = parser.parse_args(commandLineArgs)
 
 	if not path.isdir(args.dataDir):
@@ -129,42 +130,10 @@ def Main(startBlockIndex, startBlockHash, useTestNet, commandLineArgs=sys.argv[1
 		except Exception as e:
 			raise ExceptionReportedToUser("Failed to create directory " + dataDir + ":", e)
 
-	if useTestNet:
-		addressVersion = b'\x6f'
-		privateKeyAddressVersion = b'\xef'
-	else:
-		addressVersion = b'\x30'
-		privateKeyAddressVersion = b'\xbf'
-
-	wallet = Wallet.Wallet(path.join(dataDir, 'wallet.txt'), privateKeyAddressVersion=privateKeyAddressVersion, keyGenerator=keyGenerator) # litecoin testnet private key address version
-
 	if host is None:
-		configFile = args.configFile
-		if configFile is None:
-			if os.name == 'nt':
-				configFile = path.join(path.expanduser("~"), 'AppData', 'Roaming', 'Litecoin', 'litecoin.conf')
-			else:
-				configFile = path.join(path.expanduser("~"), '.litecoin', 'litecoin.conf')
-		with open(configFile, mode='rb') as f:
-			configFileBuffer = f.read()
-		clientConfig = ParseConfig.Parse(configFileBuffer)
-		RPC_HOST = clientConfig.get('externalip', 'localhost')
-		try:
-			RPC_PORT = clientConfig['rpcport']
-		except KeyError:
-			if useTestNet:
-				RPC_PORT = 19332
-			else:
-				RPC_PORT = 9332
-		assert int(RPC_PORT) > 1 and int(RPC_PORT) < 65535
-		try:
-			RPC_USER = clientConfig['rpcuser']
-			RPC_PASSWORD = clientConfig['rpcpassword']
-		except KeyError:
-			raise ExceptionReportedToUser('Values for rpcuser and rpcpassword must both be set in your config file.')
-		rpcHost = RPC.Host('http://' + RPC_USER + ':' + RPC_PASSWORD + '@' + RPC_HOST + ':' + str(RPC_PORT))
-		submittedTransactionsLogFileName = path.join(dataDir, 'submittedTransactions.txt')
-		host = Host.Host(rpcHost=rpcHost, addressVersion=addressVersion, privateKeyAddressVersion=privateKeyAddressVersion, submittedTransactionsLogFileName=submittedTransactionsLogFileName)
+		host = HostFromPrefsByProtocol(protocol='litecoin', configFile=args.configFile, dataDir=dataDir)
+
+	wallet = Wallet.Wallet(path.join(dataDir, 'wallet.txt'), privateKeyAddressVersion=host.getPrivateKeyAddressVersion(), keyGenerator=keyGenerator)
 
 	includePending = hasattr(args, 'includepending') and args.includepending
 

@@ -74,7 +74,7 @@ def RunClient(host, args):
 	fullArgs = ['--dataDir', ownerDir] + convertedArgs
 	out = io.StringIO()
 	assert host.getBlockHashAtIndexOrNone(0) is not None
-	result = ClientMain.Main(startBlockIndex=0, startBlockHash=host.getBlockHashAtIndexOrNone(0), useTestNet=True, commandLineArgs=fullArgs, host=host, keyGenerator=keyGenerator, out=out)
+	result = ClientMain.Main(startBlockIndex=0, startBlockHash=host.getBlockHashAtIndexOrNone(0), commandLineArgs=fullArgs, host=host, keyGenerator=keyGenerator, out=out)
 	return out.getvalue(), result
 
 def GetStateInfo(host, includePending=False, forceRescan=False):
@@ -165,7 +165,7 @@ class Test(unittest.TestCase):
 		out = io.StringIO()
 		startBlock = 5
 		assert host.getBlockHashAtIndexOrNone(startBlock) is None
-		self.assertRaisesRegexp(ExceptionReportedToUser, 'Block chain has not reached the swapbill start block [(]5[)][.]', ClientMain.Main, startBlockIndex=startBlock, startBlockHash='madeUpBlockHash', useTestNet=True, commandLineArgs=args, host=host, out=out)
+		self.assertRaisesRegexp(ExceptionReportedToUser, 'Block chain has not reached the swapbill start block [(]5[)][.]', ClientMain.Main, startBlockIndex=startBlock, startBlockHash='madeUpBlockHash', commandLineArgs=args, host=host, out=out)
 
 	def test_minimum_balance(self):
 		host = InitHost()

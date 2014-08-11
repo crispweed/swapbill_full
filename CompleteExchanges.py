@@ -24,7 +24,7 @@ startBlockHash='f7598a6372065a3707b1ea31921dc281af40fd50ef54dc123f7d51a7c33fd252
 while True:
 	try:
 		#-i option is important here, as this prevents us completing the same exchange multiple times!
-		result = ClientMain.Main(commandLineArgs=['get_pending_exchanges', '-i'], startBlockIndex=startBlockIndex, startBlockHash=startBlockHash, useTestNet=True)
+		result = ClientMain.Main(commandLineArgs=['get_pending_exchanges', '-i'], startBlockIndex=startBlockIndex, startBlockHash=startBlockHash)
 	except ExceptionReportedToUser as e:
 		print("get_pending_exchanges failed:", e)
 		time.sleep(40)
@@ -35,7 +35,7 @@ while True:
 		continue
 	# go ahead and complete
 	try:
-		result = ClientMain.Main(commandLineArgs=['complete_ltc_sell', '--pendingExchangeID', str(exchangeID)], startBlockIndex=startBlockIndex, startBlockHash=startBlockHash, useTestNet=True)
+		result = ClientMain.Main(commandLineArgs=['complete_ltc_sell', '--pendingExchangeID', str(exchangeID)], startBlockIndex=startBlockIndex, startBlockHash=startBlockHash)
 	except ExceptionReportedToUser as e:
 		print("complete_ltc_sell failed:", e)
 	time.sleep(40)

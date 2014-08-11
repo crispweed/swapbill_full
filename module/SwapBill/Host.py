@@ -20,6 +20,9 @@ class Host(object):
 		self._cachedBlockDataHash = None
 		self._submittedTransactionsFileName = submittedTransactionsLogFileName
 
+	def getPrivateKeyAddressVersion(self):
+		return self._privateKeyAddressVersion
+
 # unspents, addresses, transaction encode and send
 
 	def getUnspent(self):
