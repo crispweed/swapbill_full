@@ -44,7 +44,7 @@ class Host(object):
 			result.append(filtered)
 		return result
 
-	def getNewNonSwapBillAddress(self):
+	def getManagedAddress(self):
 		return Address.ToPubKeyHash(self._addressVersion, self._rpcHost.call('getnewaddress'))
 
 	def signAndSend(self, unsignedTransactionHex, privateKeys, maximumSignedSize):

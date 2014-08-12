@@ -54,7 +54,7 @@ class MockHost(object):
 		txid = MakeTXID(self._nextTXID)
 		vout = 7
 		toAdd = {'txid':txid, 'vout':vout}
-		pubKeyHash = self.getNewNonSwapBillAddress()
+		pubKeyHash = self.getManagedAddress()
 		scriptPubKey = RawTransaction.ScriptPubKeyForPubKeyHash(pubKeyHash)
 		toAdd['scriptPubKey'] = scriptPubKey
 		toAdd['address'] = pubKeyHash
@@ -109,7 +109,7 @@ class MockHost(object):
 				result.append(entry)
 		return result
 
-	def getNewNonSwapBillAddress(self):
+	def getManagedAddress(self):
 		privateKey = self._keyGenerator.generatePrivateKey()
 		pubKeyHash = self._keyGenerator.privateKeyToPubKeyHash(privateKey)
 		self._keyPairs.append((privateKey, pubKeyHash))

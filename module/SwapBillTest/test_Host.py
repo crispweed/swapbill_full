@@ -58,7 +58,7 @@ class Test(unittest.TestCase):
 		expectedQuery = ('getnewaddress',)
 		queryResult = 'mujT1HnMuekKoNRdKG5h1YWwXYb5orcJ7h'
 		rpcHost.queue.append((expectedQuery, queryResult))
-		address = host.getNewNonSwapBillAddress()
+		address = host.getManagedAddress()
 		self.assertEqual(address, b'\x9b\xee\xb8\x1f\x07Lo\x9c\xe8?\x9d\x1b\xf1\xda2\xbf\x8bVE\xbb')
 
 	def test_sign_without_swapbill_inputs(self):

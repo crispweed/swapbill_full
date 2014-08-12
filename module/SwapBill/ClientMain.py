@@ -162,7 +162,7 @@ def Main(startBlockIndex, startBlockHash, commandLineArgs=sys.argv[1:], host=Non
 	transactionBuildLayer = TransactionBuildLayer.TransactionBuildLayer(host, ownedAccounts)
 
 	def SetFeeAndSend(baseTX, baseTXInputsAmount, unspent):
-		change = host.getNewNonSwapBillAddress()
+		change = host.getManagedAddress()
 		maximumSignedSize = TransactionFee.startingMaximumSize
 		transactionFee = TransactionFee.startingFee
 		while True:
@@ -175,7 +175,7 @@ def Main(startBlockIndex, startBlockHash, commandLineArgs=sys.argv[1:], host=Non
 				transactionFee += TransactionFee.feeStep
 
 	def CheckAndSend_Common(transactionType, sourceAccounts, outputs, outputPubKeys, details):
-		change = host.getNewNonSwapBillAddress()
+		change = host.getManagedAddress()
 		print('attempting to send ' + FormatTransactionForUserDisplay.Format(host, transactionType, outputs, outputPubKeys, details), file=out)
 		baseTX = TransactionEncoding.FromStateTransaction(transactionType, sourceAccounts, outputs, outputPubKeys, details)
 		backingUnspent = transactionBuildLayer.getUnspent()
@@ -277,7 +277,7 @@ def Main(startBlockIndex, startBlockHash, commandLineArgs=sys.argv[1:], host=Non
 		details = {
 		    'swapBillOffered':Amounts.FromString(args.swapBillOffered),
 		    'exchangeRate':Amounts.PercentFromString(args.exchangeRate),
-		    'receivingAddress':host.getNewNonSwapBillAddress(),
+		    'receivingAddress':host.getManagedAddress(),
 		    'maxBlock':state._currentBlockIndex + args.blocksUntilExpiry
 		}
 		return CheckAndSend_Funded(transactionType, outputs, outputPubKeyHashes, details)
@@ -352,7 +352,7 @@ def Main(startBlockIndex, startBlockHash, commandLineArgs=sys.argv[1:], host=Non
 		details = {
 		    'backingAmount':Amounts.FromString(args.backingSwapBill),
 		    'transactionsBacked':int(args.transactionsBacked),
-		    'ltcReceiveAddress':host.getNewNonSwapBillAddress(),
+		    'ltcReceiveAddress':host.getManagedAddress(),
 		    'commission':Amounts.PercentFromString(args.commission),
 		    'maxBlock':state._currentBlockIndex + args.blocksUntilExpiry
 		}
