@@ -179,13 +179,3 @@ class Test(unittest.TestCase):
 			data = binascii.unhexlify(transactionHex.encode('ascii'))
 			expectedTransactions.append((txID, data))
 		self.assertEqual(transactions, expectedTransactions)
-
-	def test_formatting(self):
-		rpcHost = MockRPC.Host()
-		host = InitHost(rpcHost);
-		address = 'mn5c2gxCDPaNQrLHRnwEr84JLqHZ1PDWjb'
-		pubKeyHash = host.addressFromEndUserFormat(address)
-		self.assertEqual(pubKeyHash, b'G\xfd\x90\xad\xd4\xb3\xbe\xec\x9a\x9e\x7f\xf8:^d\x8d\xdf\xd7\xdcX')
-		formatted = host.formatAddressForEndUser(pubKeyHash)
-		self.assertEqual(formatted, address)
-		self.assertEqual(host.formatAccountForEndUser(('txid', 4)), 'txid:4')

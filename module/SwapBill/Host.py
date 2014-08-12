@@ -20,6 +20,8 @@ class Host(object):
 		self._cachedBlockDataHash = None
 		self._submittedTransactionsFileName = submittedTransactionsLogFileName
 
+	def getAddressVersion(self):
+		return self._addressVersion
 	def getPrivateKeyAddressVersion(self):
 		return self._privateKeyAddressVersion
 
@@ -116,11 +118,6 @@ class Host(object):
 		return result
 
 # convenience
-
-	def formatAddressForEndUser(self,  pubKeyHash):
-		return Address.FromPubKeyHash(self._addressVersion, pubKeyHash)
-	def addressFromEndUserFormat(self,  address):
-		return Address.ToPubKeyHash(self._addressVersion, address)
 
 	def formatAccountForEndUser(self, account):
 		txID, vOut = account

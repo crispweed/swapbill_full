@@ -223,7 +223,7 @@ def Main(startBlockIndex, startBlockHash, commandLineArgs=sys.argv[1:], host=Non
 
 	def CheckAndReturnPubKeyHash(address):
 		try:
-			pubKeyHash = host.addressFromEndUserFormat(address)
+			pubKeyHash = Address.ToPubKeyHash(host.getAddressVersion(), address)
 		except Address.BadAddress as e:
 			raise BadAddressArgument(address)
 		return pubKeyHash
@@ -360,7 +360,8 @@ def Main(startBlockIndex, startBlockHash, commandLineArgs=sys.argv[1:], host=Non
 
 	elif args.action == 'get_receive_address':
 		pubKeyHash = wallet.addKeyPairAndReturnPubKeyHash()
-		return {'receive_address': host.formatAddressForEndUser(pubKeyHash)}
+		address = Address.FromPubKeyHash(host.getAddressVersion(), pubKeyHash)
+		return {'receive_address': address}
 
 	elif args.action == 'get_balance':
 		total = 0

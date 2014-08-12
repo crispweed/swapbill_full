@@ -98,6 +98,9 @@ class MockHost(object):
 	def _advance(self, numberOfBlocks):
 		self._nextBlock += numberOfBlocks
 
+	def getAddressVersion(self):
+		# bitcoin address version
+		return b'\x00'
 	def getPrivateKeyAddressVersion(self):
 		# bitcoin private key address version
 		return b'\x80'
@@ -178,11 +181,6 @@ class MockHost(object):
 		assert paidFee == requiredFee # can overspend, in theory, but would like to then see the actual repeat case for this
 		self._addTransaction_Internal(txid, unsignedTransactionHex)
 		return txid
-
-	def formatAddressForEndUser(self,  pubKeyHash):
-		return Address.FromPubKeyHash(b'\x6f', pubKeyHash) # litecoin testnet address version
-	def addressFromEndUserFormat(self,  address):
-		return Address.ToPubKeyHash(b'\x6f', address) # litecoin testnet address version
 
 	def formatAccountForEndUser(self, account):
 		txID, vOut = account
