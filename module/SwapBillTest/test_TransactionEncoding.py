@@ -128,26 +128,26 @@ class Test(unittest.TestCase):
 		self.assertDictEqual(tx.__dict__, {'_inputs': [('sourceTXID', 7)], '_outputs': [(b'SB\x04 \x00\x00\x00\x00\x00\x04\x00\x00{\x00\x00\x00\xff\xff\xff\x0f', 0), ('ltcSellBackerPKH', 0), ('receivePKH', 0)]})
 		self.checkIgnoredBytes(tx, 0)
 
-	def test_PayOnProofOfReceipt(self):
+	def test_PayOnRevealSecret(self):
 		details = {'amount':10, 'maxBlock':123, 'confirmAddress':'confirmPKH', 'cancelAddress':'cancelPKH'}
 		# bad output spec
-		self.assertRaises(AssertionError, TransactionEncoding.FromStateTransaction, 'PayOnProofOfReceipt', [('sourceTXID',4)], ('changeZZ','destination'), ('changePKH', 'destinationPKH'), details)
-		self.assertRaises(AssertionError, TransactionEncoding.FromStateTransaction, 'PayOnProofOfReceipt', [('sourceTXID',4)], ('change','destinationZZ'), ('changePKH', 'destinationPKH'), details)
+		self.assertRaises(AssertionError, TransactionEncoding.FromStateTransaction, 'PayOnRevealSecret', [('sourceTXID',4)], ('changeZZ','destination'), ('changePKH', 'destinationPKH'), details)
+		self.assertRaises(AssertionError, TransactionEncoding.FromStateTransaction, 'PayOnRevealSecret', [('sourceTXID',4)], ('change','destinationZZ'), ('changePKH', 'destinationPKH'), details)
 		# missing details
 		details.pop('amount')
-		self.assertRaises(KeyError, TransactionEncoding.FromStateTransaction, 'PayOnProofOfReceipt', [('sourceTXID',4)], ('change','destination'), ('changePKH', 'destinationPKH'), details)
+		self.assertRaises(KeyError, TransactionEncoding.FromStateTransaction, 'PayOnRevealSecret', [('sourceTXID',4)], ('change','destination'), ('changePKH', 'destinationPKH'), details)
 		details['amount'] = 10
 		details.pop('maxBlock')
-		self.assertRaises(KeyError, TransactionEncoding.FromStateTransaction, 'PayOnProofOfReceipt', [('sourceTXID',4)], ('change','destination'), ('changePKH', 'destinationPKH'), details)
+		self.assertRaises(KeyError, TransactionEncoding.FromStateTransaction, 'PayOnRevealSecret', [('sourceTXID',4)], ('change','destination'), ('changePKH', 'destinationPKH'), details)
 		details['maxBlock'] = 123
 		details.pop('confirmAddress')
-		self.assertRaises(KeyError, TransactionEncoding.FromStateTransaction, 'PayOnProofOfReceipt', [('sourceTXID',4)], ('change','destination'), ('changePKH', 'destinationPKH'), details)
+		self.assertRaises(KeyError, TransactionEncoding.FromStateTransaction, 'PayOnRevealSecret', [('sourceTXID',4)], ('change','destination'), ('changePKH', 'destinationPKH'), details)
 		details['confirmAddress'] = 'confirmPKH'
 		details.pop('cancelAddress')
-		self.assertRaises(KeyError, TransactionEncoding.FromStateTransaction, 'PayOnProofOfReceipt', [('sourceTXID',4)], ('change','destination'), ('changePKH', 'destinationPKH'), details)
+		self.assertRaises(KeyError, TransactionEncoding.FromStateTransaction, 'PayOnRevealSecret', [('sourceTXID',4)], ('change','destination'), ('changePKH', 'destinationPKH'), details)
 		details['cancelAddress'] = 'cancelPKH'
 		# successful control transaction
-		tx = TransactionEncoding.FromStateTransaction('PayOnProofOfReceipt', [('sourceTXID',4)], ('change','destination'), ('changePKH', 'destinationPKH'), details)
+		tx = TransactionEncoding.FromStateTransaction('PayOnRevealSecret', [('sourceTXID',4)], ('change','destination'), ('changePKH', 'destinationPKH'), details)
 		#print(tx.__dict__.__repr__())
 		expectedDict = {
 		    '_inputs': [('sourceTXID', 4)],

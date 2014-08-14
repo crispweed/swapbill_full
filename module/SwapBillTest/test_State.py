@@ -31,7 +31,7 @@ class Test(unittest.TestCase):
 	outputsLookup = {
 	    'Burn':('destination',),
 	    'Pay':('change','destination'),
-	    'PayOnProofOfReceipt':('change','destination'),
+	    'PayOnRevealSecret':('change','destination'),
 	    'LTCBuyOffer':('ltcBuy',),
 	    'LTCSellOffer':('ltcSell',),
 	    'BackLTCSells':('ltcSellBacker',),
@@ -1141,7 +1141,7 @@ class Test(unittest.TestCase):
 		self.assertEqual(state._balances.balances, expectedBalances)
 		self.assertDictEqual(state._ltcSellBackers[0].__dict__, expectedBackerState)
 
-	def test_PayOnProofOfReceipt(self):
+	def test_PayOnRevealSecret(self):
 		state = State.State(100, 'starthash')
 		self.state = state
 		active = self.Burn(22*e(7))
@@ -1157,18 +1157,18 @@ class Test(unittest.TestCase):
 		}
 		# amount too low
 		details['amount'] = 1
-		active = self.Apply_AssertFails(state, 'PayOnProofOfReceipt', expectedError='amount is below minimum balance', sourceAccounts=[active], **details)
+		active = self.Apply_AssertFails(state, 'PayOnRevealSecret', expectedError='amount is below minimum balance', sourceAccounts=[active], **details)
 		details['amount'] = 0
-		active = self.Apply_AssertFails(state, 'PayOnProofOfReceipt', expectedError='amount is below minimum balance', sourceAccounts=[active], **details)
+		active = self.Apply_AssertFails(state, 'PayOnRevealSecret', expectedError='amount is below minimum balance', sourceAccounts=[active], **details)
 		details['amount'] = 22*e(7)
 		# max block exceeded
 		details['maxBlock'] = 99
-		active = self.Apply_AssertFails(state, 'PayOnProofOfReceipt', expectedError='max block for transaction has been exceeded', sourceAccounts=[active], **details)
+		active = self.Apply_AssertFails(state, 'PayOnRevealSecret', expectedError='max block for transaction has been exceeded', sourceAccounts=[active], **details)
 		details['maxBlock'] = 100
 		self.assertDictEqual(state._balances.balances, {active:22*e(7)})
 		self.assertFalse(state._pendingPays)
 		# good transaction
-		outputs = self.Apply_AssertSucceeds(state, 'PayOnProofOfReceipt', sourceAccounts=[active], **details)
+		outputs = self.Apply_AssertSucceeds(state, 'PayOnRevealSecret', sourceAccounts=[active], **details)
 		change = outputs['change']
 		destination = outputs['destination']
 		self.assertDictEqual(state._balances.balances, {change:0, destination:0})
@@ -1195,7 +1195,7 @@ class Test(unittest.TestCase):
 		active = change
 		# put the transaction through again
 		details['maxBlock'] = 151
-		outputs = self.Apply_AssertSucceeds(state, 'PayOnProofOfReceipt', sourceAccounts=[active], **details)
+		outputs = self.Apply_AssertSucceeds(state, 'PayOnRevealSecret', sourceAccounts=[active], **details)
 		change = outputs['change']
 		destination = outputs['destination']
 		self.assertDictEqual(state._balances.balances, {change:0, destination:0})
@@ -1232,7 +1232,7 @@ class Test(unittest.TestCase):
 		self.assertEqual(len(state._pendingPays), 0)
 		self.assertDictEqual(state._balances.balances, {destination:22*e(7)})
 
-	def test_PayOnProofOfReceipt_Cancelled(self):
+	def test_PayOnRevealSecret_Cancelled(self):
 		state = State.State(100, 'starthash')
 		self.state = state
 		active = self.Burn(22*e(7))
@@ -1246,7 +1246,7 @@ class Test(unittest.TestCase):
 		    'confirmAddress':confirmHash,
 		    'cancelAddress':cancelHash
 		}
-		outputs = self.Apply_AssertSucceeds(state, 'PayOnProofOfReceipt', sourceAccounts=[active], **details)
+		outputs = self.Apply_AssertSucceeds(state, 'PayOnRevealSecret', sourceAccounts=[active], **details)
 		change = outputs['change']
 		destination = outputs['destination']
 		self.assertDictEqual(state._balances.balances, {change:0, destination:0})

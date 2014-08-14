@@ -40,7 +40,7 @@ _fundedMappingByTypeCode = (
      ('sellerReceive',),
      (('backerLTCReceiveAddress', 'ltcOfferedPlusCommission'),)
 	),
-    ('PayOnProofOfReceipt',
+    ('PayOnRevealSecret',
      ('amount', 6, 'maxBlock', 4),
      ('change','destination'),
      (('confirmAddress', None), ('cancelAddress', None))

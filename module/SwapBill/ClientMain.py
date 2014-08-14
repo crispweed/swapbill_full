@@ -265,7 +265,7 @@ def Main(startBlockIndex, startBlockHash, commandLineArgs=sys.argv[1:], host=Non
 		else:
 			if args.cancellationAddress is None:
 				raise ExceptionReportedToUser('cancellationAddress argument must be supplied with onProofOfReceiptTo.')
-			transactionType = 'PayOnProofOfReceipt'
+			transactionType = 'PayOnRevealSecret'
 			details['confirmAddress'] = CheckAndReturnPubKeyHash_AnyVersion(args.onProofOfReceiptTo)
 			details['cancelAddress'] = CheckAndReturnPubKeyHash_AnyVersion(args.cancellationAddress)
 		return CheckAndSend_Funded(transactionType, outputs, outputPubKeyHashes, details)

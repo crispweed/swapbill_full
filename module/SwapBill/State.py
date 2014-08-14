@@ -338,7 +338,7 @@ class State(object):
 		self._newSellOffer(sell)
 		return swapBillInput
 
-	def _fundedTransaction_PayOnProofOfReceipt(self, txID, swapBillInput, amount, maxBlock, confirmAddress, cancelAddress, outputs):
+	def _fundedTransaction_PayOnRevealSecret(self, txID, swapBillInput, amount, maxBlock, confirmAddress, cancelAddress, outputs):
 		assert outputs == ('change', 'destination')
 		if amount < Constraints.minimumSwapBillBalance:
 			raise BadlyFormedTransaction('amount is below minimum balance')
