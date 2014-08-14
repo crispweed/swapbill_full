@@ -1026,7 +1026,7 @@ class Test(unittest.TestCase):
 		output, result = RunClient(host, ['get_pending_payments'])
 		expectedResult = [
 		    ('pending payment index', 0,
-		     {'confirmed': 'False', 'paid by me': True, 'expires on block': '10', 'amount': '1', 'paid to me': False})
+		     {'paid by me': True, 'expires on block': '10', 'amount': '1', 'paid to me': False})
 		]
 		self.assertEqual(result, expectedResult)
 

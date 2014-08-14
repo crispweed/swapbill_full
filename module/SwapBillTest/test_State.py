@@ -1172,7 +1172,6 @@ class Test(unittest.TestCase):
 		expectedDetails = {
 			'amount': 22*e(7),
 		    'secretHash': secretHash,
-		    'confirmed': False,
 		    'destinationAccount': destination,
 		    'expiry': 150,
 		    'refundAccount': change

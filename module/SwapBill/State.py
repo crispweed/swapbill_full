@@ -351,7 +351,6 @@ class State(object):
 		pendingPay.amount = amount
 		pendingPay.destinationAccount = destinationAccount
 		pendingPay.refundAccount = changeAccount
-		pendingPay.confirmed = False
 		pendingPay.expiry = maxBlock
 		pendingPay.secretHash = secretAddress
 		key = self._nextPendingPayIndex

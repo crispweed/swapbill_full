@@ -402,8 +402,8 @@ def Main(startBlockIndex, startBlockHash, commandLineArgs=sys.argv[1:], host=Non
 			pay = state._pendingPays[key]
 			d['paid by me'] = pay.refundAccount in ownedAccounts.tradeOfferChangeCounts
 			d['paid to me'] = pay.destinationAccount in ownedAccounts.tradeOfferChangeCounts
+			#d['secret hash'] = pay.secretHash ## TODO format for user (as hex public key hash?)
 			d['amount'] = Amounts.ToString(pay.amount)
-			d['confirmed'] = str(pay.confirmed)
 			d['expires on block'] = str(pay.expiry)
 			result.append(('pending payment index', key, d))
 		return result
