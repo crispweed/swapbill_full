@@ -57,13 +57,7 @@ sp = subparsers.add_parser('pay', help='make a swapbill payment')
 sp.add_argument('--amount', required=True, help='amount of swapbill to be paid, as a decimal fraction (one satoshi is 0.00000001)')
 sp.add_argument('--toAddress', required=True, help='pay to this address')
 sp.add_argument('--blocksUntilExpiry', type=int, default=8, help='if the transaction takes longer than this to go through then the transaction expires (in which case no payment is made and the full amount is returned as change)')
-
-sp = subparsers.add_parser('pay', help='make a swapbill payment')
-sp.add_argument('--amount', required=True, help='amount of swapbill to be paid, as a decimal fraction (one satoshi is 0.00000001)')
-sp.add_argument('--toAddress', required=True, help='pay to this address')
-sp.add_argument('--blocksUntilExpiry', type=int, default=8, help='if the transaction takes longer than this to go through then the transaction expires (in which case no payment is made and the full amount is returned as change)')
-sp.add_argument('--onProofOfReceiptTo', help='pay if receiving party can prove payment to this address (any address version, cancellationAddress required)')
-sp.add_argument('--cancellationAddress', help='cancellation address for proof of payment (any address version, when paying on proof of receipt)')
+sp.add_argument('--onRevealSecret', help='a public key hash, encoded as an address with any address version, for a non-disclosed public key')
 
 sp = subparsers.add_parser('post_ltc_buy', help='make an offer to buy litecoin with swapbill')
 sp.add_argument('--swapBillOffered', required=True, help='amount of swapbill offered, as a decimal fraction (one satoshi is 0.00000001)')
@@ -80,13 +74,9 @@ sp.add_argument('--includesCommission', help='(only applies to backed sells) spe
 sp = subparsers.add_parser('complete_ltc_sell', help='complete an ltc exchange by fulfilling a pending exchange payment')
 sp.add_argument('--pendingExchangeID', required=True, help='the id of the pending exchange payment to fulfill')
 
-sp = subparsers.add_parser('provide_proof_of_receipt', help='provide proof that the conditions for a pending payment have been met')
+sp = subparsers.add_parser('reveal_secret_for_pending_payment', help='provide the secret public key required for a pending payment to go through')
 sp.add_argument('--pendingPaymentID', required=True, help='the id of the pending payment')
-sp.add_argument('--proofOfReceipt', required=True, help='hexadecimal data for proof of receipt')
-
-sp = subparsers.add_parser('provide_proof_of_cancellation', help='provide proof required for cancelling a pending payment')
-sp.add_argument('--pendingPaymentID', required=True, help='the id of the pending payment')
-sp.add_argument('--proofOfCancellation', required=True, help='hexadecimal data for proof of cancellation')
+sp.add_argument('--secret', required=True, help='hexadecimal data for the secret (public key with previously provided hash)')
 
 sp = subparsers.add_parser('back_ltc_sells', help='commit swapbill to back ltc exchanges')
 sp.add_argument('--backingSwapBill', required=True, help='amount of swapbill to commit, as a decimal fraction (one satoshi is 0.00000001)')
@@ -257,17 +247,12 @@ def Main(startBlockIndex, startBlockHash, commandLineArgs=sys.argv[1:], host=Non
 		    'amount':Amounts.FromString(args.amount),
 		    'maxBlock':state._currentBlockIndex + args.blocksUntilExpiry
 		}
-		if args.onProofOfReceiptTo is None:
+		if args.onRevealSecret is None:
 			# standard pay transaction
-			if args.cancellationAddress is not None:
-				raise ExceptionReportedToUser('cancellationAddress argument is not valid without onProofOfReceiptTo.')
 			transactionType = 'Pay'
 		else:
-			if args.cancellationAddress is None:
-				raise ExceptionReportedToUser('cancellationAddress argument must be supplied with onProofOfReceiptTo.')
 			transactionType = 'PayOnRevealSecret'
-			details['confirmAddress'] = CheckAndReturnPubKeyHash_AnyVersion(args.onProofOfReceiptTo)
-			details['cancelAddress'] = CheckAndReturnPubKeyHash_AnyVersion(args.cancellationAddress)
+			details['confirmAddress'] = CheckAndReturnPubKeyHash_AnyVersion(args.onRevealSecret)
 		return CheckAndSend_Funded(transactionType, outputs, outputPubKeyHashes, details)
 
 	elif args.action == 'post_ltc_buy':
@@ -320,7 +305,7 @@ def Main(startBlockIndex, startBlockHash, commandLineArgs=sys.argv[1:], host=Non
 		}
 		return CheckAndSend_UnFunded(transactionType, (), (), details)
 
-	elif args.action == 'provide_proof_of_receipt':
+	elif args.action == 'reveal_secret_for_pending_payment':
 		transactionType = 'ProofOfReceipt'
 		pendingPaymentID = int(args.pendingPaymentID)
 		if not pendingPaymentID in state._pendingPays:
@@ -328,22 +313,9 @@ def Main(startBlockIndex, startBlockHash, commandLineArgs=sys.argv[1:], host=Non
 		pay = state._pendingPays[pendingPaymentID]
 		details = {
 		    'pendingPayIndex':pendingPaymentID,
-		    'publicKey':CheckedConvertFromHex(args.proofOfReceipt),
+		    'publicKey':CheckedConvertFromHex(args.secret),
 		}
 		return CheckAndSend_UnFunded(transactionType, (), (), details)
-
-	elif args.action == 'provide_proof_of_cancellation':
-		transactionType = 'ProofOfCancellation'
-		pendingPaymentID = int(args.pendingPaymentID)
-		if not pendingPaymentID in state._pendingPays:
-			raise ExceptionReportedToUser('No pending payment with the specified ID.')
-		pay = state._pendingPays[pendingPaymentID]
-		details = {
-		    'pendingPayIndex':pendingPaymentID,
-		    'publicKey':CheckedConvertFromHex(args.proofOfCancellation),
-		}
-		return CheckAndSend_UnFunded(transactionType, (), (), details)
-
 
 	elif args.action == 'back_ltc_sells':
 		transactionType = 'BackLTCSells'
@@ -432,8 +404,7 @@ def Main(startBlockIndex, startBlockHash, commandLineArgs=sys.argv[1:], host=Non
 			d['paid to me'] = pay.destinationAccount in ownedAccounts.tradeOfferChangeCounts
 			d['amount'] = Amounts.ToString(pay.amount)
 			d['confirmed'] = str(pay.confirmed)
-			d['confirmation period expires on block'] = str(pay.confirmExpiry)
-			d['cancellation period expires on block'] = str(pay.expiry)
+			d['expires on block'] = str(pay.expiry)
 			result.append(('pending payment index', key, d))
 		return result
 

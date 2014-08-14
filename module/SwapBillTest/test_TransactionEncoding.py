@@ -129,7 +129,7 @@ class Test(unittest.TestCase):
 		self.checkIgnoredBytes(tx, 0)
 
 	def test_PayOnRevealSecret(self):
-		details = {'amount':10, 'maxBlock':123, 'confirmAddress':'confirmPKH', 'cancelAddress':'cancelPKH'}
+		details = {'amount':10, 'maxBlock':123, 'confirmAddress':'confirmPKH'}
 		# bad output spec
 		self.assertRaises(AssertionError, TransactionEncoding.FromStateTransaction, 'PayOnRevealSecret', [('sourceTXID',4)], ('changeZZ','destination'), ('changePKH', 'destinationPKH'), details)
 		self.assertRaises(AssertionError, TransactionEncoding.FromStateTransaction, 'PayOnRevealSecret', [('sourceTXID',4)], ('change','destinationZZ'), ('changePKH', 'destinationPKH'), details)
@@ -143,20 +143,19 @@ class Test(unittest.TestCase):
 		details.pop('confirmAddress')
 		self.assertRaises(KeyError, TransactionEncoding.FromStateTransaction, 'PayOnRevealSecret', [('sourceTXID',4)], ('change','destination'), ('changePKH', 'destinationPKH'), details)
 		details['confirmAddress'] = 'confirmPKH'
-		details.pop('cancelAddress')
-		self.assertRaises(KeyError, TransactionEncoding.FromStateTransaction, 'PayOnRevealSecret', [('sourceTXID',4)], ('change','destination'), ('changePKH', 'destinationPKH'), details)
-		details['cancelAddress'] = 'cancelPKH'
 		# successful control transaction
 		tx = TransactionEncoding.FromStateTransaction('PayOnRevealSecret', [('sourceTXID',4)], ('change','destination'), ('changePKH', 'destinationPKH'), details)
 		#print(tx.__dict__.__repr__())
 		expectedDict = {
 		    '_inputs': [('sourceTXID', 4)],
-		    '_outputs': [(b'SB\x06\n\x00\x00\x00\x00\x00{\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00', 0), ('changePKH', 0), ('destinationPKH', 0), ('confirmPKH', 0), ('cancelPKH', 0)]
+		    '_outputs': [(b'SB\x06\n\x00\x00\x00\x00\x00{\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00', 0), ('changePKH', 0), ('destinationPKH', 0), ('confirmPKH', 0)]
 		}
 		self.assertDictEqual(tx.__dict__, expectedDict)
 		self.checkIgnoredBytes(tx, 7)
 
-	def doTestProofOfWhatever(self, transactionType, typeCode):
+	def test_ProofOfReceipt(self):
+		transactionType = 'ProofOfReceipt'
+		typeCode = b'\x81'
 		keyData = (b'\x12\x34' + b'\x00'*28 + b'\x56\x78' + b'\x00'*30 + b'\x9a\xbc')
 		details = {'pendingPayIndex':7, 'publicKey':keyData}
 		# source accounts not None
@@ -188,11 +187,6 @@ class Test(unittest.TestCase):
 		}
 		self.assertDictEqual(tx.__dict__, expectedDict)
 		self.checkIgnoredBytes(tx, 7, lastDataOutput=3)
-
-	def test_ProofOfReceipt(self):
-		self.doTestProofOfWhatever('ProofOfReceipt', b'\x81')
-	def test_ProofOfCancellation(self):
-		self.doTestProofOfWhatever('ProofOfCancellation', b'\x82')
 
 	def test_forwarding(self):
 		# cannot encode forward to future network version transactions explicitly from state transactions

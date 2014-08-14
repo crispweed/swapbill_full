@@ -43,7 +43,7 @@ _fundedMappingByTypeCode = (
     ('PayOnRevealSecret',
      ('amount', 6, 'maxBlock', 4),
      ('change','destination'),
-     (('confirmAddress', None), ('cancelAddress', None))
+     (('confirmAddress', None),)
     ),
 	)
 
@@ -56,11 +56,6 @@ _unfundedMappingByTypeCode = (
      (('destinationAddress', 'destinationAmount'),)
     ),
     ('ProofOfReceipt',
-     ('pendingPayIndex', 6, 'publicKey:Bytes', 64),
-     (),
-     ()
-    ),
-    ('ProofOfCancellation',
      ('pendingPayIndex', 6, 'publicKey:Bytes', 64),
      (),
      ()

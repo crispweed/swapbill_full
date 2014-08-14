@@ -91,14 +91,8 @@ class State(object):
 		toDelete = []
 		for key in self._pendingPays:
 			pendingPay = self._pendingPays[key]
-			if not pendingPay.confirmed and pendingPay.confirmExpiry == self._currentBlockIndex:
+			if pendingPay.expiry == self._currentBlockIndex:
 				self._balances.addTo_Forwarded(pendingPay.refundAccount, pendingPay.amount)
-				self._balances.removeRef(pendingPay.refundAccount)
-				self._balances.removeRef(pendingPay.destinationAccount)
-				toDelete.append(key)
-			elif pendingPay.expiry == self._currentBlockIndex:
-				assert pendingPay.confirmed
-				self._balances.addTo_Forwarded(pendingPay.destinationAccount, pendingPay.amount)
 				self._balances.removeRef(pendingPay.refundAccount)
 				self._balances.removeRef(pendingPay.destinationAccount)
 				toDelete.append(key)
@@ -338,7 +332,7 @@ class State(object):
 		self._newSellOffer(sell)
 		return swapBillInput
 
-	def _fundedTransaction_PayOnRevealSecret(self, txID, swapBillInput, amount, maxBlock, confirmAddress, cancelAddress, outputs):
+	def _fundedTransaction_PayOnRevealSecret(self, txID, swapBillInput, amount, maxBlock, confirmAddress, outputs):
 		assert outputs == ('change', 'destination')
 		if amount < Constraints.minimumSwapBillBalance:
 			raise BadlyFormedTransaction('amount is below minimum balance')
@@ -358,11 +352,8 @@ class State(object):
 		pendingPay.destinationAccount = destinationAccount
 		pendingPay.refundAccount = changeAccount
 		pendingPay.confirmed = False
-		pendingPay.confirmExpiry = self._currentBlockIndex + Constraints.blocksForProofOfReceiptConfirm
-		pendingPay.expiry = self._currentBlockIndex + Constraints.blocksForProofOfReceiptCancel
-		assert pendingPay.expiry > pendingPay.confirmExpiry
+		pendingPay.expiry = maxBlock
 		pendingPay.confirmHash = confirmAddress
-		pendingPay.cancelHash = cancelAddress
 		key = self._nextPendingPayIndex
 		self._nextPendingPayIndex += 1
 		self._pendingPays[key] = pendingPay
@@ -421,19 +412,8 @@ class State(object):
 		if Wallet.PublicKeyToPubKeyHash(publicKey) != pay.confirmHash:
 			raise TransactionFailsAgainstCurrentState('the supplied public key does not match the public key hash associated with the pending payment')
 		if txID is None:
-			return
-		pay.confirmed = True
-
-	def _unfundedTransaction_ProofOfCancellation(self, txID, pendingPayIndex, publicKey, outputs):
-		assert outputs == ()
-		if not pendingPayIndex in self._pendingPays:
-			raise TransactionFailsAgainstCurrentState('no pending payment with the specified index')
-		pay = self._pendingPays[pendingPayIndex]
-		if Wallet.PublicKeyToPubKeyHash(publicKey) != pay.cancelHash:
-			raise TransactionFailsAgainstCurrentState('the supplied public key does not match the public key hash associated with the pending payment')
-		if txID is None:
-			return
-		self._balances.addTo_Forwarded(pay.refundAccount, pay.amount)
+			return		
+		self._balances.addTo_Forwarded(pay.destinationAccount, pay.amount)
 		self._balances.removeRef(pay.refundAccount)
 		self._balances.removeRef(pay.destinationAccount)
 		self._pendingPays.pop(pendingPayIndex)
