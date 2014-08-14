@@ -306,7 +306,7 @@ def Main(startBlockIndex, startBlockHash, commandLineArgs=sys.argv[1:], host=Non
 		return CheckAndSend_UnFunded(transactionType, (), (), details)
 
 	elif args.action == 'reveal_secret_for_pending_payment':
-		transactionType = 'ProofOfReceipt'
+		transactionType = 'RevealPendingPaymentSecret'
 		pendingPaymentID = int(args.pendingPaymentID)
 		if not pendingPaymentID in state._pendingPays:
 			raise ExceptionReportedToUser('No pending payment with the specified ID.')

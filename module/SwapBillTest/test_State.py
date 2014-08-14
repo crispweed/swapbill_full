@@ -37,8 +37,7 @@ class Test(unittest.TestCase):
 	    'BackLTCSells':('ltcSellBacker',),
 	    'BackedLTCSellOffer':('sellerReceive',),
 	    'LTCExchangeCompletion':(),
-	    'ProofOfReceipt':(),
-	    'ProofOfCancellation':(),
+	    'RevealPendingPaymentSecret':(),
 	    'ForwardToFutureNetworkVersion':('change',)
 	    }
 
@@ -1206,13 +1205,13 @@ class Test(unittest.TestCase):
 		    'publicKey':confirmKey,
 		}
 		proofDetails['pendingPayIndex'] = 0
-		self.Apply_AssertFails(state, 'ProofOfReceipt', expectedError='no pending payment with the specified index', sourceAccounts=None, **proofDetails)
+		self.Apply_AssertFails(state, 'RevealPendingPaymentSecret', expectedError='no pending payment with the specified index', sourceAccounts=None, **proofDetails)
 		proofDetails['pendingPayIndex'] = 1
 		proofDetails['publicKey'] = b'badKey'
-		self.Apply_AssertFails(state, 'ProofOfReceipt', expectedError='the supplied public key does not match the public key hash associated with the pending payment', sourceAccounts=None, **proofDetails)
+		self.Apply_AssertFails(state, 'RevealPendingPaymentSecret', expectedError='the supplied public key does not match the public key hash associated with the pending payment', sourceAccounts=None, **proofDetails)
 		proofDetails['publicKey'] = confirmKey
 		# but then confirmed
-		self.Apply_AssertSucceeds(state, 'ProofOfReceipt', sourceAccounts=None, **proofDetails)
+		self.Apply_AssertSucceeds(state, 'RevealPendingPaymentSecret', sourceAccounts=None, **proofDetails)
 		# the pending pay is still outstanding, but flagged as confirmed
 		# we need to wait for it to expire without cancellation in order to actually receive the payment
 		self.assertEqual(len(state._pendingPays), 0)

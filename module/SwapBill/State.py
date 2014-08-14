@@ -404,7 +404,7 @@ class State(object):
 		self._balances.removeRef(exchange.sellerAccount)
 		self._pendingExchanges.pop(pendingExchangeIndex)
 
-	def _unfundedTransaction_ProofOfReceipt(self, txID, pendingPayIndex, publicKey, outputs):
+	def _unfundedTransaction_RevealPendingPaymentSecret(self, txID, pendingPayIndex, publicKey, outputs):
 		assert outputs == ()
 		if not pendingPayIndex in self._pendingPays:
 			raise TransactionFailsAgainstCurrentState('no pending payment with the specified index')

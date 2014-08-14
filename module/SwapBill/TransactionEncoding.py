@@ -55,7 +55,7 @@ _unfundedMappingByTypeCode = (
      (),
      (('destinationAddress', 'destinationAmount'),)
     ),
-    ('ProofOfReceipt',
+    ('RevealPendingPaymentSecret',
      ('pendingPayIndex', 6, 'publicKey:Bytes', 64),
      (),
      ()

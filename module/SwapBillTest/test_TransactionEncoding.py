@@ -153,8 +153,8 @@ class Test(unittest.TestCase):
 		self.assertDictEqual(tx.__dict__, expectedDict)
 		self.checkIgnoredBytes(tx, 7)
 
-	def test_ProofOfReceipt(self):
-		transactionType = 'ProofOfReceipt'
+	def test_RevealPendingPaymentSecret(self):
+		transactionType = 'RevealPendingPaymentSecret'
 		typeCode = b'\x81'
 		keyData = (b'\x12\x34' + b'\x00'*28 + b'\x56\x78' + b'\x00'*30 + b'\x9a\xbc')
 		details = {'pendingPayIndex':7, 'publicKey':keyData}
