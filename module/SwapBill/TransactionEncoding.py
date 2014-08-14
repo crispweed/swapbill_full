@@ -43,7 +43,7 @@ _fundedMappingByTypeCode = (
     ('PayOnRevealSecret',
      ('amount', 6, 'maxBlock', 4),
      ('change','destination'),
-     (('confirmAddress', None),)
+     (('secretAddress', None),)
     ),
 	)
 

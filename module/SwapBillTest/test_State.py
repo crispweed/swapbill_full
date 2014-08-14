@@ -1145,11 +1145,11 @@ class Test(unittest.TestCase):
 		self.state = state
 		active = self.Burn(22*e(7))
 		confirmKey = b'\x82p6@\x0b\x02e\x86\xe2\xdd\xdcW\x1f\xe6?\xf3-\xaf\xba-N\x84s"\x1d\x04\xb0\xc3plM\xb5\xed\xfeT\xc35R]\x1e\x0c\xa6\x97t M\xd65\xb8\x9e\xd0\xad\x9a\xd7\x97\x8c\xae\x02p]\x1f\xa4\x16\x11'
-		confirmHash = b'\xc5\xfeF\x83\xb4\x01\xb6\xde\xa6\xcf\x8b\xd1\x85\xef\x8f\xb5\xc7\xa8\xaa\xa6'
+		secretHash = b'\xc5\xfeF\x83\xb4\x01\xb6\xde\xa6\xcf\x8b\xd1\x85\xef\x8f\xb5\xc7\xa8\xaa\xa6'
 		details = {
 		    'amount':22*e(7),
 		    'maxBlock':150,
-		    'confirmAddress':confirmHash,
+		    'secretAddress':secretHash,
 		}
 		# amount too low
 		details['amount'] = 1
@@ -1171,7 +1171,7 @@ class Test(unittest.TestCase):
 		self.assertEqual(len(state._pendingPays), 1)
 		expectedDetails = {
 			'amount': 22*e(7),
-		    'confirmHash': confirmHash,
+		    'secretHash': secretHash,
 		    'confirmed': False,
 		    'destinationAccount': destination,
 		    'expiry': 150,

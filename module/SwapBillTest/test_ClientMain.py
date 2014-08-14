@@ -1013,13 +1013,13 @@ class Test(unittest.TestCase):
 
 		confirmKey = b'\x82p6@\x0b\x02e\x86\xe2\xdd\xdcW\x1f\xe6?\xf3-\xaf\xba-N\x84s"\x1d\x04\xb0\xc3plM\xb5\xed\xfeT\xc35R]\x1e\x0c\xa6\x97t M\xd65\xb8\x9e\xd0\xad\x9a\xd7\x97\x8c\xae\x02p]\x1f\xa4\x16\x11'
 		confirmKeyHex = '827036400b026586e2dddc571fe63ff32dafba2d4e8473221d04b0c3706c4db5edfe54c335525d1e0ca69774204dd635b89ed0ad9ad7978cae02705d1fa41611'
-		confirmHash = b'\xc5\xfeF\x83\xb4\x01\xb6\xde\xa6\xcf\x8b\xd1\x85\xef\x8f\xb5\xc7\xa8\xaa\xa6'
-		confirmAddress = 'myZr2DGoRFgnB9xNswJc3kwL1PmAWDGKtk' # litecoin testnet address version
+		secretHash = b'\xc5\xfeF\x83\xb4\x01\xb6\xde\xa6\xcf\x8b\xd1\x85\xef\x8f\xb5\xc7\xa8\xaa\xa6'
+		secretAddress = 'myZr2DGoRFgnB9xNswJc3kwL1PmAWDGKtk' # litecoin testnet address version
 
 		# bad pay on proof of receipt invocations
 		self.assertRaisesRegexp(ClientMain.BadAddressArgument, 'An address argument is not valid [(]badConfirmAddress[)][.]', RunClient, host, ['pay', '--amount', 1*e(8), '--toAddress', payTargetAddress, '--onRevealSecret', 'badConfirmAddress'])
 		# and then valid invocation, which should go through correctly
-		RunClient(host, ['pay', '--amount', 1*e(8), '--toAddress', payTargetAddress, '--onRevealSecret', confirmAddress])
+		RunClient(host, ['pay', '--amount', 1*e(8), '--toAddress', payTargetAddress, '--onRevealSecret', secretAddress])
 
 		output, result = RunClient(host, ['get_balance'])
 		self.assertDictEqual(result, {'balance': '0'})

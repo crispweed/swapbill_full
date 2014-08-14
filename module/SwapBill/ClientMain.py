@@ -252,7 +252,7 @@ def Main(startBlockIndex, startBlockHash, commandLineArgs=sys.argv[1:], host=Non
 			transactionType = 'Pay'
 		else:
 			transactionType = 'PayOnRevealSecret'
-			details['confirmAddress'] = CheckAndReturnPubKeyHash_AnyVersion(args.onRevealSecret)
+			details['secretAddress'] = CheckAndReturnPubKeyHash_AnyVersion(args.onRevealSecret)
 		return CheckAndSend_Funded(transactionType, outputs, outputPubKeyHashes, details)
 
 	elif args.action == 'post_ltc_buy':

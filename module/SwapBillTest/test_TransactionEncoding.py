@@ -129,7 +129,7 @@ class Test(unittest.TestCase):
 		self.checkIgnoredBytes(tx, 0)
 
 	def test_PayOnRevealSecret(self):
-		details = {'amount':10, 'maxBlock':123, 'confirmAddress':'confirmPKH'}
+		details = {'amount':10, 'maxBlock':123, 'secretAddress':'confirmPKH'}
 		# bad output spec
 		self.assertRaises(AssertionError, TransactionEncoding.FromStateTransaction, 'PayOnRevealSecret', [('sourceTXID',4)], ('changeZZ','destination'), ('changePKH', 'destinationPKH'), details)
 		self.assertRaises(AssertionError, TransactionEncoding.FromStateTransaction, 'PayOnRevealSecret', [('sourceTXID',4)], ('change','destinationZZ'), ('changePKH', 'destinationPKH'), details)
@@ -140,9 +140,9 @@ class Test(unittest.TestCase):
 		details.pop('maxBlock')
 		self.assertRaises(KeyError, TransactionEncoding.FromStateTransaction, 'PayOnRevealSecret', [('sourceTXID',4)], ('change','destination'), ('changePKH', 'destinationPKH'), details)
 		details['maxBlock'] = 123
-		details.pop('confirmAddress')
+		details.pop('secretAddress')
 		self.assertRaises(KeyError, TransactionEncoding.FromStateTransaction, 'PayOnRevealSecret', [('sourceTXID',4)], ('change','destination'), ('changePKH', 'destinationPKH'), details)
-		details['confirmAddress'] = 'confirmPKH'
+		details['secretAddress'] = 'confirmPKH'
 		# successful control transaction
 		tx = TransactionEncoding.FromStateTransaction('PayOnRevealSecret', [('sourceTXID',4)], ('change','destination'), ('changePKH', 'destinationPKH'), details)
 		#print(tx.__dict__.__repr__())
