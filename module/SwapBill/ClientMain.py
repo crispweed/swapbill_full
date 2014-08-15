@@ -114,7 +114,7 @@ def Main(commandLineArgs=sys.argv[1:], host=None, overrideStartBlock=None, keyGe
 	if not path.isdir(args.dataDir):
 		raise ExceptionReportedToUser("The following path (specified for data directory parameter) is not a valid path to an existing directory: " + args.dataDir)
 
-	dataDir = path.join(args.dataDir, 'swapBillData')
+	dataDir = path.join(args.dataDir, 'swapBillData_' + args.host)
 	if not path.exists(dataDir):
 		try:
 			os.mkdir(dataDir)
