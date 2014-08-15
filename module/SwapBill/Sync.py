@@ -5,7 +5,7 @@ from collections import deque
 from SwapBill import State, RawTransaction, TransactionEncoding, PickledCache, OwnedAccounts, ControlAddressPrefix
 from SwapBill.ExceptionReportedToUser import ExceptionReportedToUser
 
-stateVersion = 0.8
+stateVersion = 1
 ownedAccountsVersion = 0.2
 
 def _processTransactions(state, wallet, ownedAccounts, transactions, applyToState, reportPrefix, out):
@@ -62,7 +62,7 @@ def SyncAndReturnStateAndOwnedAccounts(cacheDirectory, startBlockIndex, startBlo
 	if loaded and host.getBlockHashAtIndexOrNone(blockIndex) != blockHash:
 		print('The block corresponding with cached state has been orphaned, full index generation required.', file=out)
 		loaded = False
-	if loaded and not state.startBlockMatches(startBlockHash):
+	if loaded and not state.parametersMatch(startBlockHash):
 		print('Start config does not match config from loaded state, full index generation required.', file=out)
 		loaded = False
 	if loaded:

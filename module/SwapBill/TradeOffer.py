@@ -31,13 +31,13 @@ def swapBillToLTC_RoundedUp(rate, swapBill):
 		ltc += 1
 	return ltc
 
-def MinimumBuyOfferWithRate(rate):
-	swapBillForMinLTC = ltcToSwapBill_RoundedUp(rate, Constraints.minimumExchangeLTC)
+def MinimumBuyOfferWithRate(minimumHostExchangeAmount, rate):
+	swapBillForMinLTC = ltcToSwapBill_RoundedUp(rate, minimumHostExchangeAmount)
 	return max(swapBillForMinLTC, Constraints.minimumSwapBillBalance)
 
-def MinimumSellOfferWithRate(rate):
+def MinimumSellOfferWithRate(minimumHostExchangeAmount, rate):
 	ltcForMinSwapBill = swapBillToLTC_RoundedUp(rate, Constraints.minimumSwapBillBalance)
-	return max(ltcForMinSwapBill, Constraints.minimumExchangeLTC)
+	return max(ltcForMinSwapBill, minimumHostExchangeAmount)
 
 def DepositRequiredForLTCSell(rate, ltcOffered):
 	swapBill = ltcToSwapBill_RoundedUp(rate, ltcOffered)
@@ -47,8 +47,8 @@ def DepositRequiredForLTCSell(rate, ltcOffered):
 	return deposit
 
 class BuyOffer(object):
-	def __init__(self, swapBillOffered, rate):
-		if swapBillOffered < MinimumBuyOfferWithRate(rate):
+	def __init__(self, minimumHostExchangeAmount, swapBillOffered, rate):
+		if swapBillOffered < MinimumBuyOfferWithRate(minimumHostExchangeAmount, rate):
 			raise OfferIsBelowMinimumExchange()
 		self._swapBillOffered = swapBillOffered
 		self.rate = rate
@@ -56,16 +56,16 @@ class BuyOffer(object):
 		return self._swapBillOffered == 0
 	def ltcEquivalent(self):
 		return swapBillToLTC_RoundedUp(self.rate, self._swapBillOffered)
-	def _canSubtract(self, swapBill):
+	def _canSubtract(self, minimumHostExchangeAmount, swapBill):
 		if swapBill > self._swapBillOffered:
 			return False
 		if swapBill == self._swapBillOffered:
 			return True
-		return self._swapBillOffered - swapBill >= MinimumBuyOfferWithRate(self.rate)
+		return self._swapBillOffered - swapBill >= MinimumBuyOfferWithRate(minimumHostExchangeAmount, self.rate)
 
 class SellOffer(object):
-	def __init__(self, swapBillDeposit, ltcOffered, rate):
-		if ltcOffered < MinimumSellOfferWithRate(rate):
+	def __init__(self, minimumHostExchangeAmount, swapBillDeposit, ltcOffered, rate):
+		if ltcOffered < MinimumSellOfferWithRate(minimumHostExchangeAmount, rate):
 			raise OfferIsBelowMinimumExchange()
 		self._swapBillDeposit = swapBillDeposit
 		self._ltcOffered = ltcOffered
@@ -74,12 +74,12 @@ class SellOffer(object):
 		return self._ltcOffered == 0
 	def swapBillEquivalent(self):
 		return ltcToSwapBill_RoundedUp(self.rate, self._ltcOffered)
-	def _canSubtract(self, ltc):
+	def _canSubtract(self, minimumHostExchangeAmount, ltc):
 		if ltc > self._ltcOffered:
 			return False
 		if ltc == self._ltcOffered:
 			return True
-		return self._ltcOffered - ltc >= MinimumSellOfferWithRate(self.rate)
+		return self._ltcOffered - ltc >= MinimumSellOfferWithRate(minimumHostExchangeAmount, self.rate)
 
 class Exchange(object):
 	pass
@@ -87,19 +87,12 @@ class Exchange(object):
 def OffersMeetOrOverlap(buy, sell):
 	return buy.rate <= sell.rate
 
-def _canMatchWith(buy, sell, swapBill, ltc):
-	if ltc < Constraints.minimumExchangeLTC:
-		return False
-	if swapBill < Constraints.minimumSwapBillBalance:
-		return False
-	return buy._canSubtract(ltc) and sell._canSubtract(swapBill)
-
-def MatchOffers(buy, sell):
+def MatchOffers(minimumHostExchangeAmount, buy, sell):
 	assert OffersMeetOrOverlap(buy, sell)
 	appliedRate = (buy.rate + sell.rate) // 2
 
 	ltc, rounded = _swapBillToLTC(appliedRate, buy._swapBillOffered)
-	assert ltc >= Constraints.minimumExchangeLTC # should be guaranteed by buy and sell both satisfying this minimum requirement
+	assert ltc >= minimumHostExchangeAmount # should be guaranteed by buy and sell both satisfying this minimum requirement
 
 	candidates = [(buy._swapBillOffered, ltc)]
 	if rounded:
@@ -109,12 +102,12 @@ def MatchOffers(buy, sell):
 	swapBill, rounded = _ltcToSwapBill(appliedRate, sell._ltcOffered)
 	candidates.append((swapBill, sell._ltcOffered))
 
-	ltc = sell._ltcOffered - MinimumSellOfferWithRate(sell.rate)
+	ltc = sell._ltcOffered - MinimumSellOfferWithRate(minimumHostExchangeAmount, sell.rate)
 	if ltc > 0:
 		swapBill, rounded = _ltcToSwapBill(appliedRate, ltc)
 		candidates.append((swapBill, ltc))
 
-	swapBill = buy._swapBillOffered - MinimumBuyOfferWithRate(buy.rate)
+	swapBill = buy._swapBillOffered - MinimumBuyOfferWithRate(minimumHostExchangeAmount, buy.rate)
 	if swapBill > 0:
 		ltc, rounded = _swapBillToLTC(appliedRate, swapBill)
 		candidates.append((swapBill, ltc))
@@ -122,9 +115,9 @@ def MatchOffers(buy, sell):
 	for swapBill, ltc in candidates:
 		if swapBill < Constraints.minimumSwapBillBalance:
 			continue
-		if ltc < Constraints.minimumExchangeLTC:
+		if ltc < minimumHostExchangeAmount:
 			continue
-		if buy._canSubtract(swapBill) and sell._canSubtract(ltc):
+		if buy._canSubtract(minimumHostExchangeAmount, swapBill) and sell._canSubtract(minimumHostExchangeAmount, ltc):
 			exchange = Exchange()
 			exchange.swapBillAmount = swapBill
 			exchange.ltc = ltc

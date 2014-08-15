@@ -26,9 +26,11 @@ class PendingPay(object):
 	pass
 
 class State(object):
-	def __init__(self, startBlockIndex, startBlockHash):
+	def __init__(self, startBlockIndex, startBlockHash, minimumHostExchangeAmount=1000000, blocksForExchangeCompletion=50):
 		## state is initialised at the start of the block with startBlockIndex
 		self._startBlockHash = startBlockHash
+		self._minimumHostExchangeAmount = minimumHostExchangeAmount
+		self._blocksForExchangeCompletion = blocksForExchangeCompletion
 		self._currentBlockIndex = startBlockIndex
 		self._balances = Balances.Balances()
 		self._totalCreated = 0
@@ -42,8 +44,8 @@ class State(object):
 		self._nextPendingPayIndex = 0
 		self._pendingPays = {}
 
-	def startBlockMatches(self, startBlockHash):
-		return self._startBlockHash == startBlockHash
+	def parametersMatch(self, startBlockHash, minimumHostExchangeAmount=1000000, blocksForExchangeCompletion=50):
+		return self._startBlockHash == startBlockHash and self._minimumHostExchangeAmount == minimumHostExchangeAmount and self._blocksForExchangeCompletion == blocksForExchangeCompletion
 
 	def advanceToNextBlock(self):
 		expired = self._ltcBuys.advanceToNextBlock()
@@ -103,10 +105,10 @@ class State(object):
 	def _matchOffersAndAddExchange(self, buy, sell):
 		assert buy.refundAccount in self._balances.changeCounts
 		assert sell.receivingAccount in self._balances.changeCounts
-		exchange = TradeOffer.MatchOffers(buy=buy, sell=sell)
+		exchange = TradeOffer.MatchOffers(self._minimumHostExchangeAmount, buy=buy, sell=sell)
 		self._balances.addStateChange(sell.receivingAccount)
 		self._balances.addStateChange(buy.refundAccount)
-		exchange.expiry = self._currentBlockIndex + Constraints.blocksForExchangeCompletion
+		exchange.expiry = self._currentBlockIndex + self._blocksForExchangeCompletion
 		exchange.buyerLTCReceive = buy.ltcReceiveAddress
 		exchange.buyerAccount = buy.refundAccount
 		exchange.sellerAccount = sell.receivingAccount
@@ -221,7 +223,7 @@ class State(object):
 		if exchangeRate == 0 or exchangeRate >= Amounts.percentDivisor:
 			raise BadlyFormedTransaction('invalid exchange rate value')
 		try:
-			buy = TradeOffer.BuyOffer(swapBillOffered=swapBillOffered, rate=exchangeRate)
+			buy = TradeOffer.BuyOffer(minimumHostExchangeAmount=self._minimumHostExchangeAmount, swapBillOffered=swapBillOffered, rate=exchangeRate)
 		except TradeOffer.OfferIsBelowMinimumExchange:
 			raise BadlyFormedTransaction('does not satisfy minimum exchange amount')
 		if maxBlock < self._currentBlockIndex:
@@ -245,7 +247,7 @@ class State(object):
 			raise BadlyFormedTransaction('invalid exchange rate value')
 		swapBillDeposit = TradeOffer.DepositRequiredForLTCSell(rate=exchangeRate, ltcOffered=ltcOffered)
 		try:
-			sell = TradeOffer.SellOffer(swapBillDeposit=swapBillDeposit, ltcOffered=ltcOffered, rate=exchangeRate)
+			sell = TradeOffer.SellOffer(minimumHostExchangeAmount=self._minimumHostExchangeAmount, swapBillDeposit=swapBillDeposit, ltcOffered=ltcOffered, rate=exchangeRate)
 		except TradeOffer.OfferIsBelowMinimumExchange:
 			raise BadlyFormedTransaction('does not satisfy minimum exchange amount')
 		if maxBlock < self._currentBlockIndex:
@@ -302,7 +304,7 @@ class State(object):
 		ltcOffered = ltcOfferedPlusCommission * Amounts.percentDivisor // (Amounts.percentDivisor + backer.commission)
 		swapBillDeposit = TradeOffer.DepositRequiredForLTCSell(rate=exchangeRate, ltcOffered=ltcOffered)
 		try:
-			sell = TradeOffer.SellOffer(swapBillDeposit=swapBillDeposit, ltcOffered=ltcOffered, rate=exchangeRate)
+			sell = TradeOffer.SellOffer(minimumHostExchangeAmount=self._minimumHostExchangeAmount, swapBillDeposit=swapBillDeposit, ltcOffered=ltcOffered, rate=exchangeRate)
 		except TradeOffer.OfferIsBelowMinimumExchange:
 			raise TransactionFailsAgainstCurrentState('does not satisfy minimum exchange amount')
 		if backerLTCReceiveAddress != backer.ltcReceiveAddress:

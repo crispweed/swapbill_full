@@ -152,9 +152,11 @@ class Test(unittest.TestCase):
 
 	def test_state_setup(self):
 		Constraints.minimumSwapBillBalance = Test._stored_minimumSwapBillBalance
-		state = State.State(100, 'mockhash')
-		assert state.startBlockMatches('mockhash')
-		assert not state.startBlockMatches('mockhosh')
+		state = State.State(100, 'mockhash', 1234, 60)
+		assert state.parametersMatch('mockhash', 1234, 60)
+		assert not state.parametersMatch('mockhosh', 1234, 60)
+		assert not state.parametersMatch('mockhash', 1235, 60)
+		assert not state.parametersMatch('mockhash', 1234, 61)
 
 	def test_bad_transactions(self):
 		Constraints.minimumSwapBillBalance = 1
