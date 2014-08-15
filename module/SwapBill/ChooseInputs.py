@@ -1,5 +1,5 @@
-def ChooseInputs(maxInputs, unspentAmounts, amountRequired):
-	if amountRequired == 0 or maxInputs == 0:
+def ChooseInputs(unspentAmounts, amountRequired):
+	if amountRequired == 0:
 		return ([], 0)
 	assert amountRequired > 0
 
@@ -8,8 +8,7 @@ def ChooseInputs(maxInputs, unspentAmounts, amountRequired):
 		sortedUnspent.append((amount, i))
 	sortedUnspent.sort()
 
-	if maxInputs > len(unspentAmounts):
-		maxInputs = len(unspentAmounts)
+	maxInputs = len(unspentAmounts)
 
 	spent = 0
 	result = []

@@ -27,7 +27,7 @@ def AddPaymentFeesAndChange(baseTX, baseInputAmount, dustLimit, transactionFee, 
 		raise InsufficientFunds('Not enough funds available for the transaction, total required:', totalRequired, 'transaction fee:', transactionFee, 'sum of unspent:', sum(unspentAmounts))
 
 	if baseInputAmount < totalRequired:
-		outputAssignments, outputsTotal = ChooseInputs(maxInputs=len(unspentAmounts), unspentAmounts=unspentAmounts, amountRequired=totalRequired - baseInputAmount)
+		outputAssignments, outputsTotal = ChooseInputs(unspentAmounts=unspentAmounts, amountRequired=totalRequired - baseInputAmount)
 		for i in outputAssignments:
 			filledOutTX.addInput(unspentAsInputs[i][0], unspentAsInputs[i][1])
 	else:

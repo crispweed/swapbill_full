@@ -2,11 +2,10 @@ from __future__ import print_function
 import unittest
 from SwapBill import ChooseInputs
 
-def _callWithSanityChecks(maxInputs, unspentAmounts, amountRequired):
-	assignments, spent = ChooseInputs.ChooseInputs(maxInputs, unspentAmounts, amountRequired)
+def _callWithSanityChecks(unspentAmounts, amountRequired):
+	assignments, spent = ChooseInputs.ChooseInputs(unspentAmounts, amountRequired)
 	assert type(assignments) is type([])
 	assert type(spent) is int
-	assert len(assignments) <= maxInputs
 	used = set()
 	spent_Check = 0
 	for i in assignments:
@@ -21,41 +20,11 @@ def _callWithSanityChecks(maxInputs, unspentAmounts, amountRequired):
 class Test(unittest.TestCase):
 	def test(self):
 		## test some assertion conditions
-		self.assertRaises(AssertionError, ChooseInputs.ChooseInputs, 1, [9,5,8,5], -1)
-
-		## allow zero maxInputs
-		inputs, spent = _callWithSanityChecks(0, [9,5,8,5], 8)
-		assert inputs == []
+		self.assertRaises(AssertionError, ChooseInputs.ChooseInputs, [9,5,8,5], -1)
 
 		## allow zero amountRequired
-		inputs, spent = _callWithSanityChecks(1, [9,5,8,5], 0)
+		inputs, spent = _callWithSanityChecks([9,5,8,5], 0)
 		assert inputs == []
 
-		inputs, spent = _callWithSanityChecks(1, [9,5,8,5], 8)
-		#print(inputs)
-		assert inputs == [2]
-		inputs, spent = _callWithSanityChecks(1, [9,5,8,5], 9)
-		assert inputs == [0]
-		inputs, spent = _callWithSanityChecks(1, [9,5,8,5], 10) ## fail to meet amount required, but return best
-		assert inputs == [0]
-		inputs, spent = _callWithSanityChecks(2, [9,5,8,5], 10)
-		assert inputs == [1,3]
-		inputs, spent = _callWithSanityChecks(2, [9,5,8,5], 11)
-		assert inputs == [3,2]
-		inputs, spent = _callWithSanityChecks(2, [9,5,8,5], 14)
-		assert inputs == [2,0]
-		inputs, spent = _callWithSanityChecks(3, [9,5,8,5], 1)
-		assert inputs == [1]
-		inputs, spent = _callWithSanityChecks(3, [9,5,8,5], 6)
-		assert inputs == [1,3]
-		inputs, spent = _callWithSanityChecks(3, [9,5,8,5], 11)
-		assert inputs == [1,3,2]
-		inputs, spent = _callWithSanityChecks(3, [9,5,8,5], 19)
-		assert inputs == [3,2,0]
-		inputs, spent = _callWithSanityChecks(3, [9,5,8,5], 30) ## fail to meet amount required, but return best
-		assert inputs == [3,2,0]
-		inputs, spent = _callWithSanityChecks(4, [9,5,8,5], 19)
-		self.assertListEqual(inputs, [1,3,2,0])
-		# max inputs greater than number of inputs
-		inputs, spent = _callWithSanityChecks(5, [9,5,8,5], 19)
+		inputs, spent = _callWithSanityChecks([9,5,8,5], 19)
 		self.assertListEqual(inputs, [1,3,2,0])
