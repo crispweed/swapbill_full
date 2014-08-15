@@ -101,9 +101,6 @@ class MockHost(object):
 	def getAddressVersion(self):
 		# bitcoin address version
 		return b'\x00'
-	def getPrivateKeyAddressVersion(self):
-		# bitcoin private key address version
-		return b'\x80'
 
 	def getUnspent(self):
 		result = []

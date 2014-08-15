@@ -124,7 +124,7 @@ def Main(commandLineArgs=sys.argv[1:], host=None, overrideStartBlock=None, keyGe
 	if host is None:
 		host = HostFromPrefsByProtocol(protocol=args.host, configFile=args.configFile, dataDir=dataDir)
 
-	wallet = Wallet.Wallet(path.join(dataDir, 'wallet.txt'), privateKeyAddressVersion=host.getPrivateKeyAddressVersion(), keyGenerator=keyGenerator)
+	wallet = Wallet.Wallet(path.join(dataDir, 'wallet.txt'), keyGenerator=keyGenerator)
 
 	includePending = hasattr(args, 'includepending') and args.includepending
 

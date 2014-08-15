@@ -1,5 +1,5 @@
 from __future__ import print_function
-import ecdsa, hashlib, os
+import ecdsa, hashlib, os, binascii
 from SwapBill import Address
 
 def PublicKeyToPubKeyHash(publicKey):
@@ -18,10 +18,9 @@ class DefaultKeyGenerator(object):
 		return PublicKeyToPubKeyHash(publicKey)
 
 class Wallet(object):
-	def __init__(self, fileName, privateKeyAddressVersion, keyGenerator=None):
+	def __init__(self, fileName, keyGenerator=None):
 		if keyGenerator is None:
 			keyGenerator = DefaultKeyGenerator()
-		self._privateKeyAddressVersion = privateKeyAddressVersion
 		self._keyGenerator = keyGenerator
 		self._fileName = fileName
 		self._privateKeys = []
@@ -30,20 +29,22 @@ class Wallet(object):
 			with open(fileName, mode='r') as f:
 				lines = f.readlines()
 				for line in lines:
-					privateKeyWIF = line.strip()
-					privateKey = Address.PrivateKeyFromWIF(self._privateKeyAddressVersion, privateKeyWIF)
+					privateKeyHex = line.strip()
+					privateKey = binascii.unhexlify(privateKeyHex.encode('ascii'))
+					assert type(privateKey) is type(b'')
+					assert len(privateKey) == 32
 					self._privateKeys.append(privateKey)
 					pubKeyHash = self._keyGenerator.privateKeyToPubKeyHash(privateKey)
 					self._pubKeyHashes.append(pubKeyHash)
 
 	def addKeyPairAndReturnPubKeyHash(self):
 		privateKey = self._keyGenerator.generatePrivateKey()
-		privateKeyWIF = Address.PrivateKeyToWIF(privateKey, self._privateKeyAddressVersion)
+		privateKeyHex = binascii.hexlify(privateKey).decode('ascii')
 		pubKeyHash = self._keyGenerator.privateKeyToPubKeyHash(privateKey)
 		self._privateKeys.append(privateKey)
 		self._pubKeyHashes.append(pubKeyHash)
 		with open(self._fileName, mode='a') as f:
-			f.write(privateKeyWIF)
+			f.write(privateKeyHex)
 			f.write('\n')
 		return pubKeyHash
 

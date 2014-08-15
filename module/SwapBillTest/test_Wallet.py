@@ -1,7 +1,6 @@
 from __future__ import print_function
 import unittest, os
 from SwapBill import Wallet
-#from SwapBill import Address
 
 walletFile = 'testWallet.txt'
 
@@ -9,8 +8,7 @@ class Test(unittest.TestCase):
 	def test(self):
 		if os.path.exists(walletFile):
 			os.remove(walletFile)
-		wallet = Wallet.Wallet(walletFile, b'\xef') # litecoin testnet private key address version)
-		#print(Address.FromPubKeyHash(b'\x6f', wallet.addKeyPairAndReturnPubKeyHash()))
+		wallet = Wallet.Wallet(walletFile)
 		addresses = []
 		addresses.append(wallet.addKeyPairAndReturnPubKeyHash())
 		addresses.append(wallet.addKeyPairAndReturnPubKeyHash())
@@ -18,7 +16,7 @@ class Test(unittest.TestCase):
 			self.assertTrue(wallet.hasKeyPairForPubKeyHash(address))
 		privateKeys1 = wallet._privateKeys
 		self.assertEqual(len(privateKeys1), 2)
-		wallet = Wallet.Wallet(walletFile, b'\xef') # litecoin testnet private key address version)
+		wallet = Wallet.Wallet(walletFile) # litecoin testnet private key address version)
 		addresses.append(wallet.addKeyPairAndReturnPubKeyHash())
 		for address in addresses:
 			self.assertTrue(wallet.hasKeyPairForPubKeyHash(address))

@@ -22,8 +22,6 @@ class Host(object):
 
 	def getAddressVersion(self):
 		return self._addressVersion
-	def getPrivateKeyAddressVersion(self):
-		return self._privateKeyAddressVersion
 
 # unspents, addresses, transaction encode and send
 
