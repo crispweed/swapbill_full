@@ -14,22 +14,6 @@ from SwapBill.ClientMain import TransactionNotSuccessfulAgainstCurrentState
 from SwapBill.ExceptionReportedToUser import ExceptionReportedToUser
 from SwapBill.HardCodedProtocolConstraints import Constraints
 
-class MockKeyGenerator(object):
-	def __init__(self):
-		self._next = 0
-	def generatePrivateKey(self):
-		result = str(self._next) + '-' * 31
-		self._next += 1
-		result = result[:32]
-		return result.encode('ascii')
-	def privateKeyToPubKeyHash(self, privateKey):
-		s = privateKey.decode('ascii').strip('-')
-		i = int(s)
-		result = str(i) + 'i' * 19
-		result = result[:20]
-		return result.encode('ascii')
-keyGenerator = MockKeyGenerator()
-
 def GetOwnerBalances(host, ownerList, balances):
 	result = {}
 	ownerAtStart = host._getOwner()
@@ -59,7 +43,7 @@ def InitHost():
 		assert path.isdir(dataDirectory)
 		shutil.rmtree(dataDirectory)
 	os.mkdir(dataDirectory)
-	return MockHost(keyGenerator=keyGenerator)
+	return MockHost()
 
 def RunClient(host, args, hostBlockChain='litecoin'):
 	convertedArgs = []
@@ -74,7 +58,7 @@ def RunClient(host, args, hostBlockChain='litecoin'):
 	fullArgs = ['--dataDir', ownerDir, '--host', hostBlockChain] + convertedArgs
 	out = io.StringIO()
 	assert host.getBlockHashAtIndexOrNone(0) is not None
-	result = ClientMain.Main(overrideStartBlock=0, commandLineArgs=fullArgs, host=host, keyGenerator=keyGenerator, out=out)
+	result = ClientMain.Main(overrideStartBlock=0, commandLineArgs=fullArgs, host=host, out=out)
 	return out.getvalue(), result
 
 def GetStateInfo(host, includePending=False, forceRescan=False):
@@ -1009,15 +993,8 @@ class Test(unittest.TestCase):
 		payTargetAddress = result['receive_address']
 		host._setOwner(host.defaultOwner)
 
-		confirmKey = b'\x82p6@\x0b\x02e\x86\xe2\xdd\xdcW\x1f\xe6?\xf3-\xaf\xba-N\x84s"\x1d\x04\xb0\xc3plM\xb5\xed\xfeT\xc35R]\x1e\x0c\xa6\x97t M\xd65\xb8\x9e\xd0\xad\x9a\xd7\x97\x8c\xae\x02p]\x1f\xa4\x16\x11'
-		confirmKeyHex = '827036400b026586e2dddc571fe63ff32dafba2d4e8473221d04b0c3706c4db5edfe54c335525d1e0ca69774204dd635b89ed0ad9ad7978cae02705d1fa41611'
-		secretHash = b'\xc5\xfeF\x83\xb4\x01\xb6\xde\xa6\xcf\x8b\xd1\x85\xef\x8f\xb5\xc7\xa8\xaa\xa6'
-		secretAddress = 'myZr2DGoRFgnB9xNswJc3kwL1PmAWDGKtk' # litecoin testnet address version
-
-		# bad pay on proof of receipt invocations
-		self.assertRaisesRegexp(ClientMain.BadAddressArgument, 'An address argument is not valid [(]badConfirmAddress[)][.]', RunClient, host, ['pay', '--amount', 1*e(8), '--toAddress', payTargetAddress, '--onRevealSecret', 'badConfirmAddress'])
-		# and then valid invocation, which should go through correctly
-		RunClient(host, ['pay', '--amount', 1*e(8), '--toAddress', payTargetAddress, '--onRevealSecret', secretAddress])
+		# valid invocation, which should go through correctly
+		RunClient(host, ['pay', '--amount', 1*e(8), '--toAddress', payTargetAddress, '--onRevealSecret'])
 
 		output, result = RunClient(host, ['get_balance'])
 		self.assertDictEqual(result, {'balance': '0'})
@@ -1029,19 +1006,19 @@ class Test(unittest.TestCase):
 		self.assertEqual(result, expectedResult)
 
 		# bad provide secret invocations
-		self.assertRaisesRegexp(ExceptionReportedToUser, "Bad hex string 'badProof'", RunClient, host, ['reveal_secret_for_pending_payment', '--pendingPaymentID', 0, '--secret', 'badProof'])
-		self.assertRaisesRegexp(ExceptionReportedToUser, "Transaction would not complete successfully against current state: the supplied public key does not match the public key hash associated with the pending payment", RunClient, host, ['reveal_secret_for_pending_payment', '--pendingPaymentID', '0', '--secret', confirmKeyHex.replace('8', '7')])
-		self.assertRaisesRegexp(ExceptionReportedToUser, "No pending payment with the specified ID", RunClient, host, ['reveal_secret_for_pending_payment', '--pendingPaymentID', '1', '--secret', confirmKeyHex])
+		host._setOwner('someoneElse')
+		self.assertRaisesRegexp(ExceptionReportedToUser, "The secret for this pending payment is not known", RunClient, host, ['reveal_secret_for_pending_payment', '--pendingPaymentID', 0])
+		host._setOwner(host.defaultOwner)		
+		self.assertRaisesRegexp(ExceptionReportedToUser, "No pending payment with the specified ID", RunClient, host, ['reveal_secret_for_pending_payment', '--pendingPaymentID', '1'])
 
 		self.assertEqual(result, expectedResult)
 
-		# valid invocation providing secret
-		RunClient(host, ['reveal_secret_for_pending_payment', '--pendingPaymentID', '0', '--secret', confirmKeyHex])
+		# valid invocation that should complete the payment
+		RunClient(host, ['reveal_secret_for_pending_payment', '--pendingPaymentID', '0'])
 
 		# recipient gets paid directly
 		output, result = RunClient(host, ['get_balance'])
 		self.assertDictEqual(result, {'balance': '0'})
-		# so recipient gets paid
 		host._setOwner('recipient')
 		output, result = RunClient(host, ['get_balance'])
 		self.assertDictEqual(result, {'balance': '1'})

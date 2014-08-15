@@ -1,5 +1,5 @@
 import binascii
-from SwapBill import RawTransaction, TransactionFee
+from SwapBill import RawTransaction, TransactionFee, KeyPair
 from SwapBill import Host, Address # these just for exceptions, at time of writing
 from SwapBill.ExceptionReportedToUser import ExceptionReportedToUser
 
@@ -10,13 +10,13 @@ def MakeTXID(i):
 	txid = binascii.hexlify(binascii.unhexlify(txid.encode('ascii'))).decode('ascii')
 	return txid
 
-def MatchPubKeyHashAndRemovePrivateKey(keyGenerator, pubKeyHash, privateKeys):
+def MatchPubKeyHashAndRemovePrivateKey(pubKeyHash, privateKeys):
 	remainingPrivateKeys = []
 	while True:
 		if not privateKeys:
 			raise Host.SigningFailed("Failed to find matching private key.")
 		privateKey = privateKeys[0]
-		generatedPubKeyHash = keyGenerator.privateKeyToPubKeyHash(privateKey)
+		generatedPubKeyHash = KeyPair.PrivateKeyToPubKeyHash(privateKey)
 		privateKeys = privateKeys[1:]
 		if generatedPubKeyHash == pubKeyHash:
 			return remainingPrivateKeys + privateKeys
@@ -25,10 +25,9 @@ def MatchPubKeyHashAndRemovePrivateKey(keyGenerator, pubKeyHash, privateKeys):
 class MockHost(object):
 	defaultOwner = '0'
 
-	def __init__(self, keyGenerator, ownerID=None):
+	def __init__(self, ownerID=None):
 		if ownerID is None:
 			ownerID = self.defaultOwner
-		self._keyGenerator = keyGenerator
 		self._id = ownerID
 		self._nextChange = 0
 		self._nextSwapBill = 0
@@ -110,8 +109,8 @@ class MockHost(object):
 		return result
 
 	def getManagedAddress(self):
-		privateKey = self._keyGenerator.generatePrivateKey()
-		pubKeyHash = self._keyGenerator.privateKeyToPubKeyHash(privateKey)
+		privateKey = KeyPair.GeneratePrivateKey()
+		pubKeyHash = KeyPair.PrivateKeyToPubKeyHash(privateKey)
 		self._keyPairs.append((privateKey, pubKeyHash))
 		return pubKeyHash
 	def _isHostAddress(self, pubKeyHash):
@@ -157,7 +156,7 @@ class MockHost(object):
 		if len(pubKeyHashesToBeSigned) != len(privateKeys):
 			raise Exception('number of supplied private keys does not match number of required private keys')
 		for pubKeyHash in pubKeyHashesToBeSigned:
-			privateKeys = MatchPubKeyHashAndRemovePrivateKey(self._keyGenerator, pubKeyHash, privateKeys)
+			privateKeys = MatchPubKeyHashAndRemovePrivateKey(pubKeyHash, privateKeys)
 		self._nextTXID += 1
 		txid = MakeTXID(self._nextTXID)
 		outputAmounts = []

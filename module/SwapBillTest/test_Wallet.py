@@ -26,13 +26,3 @@ class Test(unittest.TestCase):
 		self.assertFalse(wallet.hasKeyPairForPubKeyHash(b'fakePubKeyHash'))
 		os.remove(walletFile)
 
-	def test_key_pairs(self):
-		generator = Wallet.DefaultKeyGenerator()
-		privateKey = b"\x0c\x28\xfc\xa3\x86\xc7\xa2'`\x0b/\xe5\x0b|\xae\x11\xec\x86\xd3\xbf\x1f\xbeG\x1b\xe8\x98'\xe1\x9dr\xaa\x1d"
-		pubKeyHash = generator.privateKeyToPubKeyHash(privateKey)
-		self.assertEqual(pubKeyHash, b'\xa6]\x1a#\x9dN\xc6fd=5\x0c{\xb8\xfcD\xd2\x88\x11(')
-		privateKey = generator.generatePrivateKey()
-		pubKeyHash = generator.privateKeyToPubKeyHash(privateKey)
-		self.assertIs(type(pubKeyHash), type(b''))
-		self.assertEqual(len(pubKeyHash), 20)
-

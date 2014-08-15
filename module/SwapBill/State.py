@@ -1,6 +1,6 @@
 from __future__ import print_function
 import binascii
-from SwapBill import TradeOfferHeap, TradeOffer, Balances, Amounts, Wallet
+from SwapBill import TradeOfferHeap, TradeOffer, Balances, Amounts, KeyPair
 from SwapBill.HardCodedProtocolConstraints import Constraints
 from SwapBill.Amounts import e
 
@@ -410,7 +410,7 @@ class State(object):
 		if not pendingPayIndex in self._pendingPays:
 			raise TransactionFailsAgainstCurrentState('no pending payment with the specified index')
 		pay = self._pendingPays[pendingPayIndex]
-		if Wallet.PublicKeyToPubKeyHash(publicKey) != pay.secretHash:
+		if KeyPair.PublicKeyToPubKeyHash(publicKey) != pay.secretHash:
 			raise TransactionFailsAgainstCurrentState('the supplied public key does not match the public key hash associated with the pending payment')
 		if txID is None:
 			return		

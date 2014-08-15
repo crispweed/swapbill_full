@@ -58,7 +58,7 @@ sp = subparsers.add_parser('pay', help='make a swapbill payment')
 sp.add_argument('--amount', required=True, help='amount of swapbill to be paid, as a decimal fraction (one satoshi is 0.00000001)')
 sp.add_argument('--toAddress', required=True, help='pay to this address')
 sp.add_argument('--blocksUntilExpiry', type=int, default=8, help='if the transaction takes longer than this to go through then the transaction expires (in which case no payment is made and the full amount is returned as change)')
-sp.add_argument('--onRevealSecret', help='a public key hash, encoded as an address with any address version, for a non-disclosed public key')
+sp.add_argument('--onRevealSecret', action='store_true', help='makes the payment dependant on a secret (generated for the transaction and stored locally)')
 
 sp = subparsers.add_parser('post_ltc_buy', help='make an offer to buy litecoin with swapbill')
 sp.add_argument('--swapBillOffered', required=True, help='amount of swapbill offered, as a decimal fraction (one satoshi is 0.00000001)')
@@ -70,14 +70,13 @@ sp.add_argument('--ltcOffered', required=True, help='amount of ltc offered, as a
 sp.add_argument('--exchangeRate', required=True, help='the exchange rate LTC/SWP as a decimal fraction (e.g. 0.5 means one LTC for two swapbill), must be greater than 0.0 and less than 1.0')
 sp.add_argument('--backerID', help='the id of the ltc sell backer to be used for the exchange, if a backed sell is desired')
 sp.add_argument('--blocksUntilExpiry', type=int, default=2, help="(doesn't apply to backed sells) after this number of blocks the offer expires (and swapbill remaining in any unmatched part of the offer is returned)")
-sp.add_argument('--includesCommission', help='(only applies to backed sells) specifies that backer commission is to be taken out of ltcOffered (otherwise backed commission will be paid on top of ltcOffered)', action='store_true')
+sp.add_argument('--includesCommission', action='store_true', help='(only applies to backed sells) specifies that backer commission is to be taken out of ltcOffered (otherwise backed commission will be paid on top of ltcOffered)')
 
 sp = subparsers.add_parser('complete_ltc_sell', help='complete an ltc exchange by fulfilling a pending exchange payment')
 sp.add_argument('--pendingExchangeID', required=True, help='the id of the pending exchange payment to fulfill')
 
 sp = subparsers.add_parser('reveal_secret_for_pending_payment', help='provide the secret public key required for a pending payment to go through')
 sp.add_argument('--pendingPaymentID', required=True, help='the id of the pending payment')
-sp.add_argument('--secret', required=True, help='hexadecimal data for the secret (public key with previously provided hash)')
 
 sp = subparsers.add_parser('back_ltc_sells', help='commit swapbill to back ltc exchanges')
 sp.add_argument('--backingSwapBill', required=True, help='amount of swapbill to commit, as a decimal fraction (one satoshi is 0.00000001)')
@@ -108,7 +107,7 @@ sp.add_argument('-i', '--includepending', help='include transactions that have b
 sp = subparsers.add_parser('get_state_info', help='get some general state information')
 sp.add_argument('-i', '--includepending', help='include transactions that have been submitted but not yet confirmed (based on host memory pool)', action='store_true')
 
-def Main(commandLineArgs=sys.argv[1:], host=None, overrideStartBlock=None, keyGenerator=None, out=sys.stdout):
+def Main(commandLineArgs=sys.argv[1:], host=None, overrideStartBlock=None, out=sys.stdout):
 	args = parser.parse_args(commandLineArgs)
 
 	if not path.isdir(args.dataDir):
@@ -124,7 +123,8 @@ def Main(commandLineArgs=sys.argv[1:], host=None, overrideStartBlock=None, keyGe
 	if host is None:
 		host = HostFromPrefsByProtocol(protocol=args.host, configFile=args.configFile, dataDir=dataDir)
 
-	wallet = Wallet.Wallet(path.join(dataDir, 'wallet.txt'), keyGenerator=keyGenerator)
+	wallet = Wallet.Wallet(path.join(dataDir, 'wallet.txt'))
+	secretsWallet = Wallet.Wallet(path.join(dataDir, 'secretsWallet.txt'))
 
 	includePending = hasattr(args, 'includepending') and args.includepending
 
@@ -248,12 +248,12 @@ def Main(commandLineArgs=sys.argv[1:], host=None, overrideStartBlock=None, keyGe
 		    'amount':Amounts.FromString(args.amount),
 		    'maxBlock':state._currentBlockIndex + args.blocksUntilExpiry
 		}
-		if args.onRevealSecret is None:
+		if args.onRevealSecret:
+			transactionType = 'PayOnRevealSecret'
+			details['secretAddress'] = secretsWallet.addKeyPairAndReturnPubKeyHash()
+		else:
 			# standard pay transaction
 			transactionType = 'Pay'
-		else:
-			transactionType = 'PayOnRevealSecret'
-			details['secretAddress'] = CheckAndReturnPubKeyHash_AnyVersion(args.onRevealSecret)
 		return CheckAndSend_Funded(transactionType, outputs, outputPubKeyHashes, details)
 
 	elif args.action == 'post_ltc_buy':
@@ -312,9 +312,11 @@ def Main(commandLineArgs=sys.argv[1:], host=None, overrideStartBlock=None, keyGe
 		if not pendingPaymentID in state._pendingPays:
 			raise ExceptionReportedToUser('No pending payment with the specified ID.')
 		pay = state._pendingPays[pendingPaymentID]
+		if not secretsWallet.hasKeyPairForPubKeyHash(pay.secretHash):
+			raise ExceptionReportedToUser('The secret for this pending payment is not known.')		
 		details = {
 		    'pendingPayIndex':pendingPaymentID,
-		    'publicKey':CheckedConvertFromHex(args.secret),
+		    'publicKey':secretsWallet.publicKeyForPubKeyHash(pay.secretHash)
 		}
 		return CheckAndSend_UnFunded(transactionType, (), (), details)
 

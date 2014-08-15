@@ -1,6 +1,6 @@
 from __future__ import print_function
 import unittest
-from SwapBill import State, Amounts
+from SwapBill import State, Amounts, KeyPair
 from SwapBill.State import InvalidTransactionType, InvalidTransactionParameters
 from SwapBill.HardCodedProtocolConstraints import Constraints
 from SwapBill.Amounts import e
@@ -1146,8 +1146,9 @@ class Test(unittest.TestCase):
 		state = State.State(100, 'starthash')
 		self.state = state
 		active = self.Burn(22*e(7))
-		confirmKey = b'\x82p6@\x0b\x02e\x86\xe2\xdd\xdcW\x1f\xe6?\xf3-\xaf\xba-N\x84s"\x1d\x04\xb0\xc3plM\xb5\xed\xfeT\xc35R]\x1e\x0c\xa6\x97t M\xd65\xb8\x9e\xd0\xad\x9a\xd7\x97\x8c\xae\x02p]\x1f\xa4\x16\x11'
-		secretHash = b'\xc5\xfeF\x83\xb4\x01\xb6\xde\xa6\xcf\x8b\xd1\x85\xef\x8f\xb5\xc7\xa8\xaa\xa6'
+		secretPubKey = KeyPair.PrivateKeyToPublicKey(KeyPair.GeneratePrivateKey())
+		secretHash = KeyPair.PublicKeyToPubKeyHash(secretPubKey)
+		anotherPubKey = KeyPair.PrivateKeyToPublicKey(KeyPair.GeneratePrivateKey())
 		details = {
 		    'amount':22*e(7),
 		    'maxBlock':150,
@@ -1203,14 +1204,14 @@ class Test(unittest.TestCase):
 		# some proof of receipt transaction fail cases
 		proofDetails = {
 		    'pendingPayIndex':1,
-		    'publicKey':confirmKey,
+		    'publicKey':secretPubKey,
 		}
 		proofDetails['pendingPayIndex'] = 0
 		self.Apply_AssertFails(state, 'RevealPendingPaymentSecret', expectedError='no pending payment with the specified index', sourceAccounts=None, **proofDetails)
 		proofDetails['pendingPayIndex'] = 1
-		proofDetails['publicKey'] = b'badKey'
+		proofDetails['publicKey'] = anotherPubKey
 		self.Apply_AssertFails(state, 'RevealPendingPaymentSecret', expectedError='the supplied public key does not match the public key hash associated with the pending payment', sourceAccounts=None, **proofDetails)
-		proofDetails['publicKey'] = confirmKey
+		proofDetails['publicKey'] = secretPubKey
 		# but then confirmed
 		self.Apply_AssertSucceeds(state, 'RevealPendingPaymentSecret', sourceAccounts=None, **proofDetails)
 		# the pending pay is still outstanding, but flagged as confirmed
