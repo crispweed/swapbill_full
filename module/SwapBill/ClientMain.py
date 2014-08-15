@@ -47,6 +47,7 @@ class SourceAddressUnseeded(ExceptionReportedToUser):
 parser = argparse.ArgumentParser(prog='SwapBillClient', description='the reference implementation of the SwapBill protocol')
 parser.add_argument('--configFile', help='the location of the configuration file')
 parser.add_argument('--dataDir', help='the location of the data directory', default='.')
+parser.add_argument('--host', help="host blockchain, can currently be either 'litecoin' or 'bitcoin'", choices=['bitcoin', 'litecoin'], default='bitcoin')
 parser.add_argument('--forceRescan', help='force a full block chain rescan', action='store_true')
 subparsers = parser.add_subparsers(dest='action', help='the action to be taken')
 
@@ -107,7 +108,7 @@ sp.add_argument('-i', '--includepending', help='include transactions that have b
 sp = subparsers.add_parser('get_state_info', help='get some general state information')
 sp.add_argument('-i', '--includepending', help='include transactions that have been submitted but not yet confirmed (based on host memory pool)', action='store_true')
 
-def Main(startBlockIndex, startBlockHash, commandLineArgs=sys.argv[1:], host=None, keyGenerator=None, out=sys.stdout):
+def Main(commandLineArgs=sys.argv[1:], host=None, overrideStartBlock=None, keyGenerator=None, out=sys.stdout):
 	args = parser.parse_args(commandLineArgs)
 
 	if not path.isdir(args.dataDir):
@@ -121,7 +122,7 @@ def Main(startBlockIndex, startBlockHash, commandLineArgs=sys.argv[1:], host=Non
 			raise ExceptionReportedToUser("Failed to create directory " + dataDir + ":", e)
 
 	if host is None:
-		host = HostFromPrefsByProtocol(protocol='litecoin', configFile=args.configFile, dataDir=dataDir)
+		host = HostFromPrefsByProtocol(protocol=args.host, configFile=args.configFile, dataDir=dataDir)
 
 	wallet = Wallet.Wallet(path.join(dataDir, 'wallet.txt'), privateKeyAddressVersion=host.getPrivateKeyAddressVersion(), keyGenerator=keyGenerator)
 
@@ -130,7 +131,7 @@ def Main(startBlockIndex, startBlockHash, commandLineArgs=sys.argv[1:], host=Non
 	if args.action == 'get_state_info':
 		syncOut = io.StringIO()
 		startTime = time.clock()
-		state, ownedAccounts = SyncAndReturnStateAndOwnedAccounts(dataDir, startBlockIndex, startBlockHash, wallet, host, includePending=includePending, forceRescan=args.forceRescan, out=syncOut)
+		state, ownedAccounts = SyncAndReturnStateAndOwnedAccounts(dataDir, args.host, overrideStartBlock, wallet, host, includePending=includePending, forceRescan=args.forceRescan, out=syncOut)
 		elapsedTime = time.clock() - startTime
 		formattedBalances = {}
 		for account in state._balances.balances:
@@ -147,7 +148,7 @@ def Main(startBlockIndex, startBlockHash, commandLineArgs=sys.argv[1:], host=Non
 		}
 		return info
 
-	state, ownedAccounts = SyncAndReturnStateAndOwnedAccounts(dataDir, startBlockIndex, startBlockHash, wallet, host, includePending=includePending, forceRescan=args.forceRescan, out=out)
+	state, ownedAccounts = SyncAndReturnStateAndOwnedAccounts(dataDir, args.host, overrideStartBlock, wallet, host, includePending=includePending, forceRescan=args.forceRescan, out=out)
 
 	transactionBuildLayer = TransactionBuildLayer.TransactionBuildLayer(host, ownedAccounts)
 

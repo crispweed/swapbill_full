@@ -61,7 +61,7 @@ def InitHost():
 	os.mkdir(dataDirectory)
 	return MockHost(keyGenerator=keyGenerator)
 
-def RunClient(host, args):
+def RunClient(host, args, hostBlockChain='litecoin'):
 	convertedArgs = []
 	for arg in args:
 		if type(arg) is not type(''):
@@ -71,10 +71,10 @@ def RunClient(host, args):
 	ownerDir = path.join(dataDirectory, host._getOwner())
 	if not path.exists(ownerDir):
 		os.mkdir(ownerDir)
-	fullArgs = ['--dataDir', ownerDir] + convertedArgs
+	fullArgs = ['--dataDir', ownerDir, '--host', hostBlockChain] + convertedArgs
 	out = io.StringIO()
 	assert host.getBlockHashAtIndexOrNone(0) is not None
-	result = ClientMain.Main(startBlockIndex=0, startBlockHash=host.getBlockHashAtIndexOrNone(0), commandLineArgs=fullArgs, host=host, keyGenerator=keyGenerator, out=out)
+	result = ClientMain.Main(overrideStartBlock=0, commandLineArgs=fullArgs, host=host, keyGenerator=keyGenerator, out=out)
 	return out.getvalue(), result
 
 def GetStateInfo(host, includePending=False, forceRescan=False):
@@ -163,9 +163,7 @@ class Test(unittest.TestCase):
 			os.mkdir(ownerDir)
 		args = ['--dataDir', ownerDir, 'get_balance']
 		out = io.StringIO()
-		startBlock = 5
-		assert host.getBlockHashAtIndexOrNone(startBlock) is None
-		self.assertRaisesRegexp(ExceptionReportedToUser, 'Block chain has not reached the swapbill start block [(]5[)][.]', ClientMain.Main, startBlockIndex=startBlock, startBlockHash='madeUpBlockHash', commandLineArgs=args, host=host, out=out)
+		self.assertRaisesRegexp(ExceptionReportedToUser, 'Block chain has not reached the swapbill start block', ClientMain.Main, commandLineArgs=args, host=host, out=out)
 
 	def test_minimum_balance(self):
 		host = InitHost()
