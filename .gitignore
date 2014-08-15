@@ -1,5 +1,5 @@
-dataDirectoryForTests/
-swapBillData/
+dataDirectoryForTests
+swapBillData_*
 __pycache__
 htmlcov
 .coverage
