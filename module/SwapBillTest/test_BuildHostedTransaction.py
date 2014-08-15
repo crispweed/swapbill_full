@@ -73,8 +73,8 @@ class Test(unittest.TestCase):
 		# (could potentially add this to one of the other outputs, but this complicates things)
 		dustLimit = 100000
 		transactionFee = 100000
-		unspentAmounts = (100000, 200000, 300000, 100000)
-		unspentAsInputs = [('1', 7), ('2', 7), ('3', 7), ('4', 0)]
+		unspentAmounts = (100000, 100000, 200000, 300000)
+		unspentAsInputs = [('1', 7), ('4', 0), ('2', 7), ('3', 7)]
 		unspent = (unspentAmounts, unspentAsInputs)
 		changeAddress = b'change'
 		baseTX = FromData(([],[(b'controlAddress', 150000), (b'destAddress', 0)]))
