@@ -28,19 +28,55 @@ class Test(unittest.TestCase):
 		rpcHost = MockRPC.Host()
 		host = InitHost(rpcHost);
 		expectedQuery = ('listunspent',)
-		queryResult = [{'scriptPubKey': '76a914ea9273c05d44d57317274f252df2b7605c5e1d7e88ac', 'confirmations': 47, 'account': '', 'txid': 'c4d9603031f72b948e434f09c6d7c95d2a031ee18534b41760d8f12ed54948a5', 'address': 'n2uFrchnqXnEfcX8ewoGZyHQNCNp8cxcPk', 'vout': 2, 'amount': 899.998}, {'scriptPubKey': '76a914707c085200b226a7a39080c2a58468debe0b8e6f88ac', 'confirmations': 48, 'account': '', 'txid': 'f0205c8be59f924e79d1c02d91342dfcc791a0e9acc7c780b38e9c1235c6d896', 'address': 'mqmiZU7cFg4czRPiU55wfQEBgPmnRzZ7kW', 'vout': 1, 'amount': 1000.0}]
+		queryResult = [
+		    {'scriptPubKey': '76a914ea9273c05d44d57317274f252df2b7605c5e1d7e88ac', 'confirmations': 47, 'account': '', 'txid': 'c4d9603031f72b948e434f09c6d7c95d2a031ee18534b41760d8f12ed54948a5', 'address': 'n2uFrchnqXnEfcX8ewoGZyHQNCNp8cxcPk', 'vout': 2, 'amount': 899.998},
+		    {'scriptPubKey': '76a914707c085200b226a7a39080c2a58468debe0b8e6f88ac', 'confirmations': 48, 'account': '', 'txid': 'f0205c8be59f924e79d1c02d91342dfcc791a0e9acc7c780b38e9c1235c6d896', 'address': 'mqmiZU7cFg4czRPiU55wfQEBgPmnRzZ7kW', 'vout': 1, 'amount': 1000.0}
+		]
 		rpcHost.queue.append((expectedQuery, queryResult))
 		unspent = host.getUnspent()
-		self.assertEqual(unspent, [{'txid': 'c4d9603031f72b948e434f09c6d7c95d2a031ee18534b41760d8f12ed54948a5', 'scriptPubKey': '76a914ea9273c05d44d57317274f252df2b7605c5e1d7e88ac', 'address': b"\xea\x92s\xc0]D\xd5s\x17'O%-\xf2\xb7`\\^\x1d~", 'vout': 2, 'amount': 89999800000}, {'txid': 'f0205c8be59f924e79d1c02d91342dfcc791a0e9acc7c780b38e9c1235c6d896', 'scriptPubKey': '76a914707c085200b226a7a39080c2a58468debe0b8e6f88ac', 'address': b'p|\x08R\x00\xb2&\xa7\xa3\x90\x80\xc2\xa5\x84h\xde\xbe\x0b\x8eo', 'vout': 1, 'amount': 100000000000}])
+		self.assertEqual(unspent, [
+		    {'txid': 'f0205c8be59f924e79d1c02d91342dfcc791a0e9acc7c780b38e9c1235c6d896', 'scriptPubKey': '76a914707c085200b226a7a39080c2a58468debe0b8e6f88ac', 'address': b'p|\x08R\x00\xb2&\xa7\xa3\x90\x80\xc2\xa5\x84h\xde\xbe\x0b\x8eo', 'vout': 1, 'amount': 100000000000},
+		    {'txid': 'c4d9603031f72b948e434f09c6d7c95d2a031ee18534b41760d8f12ed54948a5', 'scriptPubKey': '76a914ea9273c05d44d57317274f252df2b7605c5e1d7e88ac', 'address': b"\xea\x92s\xc0]D\xd5s\x17'O%-\xf2\xb7`\\^\x1d~", 'vout': 2, 'amount': 89999800000},
+		])
+
+	def test_unspent_sorting(self):
+		rpcHost = MockRPC.Host()
+		host = InitHost(rpcHost);
+		expectedQuery = ('listunspent',)
+		spk = '76a914707c085200b226a7a39080c2a58468debe0b8e6f88ac'
+		txid = 'f0205c8be59f924e79d1c02d91342dfcc791a0e9acc7c780b38e9c1235c6d896'
+		adr = 'mqmiZU7cFg4czRPiU55wfQEBgPmnRzZ7kW'
+		pubKeyHash = b'p|\x08R\x00\xb2&\xa7\xa3\x90\x80\xc2\xa5\x84h\xde\xbe\x0b\x8eo'
+		queryResult = [
+		    {'scriptPubKey':spk , 'confirmations':47, 'account':'', 'txid':txid, 'address':adr, 'vout':1, 'amount':1.0},
+		    {'scriptPubKey':spk , 'confirmations':48, 'account':'', 'txid':txid, 'address':adr, 'vout':1, 'amount':2.0},
+		    {'scriptPubKey':spk , 'confirmations':10, 'account':'', 'txid':txid, 'address':adr, 'vout':1, 'amount':3.0},
+		    {'scriptPubKey':spk , 'confirmations':11, 'account':'', 'txid':txid, 'address':adr, 'vout':1, 'amount':4.0},
+		    {'scriptPubKey':spk , 'confirmations':60, 'account':'', 'txid':txid, 'address':adr, 'vout':1, 'amount':5.0},
+		    {'scriptPubKey':spk , 'confirmations':45, 'account':'', 'txid':txid, 'address':adr, 'vout':1, 'amount':6.0},
+		]
+		rpcHost.queue.append((expectedQuery, queryResult))
+		unspent = host.getUnspent()
+		self.assertEqual(unspent, [
+		    {'txid':txid, 'scriptPubKey':spk, 'address':pubKeyHash, 'vout':1, 'amount':500000000},
+		    {'txid':txid, 'scriptPubKey':spk, 'address':pubKeyHash, 'vout':1, 'amount':200000000},
+		    {'txid':txid, 'scriptPubKey':spk, 'address':pubKeyHash, 'vout':1, 'amount':100000000},
+		    {'txid':txid, 'scriptPubKey':spk, 'address':pubKeyHash, 'vout':1, 'amount':600000000},
+		    {'txid':txid, 'scriptPubKey':spk, 'address':pubKeyHash, 'vout':1, 'amount':400000000},
+		    {'txid':txid, 'scriptPubKey':spk, 'address':pubKeyHash, 'vout':1, 'amount':300000000},
+		])
 
 	def doConvertTest(self, amountJSONFloat, expectedSatoshis):
 		rpcHost = MockRPC.Host()
 		host = InitHost(rpcHost);
 		expectedQuery = ('listunspent',)
-		queryResult = [{'scriptPubKey': '76a914ea9273c05d44d57317274f252df2b7605c5e1d7e88ac', 'confirmations': 47, 'account': '', 'txid': 'c4d9603031f72b948e434f09c6d7c95d2a031ee18534b41760d8f12ed54948a5', 'address': 'n2uFrchnqXnEfcX8ewoGZyHQNCNp8cxcPk', 'vout': 2, 'amount': 899.998}, {'scriptPubKey': '76a914707c085200b226a7a39080c2a58468debe0b8e6f88ac', 'confirmations': 48, 'account': '', 'txid': 'f0205c8be59f924e79d1c02d91342dfcc791a0e9acc7c780b38e9c1235c6d896', 'address': 'mqmiZU7cFg4czRPiU55wfQEBgPmnRzZ7kW', 'vout': 1, 'amount': amountJSONFloat}]
+		queryResult = [
+		    {'scriptPubKey': '76a914707c085200b226a7a39080c2a58468debe0b8e6f88ac', 'confirmations': 48, 'account': '', 'txid': 'f0205c8be59f924e79d1c02d91342dfcc791a0e9acc7c780b38e9c1235c6d896', 'address': 'mqmiZU7cFg4czRPiU55wfQEBgPmnRzZ7kW', 'vout': 1, 'amount': amountJSONFloat}]
 		rpcHost.queue.append((expectedQuery, queryResult))
 		unspent = host.getUnspent()
-		self.assertEqual(unspent, [{'txid': 'c4d9603031f72b948e434f09c6d7c95d2a031ee18534b41760d8f12ed54948a5', 'scriptPubKey': '76a914ea9273c05d44d57317274f252df2b7605c5e1d7e88ac', 'address': b"\xea\x92s\xc0]D\xd5s\x17'O%-\xf2\xb7`\\^\x1d~", 'vout': 2, 'amount': 89999800000}, {'txid': 'f0205c8be59f924e79d1c02d91342dfcc791a0e9acc7c780b38e9c1235c6d896', 'scriptPubKey': '76a914707c085200b226a7a39080c2a58468debe0b8e6f88ac', 'address': b'p|\x08R\x00\xb2&\xa7\xa3\x90\x80\xc2\xa5\x84h\xde\xbe\x0b\x8eo', 'vout': 1, 'amount': expectedSatoshis}])
+		self.assertEqual(unspent, [
+		    {'txid': 'f0205c8be59f924e79d1c02d91342dfcc791a0e9acc7c780b38e9c1235c6d896', 'scriptPubKey': '76a914707c085200b226a7a39080c2a58468debe0b8e6f88ac', 'address': b'p|\x08R\x00\xb2&\xa7\xa3\x90\x80\xc2\xa5\x84h\xde\xbe\x0b\x8eo', 'vout': 1, 'amount': expectedSatoshis}
+		])
 	def test_get_unspent_float_convert(self):
 		self.doConvertTest(8.83, 883000000)
 		self.doConvertTest(0.00000001, 1)

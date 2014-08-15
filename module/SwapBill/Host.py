@@ -31,6 +31,9 @@ class Host(object):
 		# lowest level getUnspent interface
 		result = []
 		allUnspent = self._rpcHost.call('listunspent')
+		def negativeConfirmations(entry):
+			return -entry['confirmations']
+		allUnspent.sort(key = negativeConfirmations)
 		for output in allUnspent:
 			if not 'address' in output: ## is this check required?
 				continue
