@@ -2,7 +2,7 @@ from __future__ import print_function
 import unittest
 from SwapBillTest import hook_TradeOffer
 from SwapBill import TradeOffer, Amounts
-from SwapBill.TradeOffer import OfferIsBelowMinimumExchange, OfferIsBelowMinimumExchange
+from SwapBill.TradeOffer import OfferIsBelowMinimumExchange
 from SwapBill.HardCodedProtocolConstraints import Constraints
 from SwapBill.Amounts import e
 
