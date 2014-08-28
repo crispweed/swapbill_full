@@ -51,8 +51,8 @@ parser.add_argument('--host', help="host blockchain, can currently be either 'li
 parser.add_argument('--forceRescan', help='force a full block chain rescan', action='store_true')
 subparsers = parser.add_subparsers(dest='action', help='the action to be taken')
 
-sp = subparsers.add_parser('burn', help='destroy litecoin to create swapbill')
-sp.add_argument('--amount', required=True, help='amount of litecoin to be destroyed, as a decimal fraction (one satoshi is 0.00000001)')
+sp = subparsers.add_parser('burn', help='destroy host coin to create swapbill')
+sp.add_argument('--amount', required=True, help='amount of host coin to be destroyed, as a decimal fraction (one satoshi is 0.00000001)')
 
 sp = subparsers.add_parser('pay', help='make a swapbill payment')
 sp.add_argument('--amount', required=True, help='amount of swapbill to be paid, as a decimal fraction (one satoshi is 0.00000001)')
@@ -60,25 +60,25 @@ sp.add_argument('--toAddress', required=True, help='pay to this address')
 sp.add_argument('--blocksUntilExpiry', type=int, default=8, help='if the transaction takes longer than this to go through then the transaction expires (in which case no payment is made and the full amount is returned as change)')
 sp.add_argument('--onRevealSecret', action='store_true', help='makes the payment dependant on a secret (generated for the transaction and stored locally)')
 
-sp = subparsers.add_parser('post_ltc_buy', help='make an offer to buy litecoin with swapbill')
+sp = subparsers.add_parser('post_ltc_buy', help='make an offer to buy host coin with swapbill')
 sp.add_argument('--swapBillOffered', required=True, help='amount of swapbill offered, as a decimal fraction (one satoshi is 0.00000001)')
 sp.add_argument('--blocksUntilExpiry', type=int, default=8, help='after this number of blocks the offer expires (and swapbill remaining in any unmatched part of the offer is returned)')
-sp.add_argument('--exchangeRate', required=True, help='the exchange rate LTC/SWP as a decimal fraction (e.g. 0.5 means one LTC for two swapbill), must be greater than 0.0 and less than 1.0')
+sp.add_argument('--exchangeRate', required=True, help='the exchange rate host coin/swapbill as a decimal fraction (e.g. 0.5 means one host coin for two swapbill), must be greater than 0.0 and less than 1.0')
 
-sp = subparsers.add_parser('post_ltc_sell', help='make an offer to sell litecoin for swapbill')
-sp.add_argument('--ltcOffered', required=True, help='amount of ltc offered, as a decimal fraction (one satoshi is 0.00000001)')
-sp.add_argument('--exchangeRate', required=True, help='the exchange rate LTC/SWP as a decimal fraction (e.g. 0.5 means one LTC for two swapbill), must be greater than 0.0 and less than 1.0')
-sp.add_argument('--backerID', help='the id of the ltc sell backer to be used for the exchange, if a backed sell is desired')
+sp = subparsers.add_parser('post_ltc_sell', help='make an offer to sell host coin for swapbill')
+sp.add_argument('--hostCoinOffered', required=True, help='amount of host coin offered, as a decimal fraction (one satoshi is 0.00000001)')
+sp.add_argument('--exchangeRate', required=True, help='the exchange rate host coin/swapbill as a decimal fraction (e.g. 0.5 means one host coin for two swapbill), must be greater than 0.0 and less than 1.0')
+sp.add_argument('--backerID', help='the id of the sell backer to be used for the exchange, if a backed sell is desired')
 sp.add_argument('--blocksUntilExpiry', type=int, default=2, help="(doesn't apply to backed sells) after this number of blocks the offer expires (and swapbill remaining in any unmatched part of the offer is returned)")
-sp.add_argument('--includesCommission', action='store_true', help='(only applies to backed sells) specifies that backer commission is to be taken out of ltcOffered (otherwise backed commission will be paid on top of ltcOffered)')
+sp.add_argument('--includesCommission', action='store_true', help='(only applies to backed sells) specifies that backer commission is to be taken out of the amount specified for hostCoinOffered (otherwise backer commission will be paid on top of this amount)')
 
-sp = subparsers.add_parser('complete_ltc_sell', help='complete an ltc exchange by fulfilling a pending exchange payment')
+sp = subparsers.add_parser('complete_ltc_sell', help='complete a exchange with host coin by fulfilling a pending exchange payment')
 sp.add_argument('--pendingExchangeID', required=True, help='the id of the pending exchange payment to fulfill')
 
 sp = subparsers.add_parser('reveal_secret_for_pending_payment', help='provide the secret public key required for a pending payment to go through')
 sp.add_argument('--pendingPaymentID', required=True, help='the id of the pending payment')
 
-sp = subparsers.add_parser('back_ltc_sells', help='commit swapbill to back ltc exchanges')
+sp = subparsers.add_parser('back_ltc_sells', help='commit swapbill to back exchanges with host coin')
 sp.add_argument('--backingSwapBill', required=True, help='amount of swapbill to commit, as a decimal fraction (one satoshi is 0.00000001)')
 sp.add_argument('--transactionsBacked', required=True, help='the number of transactions you want to back, which then implies a maximum backing amount per transaction')
 sp.add_argument('--blocksUntilExpiry', type=int, default=200, help='number of blocks for which the backing amount should remain committed')
@@ -89,16 +89,16 @@ subparsers.add_parser('get_receive_address', help='generate a new key pair for t
 sp = subparsers.add_parser('get_balance', help='get current SwapBill balance')
 sp.add_argument('-i', '--includepending', help='include transactions that have been submitted but not yet confirmed (based on host memory pool)', action='store_true')
 
-sp = subparsers.add_parser('get_buy_offers', help='get list of currently active litecoin buy offers')
+sp = subparsers.add_parser('get_buy_offers', help='get list of currently active host coin buy offers')
 sp.add_argument('-i', '--includepending', help='include transactions that have been submitted but not yet confirmed (based on host memory pool)', action='store_true')
 
-sp = subparsers.add_parser('get_sell_offers', help='get list of currently active litecoin sell offers')
+sp = subparsers.add_parser('get_sell_offers', help='get list of currently active host coin sell offers')
 sp.add_argument('-i', '--includepending', help='include transactions that have been submitted but not yet confirmed (based on host memory pool)', action='store_true')
 
 sp = subparsers.add_parser('get_pending_exchanges', help='get current SwapBill pending exchange payments')
 sp.add_argument('-i', '--includepending', help='include transactions that have been submitted but not yet confirmed (based on host memory pool)', action='store_true')
 
-sp = subparsers.add_parser('get_ltc_sell_backers', help='get information about funds currently commited to backing ltc sell operations')
+sp = subparsers.add_parser('get_ltc_sell_backers', help='get information about funds currently commited to backing host coin sell transactions')
 sp.add_argument('-i', '--includepending', help='include transactions that have been submitted but not yet confirmed (based on host memory pool)', action='store_true')
 
 sp = subparsers.add_parser('get_pending_payments', help='get information payments currently pending proof of receipt')
@@ -141,8 +141,8 @@ def Main(commandLineArgs=sys.argv[1:], host=None, overrideStartBlock=None, out=s
 		    'totalCreated':state._totalCreated,
 		    'atEndOfBlock':state._currentBlockIndex - 1, 'balances':formattedBalances, 'syncOutput':syncOut.getvalue(),
 		    'syncTime':elapsedTime,
-		    'numberOfLTCBuyOffers':state._ltcBuys.size(),
-		    'numberOfLTCSellOffers':state._ltcSells.size(),
+		    'numberOfHostCoinBuyOffers':state._ltcBuys.size(),
+		    'numberOfHostCoinSellOffers':state._ltcSells.size(),
 		    'numberOfPendingExchanges':len(state._pendingExchanges),
 		    'numberOfOutputs':len(ownedAccounts.accounts)
 		}
@@ -274,7 +274,7 @@ def Main(commandLineArgs=sys.argv[1:], host=None, overrideStartBlock=None, out=s
 			transactionType = 'LTCSellOffer'
 			outputs = ('ltcSell',)
 			details['maxBlock'] = state._currentBlockIndex + args.blocksUntilExpiry
-			details['ltcOffered'] = Amounts.FromString(args.ltcOffered)
+			details['ltcOffered'] = Amounts.FromString(args.hostCoinOffered)
 		else:
 			backerID = int(args.backerID)
 			if not backerID in state._ltcSellBackers:
@@ -282,7 +282,7 @@ def Main(commandLineArgs=sys.argv[1:], host=None, overrideStartBlock=None, out=s
 			backer = state._ltcSellBackers[backerID]
 			transactionType = 'BackedLTCSellOffer'
 			outputs = ('sellerReceive',)
-			ltc = Amounts.FromString(args.ltcOffered)
+			ltc = Amounts.FromString(args.hostCoinOffered)
 			if args.includesCommission:
 				details['ltcOfferedPlusCommission'] = ltc
 			else:
@@ -350,7 +350,7 @@ def Main(commandLineArgs=sys.argv[1:], host=None, overrideStartBlock=None, out=s
 			mine = offer.refundAccount in ownedAccounts.tradeOfferChangeCounts
 			exchangeAmount = offer._swapBillOffered
 			ltc = offer.ltcEquivalent()
-			details = {'swapbill offered':Amounts.ToString(exchangeAmount), 'ltc equivalent':Amounts.ToString(ltc), 'mine':mine}
+			details = {'swapbill offered':Amounts.ToString(exchangeAmount), 'host coin equivalent':Amounts.ToString(ltc), 'mine':mine}
 			result.append(('exchange rate', Amounts.PercentToString(offer.rate), details))
 		return result
 
@@ -361,7 +361,7 @@ def Main(commandLineArgs=sys.argv[1:], host=None, overrideStartBlock=None, out=s
 			ltc = offer._ltcOffered
 			depositAmount = offer._swapBillDeposit
 			swapBillEquivalent = offer.swapBillEquivalent()
-			details = {'ltc offered':Amounts.ToString(ltc), 'deposit':Amounts.ToString(depositAmount), 'swapbill equivalent':Amounts.ToString(swapBillEquivalent), 'mine':mine}
+			details = {'host coin offered':Amounts.ToString(ltc), 'deposit':Amounts.ToString(depositAmount), 'swapbill equivalent':Amounts.ToString(swapBillEquivalent), 'mine':mine}
 			if offer.isBacked:
 				details['backer id'] = offer.backerIndex
 			result.append(('exchange rate', Amounts.PercentToString(offer.rate), details))
@@ -376,7 +376,7 @@ def Main(commandLineArgs=sys.argv[1:], host=None, overrideStartBlock=None, out=s
 			d['I am buyer (and waiting for payment)'] = exchange.buyerAccount in ownedAccounts.tradeOfferChangeCounts
 			d['deposit paid by seller'] = Amounts.ToString(exchange.swapBillDeposit)
 			d['swap bill paid by buyer'] = Amounts.ToString(exchange.swapBillAmount)
-			d['outstanding ltc payment amount'] = Amounts.ToString(exchange.ltc)
+			d['outstanding host coin payment amount'] = Amounts.ToString(exchange.ltc)
 			d['expires on block'] = exchange.expiry
 			d['blocks until expiry'] = exchange.expiry - state._currentBlockIndex + 1
 			if exchange.backerIndex != -1:
@@ -395,7 +395,7 @@ def Main(commandLineArgs=sys.argv[1:], host=None, overrideStartBlock=None, out=s
 			d['expires on block'] = backer.expiry
 			d['blocks until expiry'] = backer.expiry - state._currentBlockIndex + 1
 			d['commission'] = Amounts.PercentToString(backer.commission)
-			result.append(('ltc sell backer index', key, d))
+			result.append(('host coin sell backer index', key, d))
 		return result
 
 	elif args.action == 'get_pending_payments':
