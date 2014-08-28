@@ -17,14 +17,11 @@ from SwapBill.HardCodedProtocolConstraints import Constraints
 
 def GetOwnerBalances(host, ownerList, balances):
 	result = {}
-	ownerAtStart = host._getOwner()
 	for owner in ownerList:
-		host._setOwner(owner)
-		output, info = RunClient(host, ['get_balance'])
+		output, info = RunClient(host, ['get_balance'], owner=owner)
 		amount = Amounts.FromString(info['balance'])
 		if amount != 0:
 			result[owner] = amount
-	host._setOwner(ownerAtStart)
 	return result
 
 def GetBackingAmount(host, balances):
@@ -46,14 +43,18 @@ def InitHost():
 	os.mkdir(dataDirectory)
 	return MockHost()
 
-def RunClient(host, args, hostBlockChain='litecoin'):
+defaultOwner = '0'
+
+def RunClient(host, args, hostBlockChain='litecoin', owner=None):
+	if owner is None:
+		owner = defaultOwner
 	convertedArgs = []
 	for arg in args:
 		if type(arg) is not type(''):
 			arg = Amounts.ToString(arg)
 		convertedArgs.append(arg)
 	assert path.isdir(dataDirectory)
-	ownerDir = path.join(dataDirectory, host._getOwner())
+	ownerDir = path.join(dataDirectory, owner)
 	if not path.exists(ownerDir):
 		os.mkdir(ownerDir)
 	fullArgs = ['--dataDir', ownerDir, '--host', hostBlockChain] + convertedArgs
@@ -63,14 +64,16 @@ def RunClient(host, args, hostBlockChain='litecoin'):
 	result = ClientMain.Main(overrideStartBlock=0, commandLineArgs=fullArgs, out=out)
 	return out.getvalue(), result
 
-def GetStateInfo(host, includePending=False, forceRescan=False):
+def GetStateInfo(host, includePending=False, forceRescan=False, owner=None):
+	if owner is None:
+		owner = defaultOwner
 	args = []
 	if forceRescan:
 		args.append('--forceRescan')
 	args.append('get_state_info')
 	if includePending:
 		args.append('-i')
-	output, info = RunClient(host, args)
+	output, info = RunClient(host, args, owner=owner)
 	#CheckEachBalanceHasUnspent(host, info['balances'])
 	return info
 
@@ -90,10 +93,8 @@ class Test(unittest.TestCase):
 		RunClient(host, ['burn', '--amount', 35*e(6)])
 		info = GetStateInfo(host)
 		self.assertEqual(info['balances'], {"02:1": 2*e(7), "03:1": 35*e(6)})
-		host._setOwner('recipient')
-		output, result = RunClient(host, ['get_receive_address'])
+		output, result = RunClient(host, ['get_receive_address'], owner='recipient')
 		payTargetAddress = result['receive_address']
-		host._setOwner(host.defaultOwner)
 		RunClient(host, ['pay', '--amount', 1*e(7), '--toAddress', payTargetAddress])
 		self.assertTrue(info['syncOutput'].startswith('Loaded cached state data successfully\nState update starting from block 0\n'))
 		info = GetStateInfo(host)
@@ -101,16 +102,14 @@ class Test(unittest.TestCase):
 		self.assertEqual(info['syncOutput'].count('in memory: Burn'), 2)
 		self.assertEqual(info['syncOutput'].count('in memory: Pay'), 1)
 		self.assertEqual(info['syncOutput'], 'Loaded cached state data successfully\nState update starting from block 0\nCommitted state updated to start of block 0\nin memory: Burn\n - 0.2 swapbill output added\nin memory: Burn\n - 0.35 swapbill output added\nin memory: Pay\n - 0.2 swapbill output consumed\n - 0.1 swapbill output added\nIn memory state updated to end of block 3\n')
-		host._setOwner('recipient')
-		info = GetStateInfo(host)
+		info = GetStateInfo(host, owner='recipient')
 		self.assertEqual(info['syncOutput'].count('in memory: Burn'), 0)
 		self.assertEqual(info['syncOutput'].count('in memory: Pay'), 1)
 		# ** following changed since change to call get_receive_address for payTargetAddress
 		# and get_receive_address then currently does a sync
 		self.assertEqual(info['syncOutput'], 'Loaded cached state data successfully\nState update starting from block 0\nCommitted state updated to start of block 0\nin memory: Pay\n - 0.1 swapbill output added\nIn memory state updated to end of block 3\n')
 		#self.assertEqual(info['syncOutput'], 'Failed to load from cache, full index generation required (no cache file found)\nState update starting from block 0\nCommitted state updated to start of block 0\nin memory: Pay\n - 10000000 swapbill output added\nIn memory state updated to end of block 3\n')
-		host._setOwner('someoneElse')
-		info = GetStateInfo(host)
+		info = GetStateInfo(host, owner='someoneElse')
 		self.assertEqual(info['syncOutput'].count('in memory: Burn'), 0)
 		self.assertEqual(info['syncOutput'].count('in memory: Pay'), 0)
 		self.assertEqual(info['syncOutput'], 'Failed to load from cache, full index generation required (no cache file found)\nState update starting from block 0\nCommitted state updated to start of block 0\nIn memory state updated to end of block 3\n')
@@ -120,10 +119,8 @@ class Test(unittest.TestCase):
 		host._addUnspent(100000000)
 		RunClient(host, ['burn', '--amount', 2*e(7)])
 		RunClient(host, ['burn', '--amount', 3*e(7)])
-		host._setOwner('recipient')
-		output, result = RunClient(host, ['get_receive_address'])
+		output, result = RunClient(host, ['get_receive_address'], owner='recipient')
 		payTargetAddress = result['receive_address']
-		host._setOwner(host.defaultOwner)
 		RunClient(host, ['pay', '--amount', 1*e(7), '--toAddress', payTargetAddress])
 		host.holdNewTransactions = True
 		RunClient(host, ['burn', '--amount', 4*e(7)])
@@ -144,7 +141,7 @@ class Test(unittest.TestCase):
 
 	def test_start_block_not_reached(self):
 		host = InitHost()
-		ownerDir = path.join(dataDirectory, host._getOwner())
+		ownerDir = path.join(dataDirectory, "0")
 		if not path.exists(ownerDir):
 			os.mkdir(ownerDir)
 		args = ['--dataDir', ownerDir, 'get_balance']
@@ -157,10 +154,8 @@ class Test(unittest.TestCase):
 		host._addUnspent(500000000)
 		self.assertRaisesRegexp(ExceptionReportedToUser, 'Transaction does not meet protocol constraints: burn output is below minimum balance', RunClient, host, ['burn', '--amount', 1*e(7)-1])
 		RunClient(host, ['burn', '--amount', 2*e(7)])
-		host._setOwner('recipient')
-		output, result = RunClient(host, ['get_receive_address'])
+		output, result = RunClient(host, ['get_receive_address'], owner='recipient')
 		payTargetAddress = result['receive_address']
-		host._setOwner(host.defaultOwner)
 		self.assertRaisesRegexp(ExceptionReportedToUser, 'Transaction does not meet protocol constraints: amount is below minimum balance', RunClient, host, ['pay', '--amount', 1*e(7)-1, '--toAddress', payTargetAddress])
 		self.assertRaisesRegexp(ExceptionReportedToUser, 'Insufficient swapbill for transaction', RunClient, host, ['pay', '--amount', 1*e(7)+1, '--toAddress', payTargetAddress])
 		# but can split exactly
@@ -195,63 +190,63 @@ class Test(unittest.TestCase):
 
 	def test_refund_account_referenced_during_trade(self):
 		host = InitHost()
-		host._setOwner('1')
 		host._addUnspent(5*e(8))
-		RunClient(host, ['burn', '--amount', 1*e(8)])
-		RunClient(host, ['sell_offer', '--hostCoinOffered', 3*e(7)//2, '--exchangeRate', '0.5', '--blocksUntilExpiry', '20'])
+		owner = '1'
+		RunClient(host, ['burn', '--amount', 1*e(8)], owner=owner)
+		RunClient(host, ['sell_offer', '--hostCoinOffered', 3*e(7)//2, '--exchangeRate', '0.5', '--blocksUntilExpiry', '20'], owner=owner)
 		deposit = 3*e(7) // 16
-		output, result = RunClient(host, ['get_balance'])
+		output, result = RunClient(host, ['get_balance'], owner=owner)
 		# receiving account is created, with minimumBalance, here
 		self.assertDictEqual(result, {'balance': Amounts.ToString(1*e(8)-deposit-Constraints.minimumSwapBillBalance)})
-		host._setOwner('2')
+		owner = '2'
 		host._addUnspent(500000000)
-		RunClient(host, ['burn', '--amount', 2*e(8)])
-		RunClient(host, ['buy_offer', '--swapBillOffered', 29900000, '--exchangeRate', '0.5'])
+		RunClient(host, ['burn', '--amount', 2*e(8)], owner=owner)
+		RunClient(host, ['buy_offer', '--swapBillOffered', 29900000, '--exchangeRate', '0.5'], owner=owner)
 		# the offers can't match, because this would result in a remainder below minimum exchange
-		output, result = RunClient(host, ['get_balance'])
+		output, result = RunClient(host, ['get_balance'], owner=owner)
 		self.assertDictEqual(result, {'balance': '1.701'})
-		host._setOwner('1')
-		output, result = RunClient(host, ['get_balance'])
+		owner = '1'
+		output, result = RunClient(host, ['get_balance'], owner=owner)
 		self.assertDictEqual(result, {'balance': Amounts.ToString(1*e(8)-deposit-Constraints.minimumSwapBillBalance)})
 		# the refund account is referenced by the trade, but *can* now be spent
-		host._setOwner('recipient')
-		output, result = RunClient(host, ['get_receive_address'])
+		owner = 'recipient'
+		output, result = RunClient(host, ['get_receive_address'], owner=owner)
 		payTargetAddress = result['receive_address']
-		host._setOwner('1')
+		owner = '1'
 		# change output (active account) can be spent
-		RunClient(host, ['pay', '--amount', Amounts.ToString(1*e(8)-deposit-Constraints.minimumSwapBillBalance), '--toAddress', payTargetAddress])
-		output, result = RunClient(host, ['get_balance'])
+		RunClient(host, ['pay', '--amount', Amounts.ToString(1*e(8)-deposit-Constraints.minimumSwapBillBalance), '--toAddress', payTargetAddress], owner=owner)
+		output, result = RunClient(host, ['get_balance'], owner=owner)
 		self.assertDictEqual(result, {'balance': '0'})
-		host._setOwner('recipient')
-		output, result = RunClient(host, ['get_balance'])
+		owner = 'recipient'
+		output, result = RunClient(host, ['get_balance'], owner=owner)
 		self.assertDictEqual(result, {'balance': Amounts.ToString((1*e(8)-deposit-Constraints.minimumSwapBillBalance))})
 	def test_receiving_account_referenced_during_trade(self):
 		host = InitHost()
-		host._setOwner('1')
 		host._addUnspent(500000000)
-		RunClient(host, ['burn', '--amount', 100000000])
-		RunClient(host, ['sell_offer', '--hostCoinOffered', 29900000//2, '--exchangeRate', '0.5'])
-		output, result = RunClient(host, ['get_balance'])
+		owner = '1'
+		RunClient(host, ['burn', '--amount', 100000000], owner=owner)
+		RunClient(host, ['sell_offer', '--hostCoinOffered', 29900000//2, '--exchangeRate', '0.5'], owner=owner)
+		output, result = RunClient(host, ['get_balance'], owner=owner)
 		# refund account is created, with minimumBalance, here
 		self.assertDictEqual(result, {'balance': Amounts.ToString(98131250-Constraints.minimumSwapBillBalance)})
-		host._setOwner('2')
 		host._addUnspent(500000000)
-		RunClient(host, ['burn', '--amount', 200000000])
-		RunClient(host, ['buy_offer', '--swapBillOffered', 30000000, '--exchangeRate', '0.5'])
-		output, result = RunClient(host, ['get_balance'])
+		owner = '2'
+		RunClient(host, ['burn', '--amount', 200000000], owner=owner)
+		RunClient(host, ['buy_offer', '--swapBillOffered', 30000000, '--exchangeRate', '0.5'], owner=owner)
+		output, result = RunClient(host, ['get_balance'], owner=owner)
 		# the offers can't match, because this would result in a remainder below minimum exchange
 		self.assertDictEqual(result, {'balance': '1.7'})
 		# the refund account is referenced by the trade, because it may need to be credited, depending on how the trade plays out
 		# but *can* now be spent, nevertheless
-		host._setOwner('recipient')
-		output, result = RunClient(host, ['get_receive_address'])
+		owner = 'recipient'
+		output, result = RunClient(host, ['get_receive_address'], owner=owner)
 		payTargetAddress = result['receive_address']
-		host._setOwner('2')
-		RunClient(host, ['pay', '--amount', '1.7', '--toAddress', payTargetAddress])
-		output, result = RunClient(host, ['get_balance'])
+		owner = '2'
+		RunClient(host, ['pay', '--amount', '1.7', '--toAddress', payTargetAddress], owner=owner)
+		output, result = RunClient(host, ['get_balance'], owner=owner)
 		self.assertDictEqual(result, {'balance': '0'})
-		host._setOwner('recipient')
-		output, result = RunClient(host, ['get_balance'])
+		owner = 'recipient'
+		output, result = RunClient(host, ['get_balance'], owner=owner)
 		self.assertDictEqual(result, {'balance': '1.7'})
 
 	def test_burn_less_than_dust_limit(self):
@@ -263,10 +258,8 @@ class Test(unittest.TestCase):
 		host = InitHost()
 		host._addUnspent(5*e(8))
 		RunClient(host, ['burn', '--amount', 3*e(7)])
-		host._setOwner('recipient')
-		output, result = RunClient(host, ['get_receive_address'])
+		output, result = RunClient(host, ['get_receive_address'], owner='recipient')
 		payTargetAddress = result['receive_address']
-		host._setOwner(host.defaultOwner)
 		self.assertBalancesEqual(host, [3*e(7)])
 		RunClient(host, ['pay', '--amount', 1*e(7), '--toAddress', payTargetAddress, '--blocksUntilExpiry', '4'])
 		host.holdNewTransactions = True
@@ -279,19 +272,15 @@ class Test(unittest.TestCase):
 		# so didn't expire yet, on block 6
 		output, result = RunClient(host, ['get_balance', '-i'])
 		self.assertEqual(result['balance'], '0.2')
-		host._setOwner('recipient')
-		output, result = RunClient(host, ['get_balance', '-i'])
+		output, result = RunClient(host, ['get_balance', '-i'], owner='recipient')
 		self.assertEqual(result['balance'], '0.1')
-		host._setOwner(host.defaultOwner)
 		host._advance(1)
 		self.assertEqual(host._nextBlock, 7)
 		# but expires on block 7
 		output, result = RunClient(host, ['get_balance', '-i'])
 		self.assertEqual(result['balance'], '0.3')
-		host._setOwner('recipient')
-		output, result = RunClient(host, ['get_balance', '-i'])
+		output, result = RunClient(host, ['get_balance', '-i'], owner='recipient')
 		self.assertEqual(result['balance'], '0')
-		host._setOwner(host.defaultOwner)
 		# still on block 7
 		# (transaction was added from mem pool in the above)
 		self.assertEqual(host._nextBlock, 7)
@@ -415,10 +404,8 @@ class Test(unittest.TestCase):
 		nextTX += 1
 		info = GetStateInfo(host)
 		self.assertEqual(info['balances'], {firstBurnTarget:1*e(7), secondBurnTarget:15*e(6), thirdBurnTarget:26*e(6)})
-		host._setOwner('recipient')
-		output, result = RunClient(host, ['get_receive_address'])
+		output, result = RunClient(host, ['get_receive_address'], owner='recipient')
 		payTargetAddress = result['receive_address']
-		host._setOwner(host.defaultOwner)
 		self.assertRaisesRegexp(ClientMain.BadAddressArgument, 'An address argument is not valid', RunClient, host, ['pay', '--amount', 12*e(6), '--toAddress', 'madeUpAddress'])
 		RunClient(host, ['pay', '--amount', 12*e(6), '--toAddress', payTargetAddress])
 		payChange = "0" + str(nextTX) + ":1"
@@ -426,18 +413,15 @@ class Test(unittest.TestCase):
 		nextTX += 1
 		output, info = RunClient(host, ['get_balance'])
 		self.assertDictEqual(info, {'balance': Amounts.ToString(39*e(6))})
-		host._setOwner('recipient')
-		output, info = RunClient(host, ['get_balance'])
+		output, info = RunClient(host, ['get_balance'], owner='recipient')
 		self.assertDictEqual(info, {'balance': Amounts.ToString(12*e(6))})
-		info = GetStateInfo(host)
+		info = GetStateInfo(host, owner='recipient')
 		self.assertEqual(info['balances'], {thirdBurnTarget:26*e(6), payTarget:12*e(6), payChange:13*e(6)})
-		host._setOwner(host.defaultOwner)
 		# and this should now work, now we can use more than one input per transaction
 		RunClient(host, ['pay', '--amount', 16*e(6), '--toAddress', payTargetAddress])
 		output, info = RunClient(host, ['get_balance'])
 		self.assertDictEqual(info, {'balance': Amounts.ToString(23*e(6))})
-		host._setOwner('recipient')
-		output, info = RunClient(host, ['get_balance'])
+		output, info = RunClient(host, ['get_balance'], owner='recipient')
 		self.assertDictEqual(info, {'balance': Amounts.ToString(28*e(6))})
 
 	def test_pay_from_multiple_outputs(self):
@@ -462,10 +446,8 @@ class Test(unittest.TestCase):
 		nextTX += 1
 		info = GetStateInfo(host)
 		self.assertEqual(info['balances'], {firstBurnTarget:1*e(7), secondBurnTarget:15*e(6), thirdBurnTarget:16*e(6)})
-		host._setOwner('recipient')
-		output, result = RunClient(host, ['get_receive_address'])
+		output, result = RunClient(host, ['get_receive_address'], owner='recipient')
 		payTargetAddress = result['receive_address']
-		host._setOwner(host.defaultOwner)
 		RunClient(host, ['pay', '--amount', 41*e(6), '--toAddress', payTargetAddress])
 		payChange = "0" + str(nextTX) + ":1"
 		payTarget = "0" + str(nextTX) + ":2"
@@ -494,10 +476,8 @@ class Test(unittest.TestCase):
 		host.holdNewTransactions = False
 		info = GetStateInfo(host)
 		self.assertEqual(info['balances'], {'02:1': 5*e(7)})
-		host._setOwner('recipient')
-		output, result = RunClient(host, ['get_receive_address'])
+		output, result = RunClient(host, ['get_receive_address'], owner='recipient')
 		payTargetAddress = result['receive_address']
-		host._setOwner(host.defaultOwner)
 		RunClient(host, ['pay', '--amount', 1*e(7), '--toAddress', payTargetAddress])
 		host.holdNewTransactions = True
 		info = GetStateInfo(host)
@@ -528,36 +508,29 @@ class Test(unittest.TestCase):
 
 	def test_two_owners(self):
 		host = InitHost()
-		host._setOwner('1')
 		host._addUnspent(1*e(8))
-		RunClient(host, ['burn', '--amount', 1*e(7)])
-		host._setOwner('2')
+		RunClient(host, ['burn', '--amount', 1*e(7)], owner='1')
 		host._addUnspent(1*e(8))
-		RunClient(host, ['burn', '--amount', 2*e(7)])
+		RunClient(host, ['burn', '--amount', 2*e(7)], owner='2')
 		info = GetStateInfo(host)
 		self.assertEqual(info['balances'], {'02:1':10000000, '04:1':20000000})
-		output, info = RunClient(host, ['get_balance'])
+		output, info = RunClient(host, ['get_balance'], owner='2')
 		self.assertDictEqual(info, {'balance': '0.2'})
-		host._setOwner('1')
-		output, info = RunClient(host, ['get_balance'])
+		output, info = RunClient(host, ['get_balance'], owner='1')
 		self.assertDictEqual(info, {'balance': '0.1'})
 
 	def test_expected_dust_and_fees(self):
 		host = InitHost()
 		ownerList = ('alice', 'bob', 'clive', 'dave')
-		host._setOwner('alice')
 		expectedDustAndFees = 200000
 		host._addUnspent(3*e(7) + expectedDustAndFees)
-		RunClient(host, ['burn', '--amount', 3*e(7)])
-		host._setOwner('bob')
+		RunClient(host, ['burn', '--amount', 3*e(7)], owner='alice')
 		host._addUnspent(2*e(7) + expectedDustAndFees)
-		RunClient(host, ['burn', '--amount', 2*e(7)])
-		host._setOwner('clive')
+		RunClient(host, ['burn', '--amount', 2*e(7)], owner='bob')
 		host._addUnspent(5*e(7) + expectedDustAndFees)
-		RunClient(host, ['burn', '--amount', 5*e(7)])
-		host._setOwner('dave')
+		RunClient(host, ['burn', '--amount', 5*e(7)], owner='clive')
 		host._addUnspent(6*e(7) + expectedDustAndFees + 100000) ## will have 100000 backing funds left over
-		RunClient(host, ['burn', '--amount', 6*e(7)])
+		RunClient(host, ['burn', '--amount', 6*e(7)], owner='dave')
 		info = GetStateInfo(host)
 		ownerBalances = GetOwnerBalances(host, ownerList, info['balances'])
 		self.assertDictEqual(ownerBalances, {'bob': 2*e(7), 'clive': 5*e(7), 'alice': 3*e(7), 'dave': 6*e(7)})
@@ -568,51 +541,43 @@ class Test(unittest.TestCase):
 		host = InitHost()
 		ownerList = ('alice', 'bob', 'clive', 'dave')
 		for owner in ownerList:
-			host._setOwner(owner)
 			host._addUnspent(2*e(8))
 		# initialise some account balances
-		host._setOwner('alice')
-		RunClient(host, ['burn', '--amount', 4*e(7)])
-		host._setOwner('bob')
-		RunClient(host, ['burn', '--amount', 3*e(7)])
-		host._setOwner('clive')
-		RunClient(host, ['burn', '--amount', 6*e(7)])
-		host._setOwner('dave')
-		RunClient(host, ['burn', '--amount', 7*e(7)])
+		RunClient(host, ['burn', '--amount', 4*e(7)], owner='alice')
+		RunClient(host, ['burn', '--amount', 3*e(7)], owner='bob')
+		RunClient(host, ['burn', '--amount', 6*e(7)], owner='clive')
+		RunClient(host, ['burn', '--amount', 7*e(7)], owner='dave')
 		# alice and bob both want to buy LTC
 		# clive and dave both want to sell
 		# alice makes buy offer
-		host._setOwner('alice')
-		RunClient(host, ['buy_offer', '--swapBillOffered', 3*e(7), '--exchangeRate', '0.5', '--blocksUntilExpiry', '100'])
-		info = GetStateInfo(host)
+		RunClient(host, ['buy_offer', '--swapBillOffered', 3*e(7), '--exchangeRate', '0.5', '--blocksUntilExpiry', '100'], owner='alice')
+		info = GetStateInfo(host, owner='alice')
 		self.assertEqual(info['numberOfHostCoinBuyOffers'], 1)
 		self.assertEqual(info['numberOfHostCoinSellOffers'], 0)
 		self.assertEqual(info['numberOfPendingExchanges'], 0)
 		ownerBalances = GetOwnerBalances(host, ownerList, info['balances'])
 		self.assertDictEqual(ownerBalances, {'alice': 1*e(7), 'bob': 3*e(7), 'clive': 6*e(7), 'dave': 7*e(7)})
-		output, result = RunClient(host, ['get_buy_offers'])
+		output, result = RunClient(host, ['get_buy_offers'], owner='alice')
 		self.assertEqual(result, [('exchange rate', '0.5', {'host coin equivalent': Amounts.ToString(15000000), 'mine': True, 'swapbill offered': Amounts.ToString(30000000)})])
 		# bob makes better offer, but with smaller amount
-		host._setOwner('bob')
-		output, result = RunClient(host, ['get_buy_offers'])
+		output, result = RunClient(host, ['get_buy_offers'], owner='bob')
 		self.assertEqual(result, [('exchange rate', '0.5', {'host coin equivalent': Amounts.ToString(15000000), 'mine': False, 'swapbill offered': Amounts.ToString(30000000)})])
-		RunClient(host, ['buy_offer', '--swapBillOffered', 1*e(7), '--exchangeRate', '0.25'])
+		RunClient(host, ['buy_offer', '--swapBillOffered', 1*e(7), '--exchangeRate', '0.25'], owner='bob')
 		info = GetStateInfo(host)
 		ownerBalances = GetOwnerBalances(host, ownerList, info['balances'])
 		self.assertDictEqual(ownerBalances, {'alice': 1*e(7), 'bob': 2*e(7), 'clive': 6*e(7), 'dave': 7*e(7)})
 		self.assertEqual(info['numberOfHostCoinBuyOffers'], 2)
 		self.assertEqual(info['numberOfHostCoinSellOffers'], 0)
 		self.assertEqual(info['numberOfPendingExchanges'], 0)
-		output, result = RunClient(host, ['get_buy_offers'])
+		output, result = RunClient(host, ['get_buy_offers'], owner='bob')
 		expectedResult = [
 			('exchange rate', '0.25', {'host coin equivalent': Amounts.ToString(2500000), 'mine': True, 'swapbill offered': Amounts.ToString(10000000)}),
 			('exchange rate', '0.5', {'host coin equivalent': Amounts.ToString(15000000), 'mine': False, 'swapbill offered': Amounts.ToString(30000000)})
 		]
 		self.assertEqual(result, expectedResult)
 		# clive makes a sell offer, matching bob's buy exactly
-		host._setOwner('clive')
 		host._addUnspent(100000000)
-		RunClient(host, ['sell_offer', '--hostCoinOffered', 10000000//4, '--exchangeRate', '0.25'])
+		RunClient(host, ['sell_offer', '--hostCoinOffered', 10000000//4, '--exchangeRate', '0.25'], owner='clive')
 		cliveCompletionPaymentExpiry = host._nextBlock + 50 # note that RunClient posts the transaction, and then the transaction will go through in the next block
 		info = GetStateInfo(host)
 		ownerBalances = GetOwnerBalances(host, ownerList, info['balances'])
@@ -620,9 +585,9 @@ class Test(unittest.TestCase):
 		self.assertEqual(info['numberOfHostCoinBuyOffers'], 1)
 		self.assertEqual(info['numberOfHostCoinSellOffers'], 0)
 		self.assertEqual(info['numberOfPendingExchanges'], 1)
-		output, result = RunClient(host, ['get_sell_offers'])
+		output, result = RunClient(host, ['get_sell_offers'], owner='clive')
 		self.assertEqual(result, []) # (got matched immediately)
-		output, result = RunClient(host, ['get_pending_exchanges'])
+		output, result = RunClient(host, ['get_pending_exchanges'], owner='clive')
 		expectedResult = [
 			('pending exchange index', 0, {
 				'I am seller (and need to complete)': True,
@@ -635,8 +600,7 @@ class Test(unittest.TestCase):
 			})]
 		self.assertEqual(result, expectedResult)
 		# dave and bob make overlapping offers that 'cross over'
-		host._setOwner('bob')
-		output, result = RunClient(host, ['get_pending_exchanges'])
+		output, result = RunClient(host, ['get_pending_exchanges'], owner='bob')
 		# (as above, but identifies bob as buyer instead of seller)
 		expectedResult = [
 			('pending exchange index', 0, {
@@ -651,16 +615,15 @@ class Test(unittest.TestCase):
 		self.assertEqual(result, expectedResult)
 		# we now need enough to fund the offer with minimum balance in refund account
 		# (which should now be possible without any new burns)
-		RunClient(host, ['buy_offer', '--swapBillOffered', 1*e(7), '--exchangeRate', '0.25'])
+		RunClient(host, ['buy_offer', '--swapBillOffered', 1*e(7), '--exchangeRate', '0.25'], owner='bob')
 		info = GetStateInfo(host)
 		ownerBalances = GetOwnerBalances(host, ownerList, info['balances'])
 		self.assertDictEqual(ownerBalances, {'alice': 1*e(7), 'bob': 1*e(7), 'clive': 5*e(7)-625000+1*e(7), 'dave': 7*e(7)})
 		self.assertEqual(info['numberOfHostCoinBuyOffers'], 2)
 		self.assertEqual(info['numberOfHostCoinSellOffers'], 0)
 		self.assertEqual(info['numberOfPendingExchanges'], 1)
-		host._setOwner('dave')
 		exchangeRate = 269531250
-		RunClient(host, ['sell_offer', '--hostCoinOffered', 2*e(7) * exchangeRate // Amounts.percentDivisor, '--exchangeRate', Amounts.PercentToString(exchangeRate), '--blocksUntilExpiry', '100'])
+		RunClient(host, ['sell_offer', '--hostCoinOffered', 2*e(7) * exchangeRate // Amounts.percentDivisor, '--exchangeRate', Amounts.PercentToString(exchangeRate), '--blocksUntilExpiry', '100'], owner='dave')
 		info = GetStateInfo(host)
 		ownerBalances = GetOwnerBalances(host, ownerList, info['balances'])
 		self.assertDictEqual(ownerBalances, {'alice': 1*e(7), 'bob': 1*e(7), 'clive': 5*e(7)-625000+1*e(7), 'dave': 7*e(7)-1250000-Constraints.minimumSwapBillBalance})
@@ -670,7 +633,7 @@ class Test(unittest.TestCase):
 		output, result = RunClient(host, ['get_buy_offers'])
 		expectedResult = [('exchange rate', '0.5', {'host coin equivalent': Amounts.ToString(15000000), 'mine': False, 'swapbill offered': Amounts.ToString(30000000)})]
 		self.assertEqual(result, expectedResult)
-		output, result = RunClient(host, ['get_sell_offers'])
+		output, result = RunClient(host, ['get_sell_offers'], owner='dave')
 		# didn't check the exact calculations for this value, but seems about right
 		# note that dave now *gets more swapbill*, in the case of overlapping offers, instead of *spending less litecoin*
 		daveSwapBillReceived = 11125000
@@ -699,8 +662,7 @@ class Test(unittest.TestCase):
 		ownerBalances = GetOwnerBalances(host, ownerList, info['balances'])
 		self.assertDictEqual(ownerBalances, {'alice': 1*e(7), 'bob': 2*e(7)+625000, 'clive': 6*e(7)-625000, 'dave': 7*e(7)-1250000-Constraints.minimumSwapBillBalance})
 		# dave is more on the ball, and makes his completion payment
-		host._setOwner('dave')
-		RunClient(host, ['complete_sell', '--pendingExchangeID', '1'])
+		RunClient(host, ['complete_sell', '--pendingExchangeID', '1'], owner='dave')
 		info = GetStateInfo(host)
 		# dave gets credited bob's exchange funds, and is also refunded the matched part of his exchange deposit
 		# but seeded amount locked up in sell offer is not refunded, because part of this sell offer is still outstanding
@@ -710,31 +672,27 @@ class Test(unittest.TestCase):
 		self.assertEqual(info['numberOfHostCoinSellOffers'], 1)
 		self.assertEqual(info['numberOfPendingExchanges'], 0)
 
-		host._setOwner('alice')
-		info = GetStateInfo(host, includePending=False, forceRescan=True)
+		info = GetStateInfo(host, includePending=False, forceRescan=True, owner='alice')
 		self.assertEqual(info['syncOutput'].count(': Burn'), 1)
 		self.assertEqual(info['syncOutput'].count(': LTCBuyOffer'), 1)
 		self.assertEqual(info['syncOutput'].count(': LTCSellOffer'), 0)
 		self.assertEqual(info['syncOutput'].count(': LTCExchangeCompletion'), 0)
 		self.assertEqual(info['syncOutput'].count(': Pay'), 0)
 		self.assertEqual(info['syncOutput'].count('trade offer or pending exchange expired'), 0)
-		host._setOwner('bob')
-		info = GetStateInfo(host, includePending=False, forceRescan=True)
+		info = GetStateInfo(host, includePending=False, forceRescan=True, owner='bob')
 		self.assertEqual(info['syncOutput'].count(': Burn'), 1)
 		self.assertEqual(info['syncOutput'].count(': LTCBuyOffer'), 2)
 		self.assertEqual(info['syncOutput'].count(': LTCSellOffer'), 2)
 		self.assertEqual(info['syncOutput'].count(': LTCExchangeCompletion'), 1)
 		self.assertEqual(info['syncOutput'].count(': Pay'), 0)
 		self.assertEqual(info['syncOutput'].count('trade offer or pending exchange expired'), 1)
-		host._setOwner('clive')
-		info = GetStateInfo(host, includePending=False, forceRescan=True)
+		info = GetStateInfo(host, includePending=False, forceRescan=True, owner='clive')
 		self.assertEqual(info['syncOutput'].count(': Burn'), 1)
 		self.assertEqual(info['syncOutput'].count(': LTCSellOffer'), 1)
 		self.assertEqual(info['syncOutput'].count(': LTCExchangeCompletion'), 0)
 		self.assertEqual(info['syncOutput'].count(': Pay'), 0)
 		self.assertEqual(info['syncOutput'].count('trade offer or pending exchange expired'), 1)
-		host._setOwner('dave')
-		info = GetStateInfo(host, includePending=False, forceRescan=True)
+		info = GetStateInfo(host, includePending=False, forceRescan=True, owner='dave')
 		self.assertEqual(info['syncOutput'].count(': Burn'), 1)
 		self.assertEqual(info['syncOutput'].count(': LTCSellOffer'), 1)
 		self.assertEqual(info['syncOutput'].count(': LTCExchangeCompletion'), 1)
@@ -761,10 +719,8 @@ class Test(unittest.TestCase):
 		output, info = RunClient(host, ['get_balance'])
 		self.assertDictEqual(info, {'balance': Amounts.ToString(1*e(15))})
 		# but amounts for pay transaction (for example) *are* restricted
-		host._setOwner('recipient')
-		output, result = RunClient(host, ['get_receive_address'])
+		output, result = RunClient(host, ['get_receive_address'], owner='recipient')
 		payTargetAddress = result['receive_address']
-		host._setOwner(host.defaultOwner)
 		self.assertRaisesRegexp(ExceptionReportedToUser, 'Transaction parameter value exceeds supported range.', RunClient, host, ['pay', '--amount', 1*e(15), '--toAddress', payTargetAddress])
 		self.assertRaisesRegexp(ExceptionReportedToUser, 'negative values are not permitted', RunClient, host, ['pay', '--amount', -1*e(7), '--toAddress', payTargetAddress])
 
@@ -800,14 +756,13 @@ class Test(unittest.TestCase):
 	def test_backed_ltc_sell(self):
 		host = InitHost()
 		ownerList = ('backer', 'buyer', 'seller')
-		host._setOwner('backer')
 		host._addUnspent(2*e(12))
-		RunClient(host, ['burn', '--amount', 1*e(12)])
-		RunClient(host, ['back_sells', '--backingSwapBill', 1*e(12), '--transactionsBacked', '1000', '--blocksUntilExpiry', '20', '--commission', '0.0625'])
-		output, info = RunClient(host, ['get_balance'])
+		RunClient(host, ['burn', '--amount', 1*e(12)], owner='backer')
+		RunClient(host, ['back_sells', '--backingSwapBill', 1*e(12), '--transactionsBacked', '1000', '--blocksUntilExpiry', '20', '--commission', '0.0625'], owner='backer')
+		output, info = RunClient(host, ['get_balance'], owner='backer')
 		self.assertDictEqual(info, {'balance': '0'})
 		self.assertEqual(host._nextBlock, 3)
-		output, result = RunClient(host, ['get_sell_backers'])
+		output, result = RunClient(host, ['get_sell_backers'], owner='backer')
 		expectedBackingAmount = 1*e(12)
 		expectedBackerDetails = {
 		'commission': '0.0625',
@@ -817,21 +772,19 @@ class Test(unittest.TestCase):
 		'maximum per transaction': Amounts.ToString(1*e(9))
 		}
 		self.assertListEqual(result, [('host coin sell backer index', 0, expectedBackerDetails)])
-		host._setOwner('buyer')
-		RunClient(host, ['burn', '--amount', 3*e(8)])
-		RunClient(host, ['buy_offer', '--swapBillOffered', 3*e(8), '--exchangeRate', '0.5', '--blocksUntilExpiry', '100'])
+		RunClient(host, ['burn', '--amount', 3*e(8)], owner='buyer')
+		RunClient(host, ['buy_offer', '--swapBillOffered', 3*e(8), '--exchangeRate', '0.5', '--blocksUntilExpiry', '100'], owner='buyer')
 		info = GetStateInfo(host)
 		self.assertEqual(info['numberOfHostCoinBuyOffers'], 1)
 		self.assertEqual(info['numberOfHostCoinSellOffers'], 0)
 		self.assertEqual(info['numberOfPendingExchanges'], 0)
 		ownerBalances = GetOwnerBalances(host, ownerList, info['balances'])
 		self.assertDictEqual(ownerBalances, {})
-		output, result = RunClient(host, ['get_buy_offers'])
+		output, result = RunClient(host, ['get_buy_offers'], owner='buyer')
 		self.assertEqual(result, [('exchange rate', '0.5', {'host coin equivalent': Amounts.ToString(15*e(7)), 'mine': True, 'swapbill offered': Amounts.ToString(3*e(8))})])
-		host._setOwner('seller')
 		ltcOffered = 15*e(7)
 		commission = ltcOffered // 16
-		RunClient(host, ['sell_offer', '--hostCoinOffered', ltcOffered+commission, '--exchangeRate', '0.5', '--backerID', 0, '--includesCommission'])
+		RunClient(host, ['sell_offer', '--hostCoinOffered', ltcOffered+commission, '--exchangeRate', '0.5', '--backerID', 0, '--includesCommission'], owner='seller')
 		info = GetStateInfo(host)
 		ownerBalances = GetOwnerBalances(host, ownerList, info['balances'])
 		self.assertDictEqual(ownerBalances, {'seller': 3*e(8)})
@@ -843,10 +796,9 @@ class Test(unittest.TestCase):
 		expectedBackingAmount -= 3*e(8)
 		expectedBackerDetails['backing amount'] = Amounts.ToString(expectedBackingAmount)
 		expectedBackerDetails['blocks until expiry'] = 17
-		host._setOwner('backer')
-		output, result = RunClient(host, ['get_sell_backers'])
+		output, result = RunClient(host, ['get_sell_backers'], owner='backer')
 		self.assertListEqual(result, [('host coin sell backer index', 0, expectedBackerDetails)])
-		output, result = RunClient(host, ['get_pending_exchanges'])
+		output, result = RunClient(host, ['get_pending_exchanges'], owner='backer')
 		expectedResult = [('pending exchange index', 0,
 		     {
 		         'expires on block': 55,
@@ -863,15 +815,13 @@ class Test(unittest.TestCase):
 
 	def test_backed_ltc_sell_add_commission(self):
 		host = InitHost()
-		host._setOwner('backer')
 		host._addUnspent(2*e(12))
-		RunClient(host, ['burn', '--amount', 1*e(12)])
-		RunClient(host, ['back_sells', '--backingSwapBill', 1*e(12), '--transactionsBacked', '1000', '--blocksUntilExpiry', '20', '--commission', '0.0625'])
-		host._setOwner('seller')
+		RunClient(host, ['burn', '--amount', 1*e(12)], owner='backer')
+		RunClient(host, ['back_sells', '--backingSwapBill', 1*e(12), '--transactionsBacked', '1000', '--blocksUntilExpiry', '20', '--commission', '0.0625'], owner='backer')
 		ltcOffered = 15*e(7)
 		commission = ltcOffered // 16
-		RunClient(host, ['sell_offer', '--hostCoinOffered', ltcOffered, '--exchangeRate', '0.5', '--backerID', 0])
-		output, result = RunClient(host, ['get_sell_offers'])
+		RunClient(host, ['sell_offer', '--hostCoinOffered', ltcOffered, '--exchangeRate', '0.5', '--backerID', 0], owner='seller')
+		output, result = RunClient(host, ['get_sell_offers'], owner='seller')
 		self.assertEqual(result, [('exchange rate', '0.5', {'backer id':0, 'host coin offered': Amounts.ToString(ltcOffered), 'mine': False, 'swapbill equivalent': Amounts.ToString(ltcOffered*2), 'deposit': Amounts.ToString(ltcOffered*2//Constraints.depositDivisor)})])
 
 	def test_bad_commission(self):
@@ -907,46 +857,42 @@ class Test(unittest.TestCase):
 		host = InitHost()
 		ownerList = ['buyer', 'seller', 'backer']
 		host._addUnspent(5*e(12))
-		host._setOwner('buyer')
-		RunClient(host, ['burn', '--amount', 6*e(9)])
-		RunClient(host, ['buy_offer', '--swapBillOffered', 2*e(9), '--exchangeRate', '0.5', '--blocksUntilExpiry', '100'])
-		RunClient(host, ['buy_offer', '--swapBillOffered', 4*e(9), '--exchangeRate', '0.5', '--blocksUntilExpiry', '100'])
+		RunClient(host, ['burn', '--amount', 6*e(9)], owner='buyer')
+		RunClient(host, ['buy_offer', '--swapBillOffered', 2*e(9), '--exchangeRate', '0.5', '--blocksUntilExpiry', '100'], owner='buyer')
+		RunClient(host, ['buy_offer', '--swapBillOffered', 4*e(9), '--exchangeRate', '0.5', '--blocksUntilExpiry', '100'], owner='buyer')
 		info = GetStateInfo(host)
 		self.assertEqual(info['numberOfHostCoinBuyOffers'], 2)
 		self.assertEqual(info['numberOfHostCoinSellOffers'], 0)
 		self.assertEqual(info['numberOfPendingExchanges'], 0)
 		ownerBalances = GetOwnerBalances(host, ownerList, info['balances'])
 		self.assertEqual(ownerBalances, {})
-		host._setOwner('backer')
-		RunClient(host, ['burn', '--amount', 1*e(12)])
-		RunClient(host, ['back_sells', '--backingSwapBill', 1*e(12), '--transactionsBacked', '10', '--blocksUntilExpiry', '100', '--commission', '0.1'])
-		host._setOwner('seller')
+		RunClient(host, ['burn', '--amount', 1*e(12)], owner='backer')
+		RunClient(host, ['back_sells', '--backingSwapBill', 1*e(12), '--transactionsBacked', '10', '--blocksUntilExpiry', '100', '--commission', '0.1'], owner='backer')
 		ltcOffered = 6*e(9)//2
 		deposit = 6*e(9)//Constraints.depositDivisor
 		ltcCommission = ltcOffered // 10
-		RunClient(host, ['sell_offer', '--hostCoinOffered', ltcOffered + ltcCommission, '--exchangeRate', '0.5', '--backerID', 0, '--includesCommission'])
+		RunClient(host, ['sell_offer', '--hostCoinOffered', ltcOffered + ltcCommission, '--exchangeRate', '0.5', '--backerID', 0, '--includesCommission'], owner='seller')
 		info = GetStateInfo(host)
 		self.assertEqual(info['numberOfHostCoinBuyOffers'], 0)
 		self.assertEqual(info['numberOfHostCoinSellOffers'], 0)
 		self.assertEqual(info['numberOfPendingExchanges'], 2)
 		# the backer gets a trade count incremented twice here, which triggered an incorrect assert
-		host._setOwner('backer')
-		output, result = RunClient(host, ['get_balance'])
+		output, result = RunClient(host, ['get_balance'], owner='backer')
 		self.assertDictEqual(result, {'balance': '0'})
 		ownerBalances = GetOwnerBalances(host, ownerList, info['balances'])
 		self.assertEqual(ownerBalances, {'seller':6*e(9)})
 		expectedBackerDetails = {'commission': '0.1', 'blocks until expiry': 99, 'I am backer': True, 'backing amount': Amounts.ToString(1*e(12)-6*e(9)-deposit), 'expires on block': 105, 'maximum per transaction': Amounts.ToString(1*e(11))}
-		output, result = RunClient(host, ['get_sell_backers'])
+		output, result = RunClient(host, ['get_sell_backers'], owner='backer')
 		self.assertListEqual(result, [('host coin sell backer index', 0, expectedBackerDetails)])
-		RunClient(host, ['complete_sell', '--pendingExchangeID', '0'])
-		RunClient(host, ['complete_sell', '--pendingExchangeID', '1'])
-		output, result = RunClient(host, ['get_balance'])
+		RunClient(host, ['complete_sell', '--pendingExchangeID', '0'], owner='backer')
+		RunClient(host, ['complete_sell', '--pendingExchangeID', '1'], owner='backer')
+		output, result = RunClient(host, ['get_balance'], owner='backer')
 		self.assertDictEqual(result, {'balance': '0'})
 		ownerBalances = GetOwnerBalances(host, ownerList, info['balances'])
 		self.assertEqual(ownerBalances, {'seller':6*e(9)})
 		expectedBackerDetails['backing amount'] = Amounts.ToString(Amounts.FromString(expectedBackerDetails['backing amount']) + 6*e(9)+deposit)
 		expectedBackerDetails['blocks until expiry'] -= 2
-		output, result = RunClient(host, ['get_sell_backers'])
+		output, result = RunClient(host, ['get_sell_backers'], owner='backer')
 		self.assertListEqual(result, [('host coin sell backer index', 0, expectedBackerDetails)])
 
 	def test_10_unspent(self):
@@ -991,10 +937,8 @@ class Test(unittest.TestCase):
 		host = InitHost()
 		host._addUnspent(11*e(7))
 		RunClient(host, ['burn', '--amount', 1*e(8)])
-		host._setOwner('recipient')
-		output, result = RunClient(host, ['get_receive_address'])
+		output, result = RunClient(host, ['get_receive_address'], owner='recipient')
 		payTargetAddress = result['receive_address']
-		host._setOwner(host.defaultOwner)
 
 		# valid invocation, which should go through correctly
 		RunClient(host, ['pay', '--amount', 1*e(8), '--toAddress', payTargetAddress, '--onRevealSecret'])
@@ -1009,9 +953,7 @@ class Test(unittest.TestCase):
 		self.assertEqual(result, expectedResult)
 
 		# bad provide secret invocations
-		host._setOwner('someoneElse')
-		self.assertRaisesRegexp(ExceptionReportedToUser, "The secret for this pending payment is not known", RunClient, host, ['reveal_secret_for_pending_payment', '--pendingPaymentID', 0])
-		host._setOwner(host.defaultOwner)		
+		self.assertRaisesRegexp(ExceptionReportedToUser, "The secret for this pending payment is not known", RunClient, host, ['reveal_secret_for_pending_payment', '--pendingPaymentID', 0], owner='someoneElse')
 		self.assertRaisesRegexp(ExceptionReportedToUser, "No pending payment with the specified ID", RunClient, host, ['reveal_secret_for_pending_payment', '--pendingPaymentID', '1'])
 
 		self.assertEqual(result, expectedResult)
@@ -1022,9 +964,7 @@ class Test(unittest.TestCase):
 		# recipient gets paid directly
 		output, result = RunClient(host, ['get_balance'])
 		self.assertDictEqual(result, {'balance': '0'})
-		host._setOwner('recipient')
-		output, result = RunClient(host, ['get_balance'])
+		output, result = RunClient(host, ['get_balance'], owner='recipient')
 		self.assertDictEqual(result, {'balance': '1'})
-		host._setOwner(host.defaultOwner)
 		output, result = RunClient(host, ['get_pending_payments'])
 		self.assertEqual(result, [])

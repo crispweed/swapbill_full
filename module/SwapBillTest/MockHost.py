@@ -23,10 +23,8 @@ def MatchPubKeyHashAndRemovePrivateKey(pubKeyHash, privateKeys):
 		remainingPrivateKeys.append(privateKey)
 
 class MockHost(object):
-	defaultOwner = '0'
 
 	def __init__(self):
-		self._id = self.defaultOwner
 		self._nextChange = 0
 		self._nextSwapBill = 0
 		# start block is zero, already confirmed, contains no transactions
@@ -39,12 +37,6 @@ class MockHost(object):
 		self._unspent = []
 		self._keyPairs = []
 		self.holdNewTransactions = False
-
-	def _setOwner(self, id):
-		assert not '_' in id
-		self._id = id
-	def _getOwner(self):
-		return self._id
 
 	def _addUnspent(self, amount):
 		self._nextTXID += 1
