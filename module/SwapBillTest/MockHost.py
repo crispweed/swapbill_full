@@ -25,10 +25,8 @@ def MatchPubKeyHashAndRemovePrivateKey(pubKeyHash, privateKeys):
 class MockHost(object):
 	defaultOwner = '0'
 
-	def __init__(self, ownerID=None):
-		if ownerID is None:
-			ownerID = self.defaultOwner
-		self._id = ownerID
+	def __init__(self):
+		self._id = self.defaultOwner
 		self._nextChange = 0
 		self._nextSwapBill = 0
 		# start block is zero, already confirmed, contains no transactions
