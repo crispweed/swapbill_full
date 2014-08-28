@@ -20,7 +20,7 @@ try:
 	from SwapBill.ExceptionReportedToUser import ExceptionReportedToUser
 	from SwapBill.State import InsufficientFundsForTransaction, BadlyFormedTransaction, TransactionFailsAgainstCurrentState
 	from SwapBill.HardCodedProtocolConstraints import Constraints
-	from SwapBill.HostFromPrefsByProtocol import HostFromPrefsByProtocol
+	from SwapBill import HostFromPrefsByProtocol
 except ImportError as e:
 	message = str(e)
 	start = 'No module named '
@@ -114,7 +114,7 @@ sp.add_argument('-i', '--includepending', help='include transactions that have b
 sp = subparsers.add_parser('get_state_info', help='get some general state information')
 sp.add_argument('-i', '--includepending', help='include transactions that have been submitted but not yet confirmed (based on host memory pool)', action='store_true')
 
-def Main(commandLineArgs=sys.argv[1:], host=None, overrideStartBlock=None, out=sys.stdout):
+def Main(commandLineArgs=sys.argv[1:], overrideStartBlock=None, out=sys.stdout):
 	args = parser.parse_args(commandLineArgs)
 
 	if not path.isdir(args.dataDir):
@@ -127,8 +127,7 @@ def Main(commandLineArgs=sys.argv[1:], host=None, overrideStartBlock=None, out=s
 		except Exception as e:
 			raise ExceptionReportedToUser("Failed to create directory " + dataDir + ":", e)
 
-	if host is None:
-		host = HostFromPrefsByProtocol(protocol=args.host, configFile=args.configFile, dataDir=dataDir)
+	host = HostFromPrefsByProtocol.HostFromPrefsByProtocol(protocol=args.host, configFile=args.configFile, dataDir=dataDir)
 
 	wallet = Wallet.Wallet(path.join(dataDir, 'wallet.txt'))
 	secretsWallet = Wallet.Wallet(path.join(dataDir, 'secretsWallet.txt'))
