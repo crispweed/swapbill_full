@@ -60,6 +60,13 @@ sp.add_argument('--toAddress', required=True, help='pay to this address')
 sp.add_argument('--blocksUntilExpiry', type=int, default=8, help='if the transaction takes longer than this to go through then the transaction expires (in which case no payment is made and the full amount is returned as change)')
 sp.add_argument('--onRevealSecret', action='store_true', help='makes the payment dependant on a secret (generated for the transaction and stored locally)')
 
+#sp = subparsers.add_parser('counterpayment', help='make a swapbill payment that depends on the same secret as another payment')
+#sp.add_argument('--amount', required=True, help='amount of swapbill to be paid, as a decimal fraction (one satoshi is 0.00000001)')
+#sp.add_argument('--toAddress', required=True, help='pay to this address')
+#sp.add_argument('--blocksUntilExpiry', type=int, default=8, help='if the transaction takes longer than this to go through then the transaction expires (in which case no payment is made and the full amount is returned as change)')
+#sp.add_argument('--pendingPaymentHost', required=True, help="host blockchain for target payment, can currently be either 'litecoin' or 'bitcoin'", choices=['bitcoin', 'litecoin'])
+#sp.add_argument('--pendingPaymentID', required=True, help='the id of the pending payment, on the specified blockchain')
+
 sp = subparsers.add_parser('buy_offer', help='make an offer to buy host coin with swapbill')
 sp.add_argument('--swapBillOffered', required=True, help='amount of swapbill offered, as a decimal fraction (one satoshi is 0.00000001)')
 sp.add_argument('--blocksUntilExpiry', type=int, default=8, help='after this number of blocks the offer expires (and swapbill remaining in any unmatched part of the offer is returned)')
@@ -255,6 +262,17 @@ def Main(commandLineArgs=sys.argv[1:], host=None, overrideStartBlock=None, out=s
 			# standard pay transaction
 			transactionType = 'Pay'
 		return CheckAndSend_Funded(transactionType, outputs, outputPubKeyHashes, details)
+
+	#elif args.action == 'counterpayment':
+		#outputs = ('change', 'destination')
+		#outputPubKeyHashes = (wallet.addKeyPairAndReturnPubKeyHash(), CheckAndReturnPubKeyHash(args.toAddress))
+		#details = {
+		#'amount':Amounts.FromString(args.amount),
+		#'maxBlock':state._currentBlockIndex + args.blocksUntilExpiry
+		#}
+		#transactionType = 'PayOnRevealSecret'
+		#details['secretAddress'] = secretsWallet.addKeyPairAndReturnPubKeyHash()
+		#return CheckAndSend_Funded(transactionType, outputs, outputPubKeyHashes, details)
 
 	elif args.action == 'buy_offer':
 		transactionType = 'LTCBuyOffer'
