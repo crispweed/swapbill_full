@@ -1,30 +1,12 @@
 from __future__ import print_function
 import unittest
+from SwapBillTest import hook_TradeOffer
 from SwapBill import TradeOffer, Amounts
 from SwapBill.TradeOffer import OfferIsBelowMinimumExchange, OfferIsBelowMinimumExchange
 from SwapBill.HardCodedProtocolConstraints import Constraints
 from SwapBill.Amounts import e
 
 minimumHostExchangeAmount = 1000000
-
-def MatchOffersWrapper(originalFunction):
-	def Wrapper(minimumHostExchangeAmount, buy, sell):
-		swapBillOffered = buy._swapBillOffered
-		swapBillDeposit = sell._swapBillDeposit
-		ltcOffered = sell._ltcOffered
-		exchange = originalFunction(minimumHostExchangeAmount=minimumHostExchangeAmount, buy=buy, sell=sell)
-		swapBillOffered -= exchange.swapBillAmount
-		swapBillDeposit -= exchange.swapBillDeposit
-		ltcOffered -= exchange.ltc
-		swapBillOffered -= buy._swapBillOffered
-		swapBillDeposit -= sell._swapBillDeposit
-		ltcOffered -= sell._ltcOffered
-		assert swapBillOffered == 0
-		assert swapBillDeposit == 0
-		assert ltcOffered == 0
-		return exchange
-	return Wrapper
-TradeOffer.MatchOffers = MatchOffersWrapper(TradeOffer.MatchOffers)
 
 class Test(unittest.TestCase):
 	def MinimumSellOffer(self, minimumHostExchangeAmount, rate):
