@@ -59,12 +59,12 @@ sp.add_argument('--toAddress', required=True, help='pay to this address')
 sp.add_argument('--blocksUntilExpiry', type=int, default=8, help='if the transaction takes longer than this to go through then the transaction expires (in which case no payment is made and the full amount is returned as change)')
 sp.add_argument('--onRevealSecret', action='store_true', help='makes the payment dependant on a secret (generated for the transaction and stored locally)')
 
-#sp = subparsers.add_parser('counterpayment', help='make a swapbill payment that depends on the same secret as another payment')
-#sp.add_argument('--amount', required=True, help='amount of swapbill to be paid, as a decimal fraction (one satoshi is 0.00000001)')
-#sp.add_argument('--toAddress', required=True, help='pay to this address')
-#sp.add_argument('--blocksUntilExpiry', type=int, default=8, help='if the transaction takes longer than this to go through then the transaction expires (in which case no payment is made and the full amount is returned as change)')
-#sp.add_argument('--pendingPaymentHost', required=True, help="host blockchain for target payment, can currently be either 'litecoin' or 'bitcoin'", choices=['bitcoin', 'litecoin'])
-#sp.add_argument('--pendingPaymentID', required=True, help='the id of the pending payment, on the specified blockchain')
+sp = subparsers.add_parser('counterpayment', help='make a swapbill payment that depends on the same secret as another payment')
+sp.add_argument('--amount', required=True, help='amount of swapbill to be paid, as a decimal fraction (one satoshi is 0.00000001)')
+sp.add_argument('--toAddress', required=True, help='pay to this address')
+sp.add_argument('--blocksUntilExpiry', type=int, default=8, help='if the transaction takes longer than this to go through then the transaction expires (in which case no payment is made and the full amount is returned as change)')
+sp.add_argument('--pendingPaymentHost', required=True, help="host blockchain for target payment, can currently be either 'litecoin' or 'bitcoin'", choices=['bitcoin', 'litecoin'])
+sp.add_argument('--pendingPaymentID', required=True, help='the id of the pending payment, on the specified blockchain')
 
 sp = subparsers.add_parser('buy_offer', help='make an offer to buy host coin with swapbill')
 sp.add_argument('--swapBillOffered', required=True, help='amount of swapbill offered, as a decimal fraction (one satoshi is 0.00000001)')
@@ -113,7 +113,7 @@ sp.add_argument('-i', '--includepending', help='include transactions that have b
 sp = subparsers.add_parser('get_state_info', help='get some general state information')
 sp.add_argument('-i', '--includepending', help='include transactions that have been submitted but not yet confirmed (based on host memory pool)', action='store_true')
 
-def DoSync(dataDir, protocol, overrideStartBlock, forceRescan, includePending, out):
+def DoSync(dataDir, protocol, forceRescan, includePending, out):
 	dataDir = path.join(dataDir, protocol)
 	if not path.exists(dataDir):
 		try:
@@ -122,10 +122,10 @@ def DoSync(dataDir, protocol, overrideStartBlock, forceRescan, includePending, o
 			raise ExceptionReportedToUser("Failed to create directory " + dataDir + ":", e)
 	host = HostFromPrefsByProtocol.HostFromPrefsByProtocol(protocol=protocol, dataDir=dataDir)
 	wallet = Wallet.Wallet(path.join(dataDir, 'wallet.txt'))
-	state, ownedAccounts = SyncAndReturnStateAndOwnedAccounts(dataDir, protocol, overrideStartBlock, wallet, host, includePending=includePending, forceRescan=forceRescan, out=out)
+	state, ownedAccounts = SyncAndReturnStateAndOwnedAccounts(dataDir, protocol, wallet, host, includePending=includePending, forceRescan=forceRescan, out=out)
 	return host, wallet, state, ownedAccounts
 
-def Main(commandLineArgs=sys.argv[1:], overrideStartBlock=None, out=sys.stdout):
+def Main(commandLineArgs=sys.argv[1:], out=sys.stdout):
 	args = parser.parse_args(commandLineArgs)
 
 	if not path.isdir(args.dataDir):
@@ -148,7 +148,7 @@ def Main(commandLineArgs=sys.argv[1:], overrideStartBlock=None, out=sys.stdout):
 	includePending = hasattr(args, 'includepending') and args.includepending
 
 	#startTime = time.clock()
-	host, wallet, state, ownedAccounts = DoSync(dataDir=dataDir, protocol=args.host, overrideStartBlock=overrideStartBlock, forceRescan=args.forceRescan, includePending=includePending, out=syncOut)
+	host, wallet, state, ownedAccounts = DoSync(dataDir=dataDir, protocol=args.host, forceRescan=args.forceRescan, includePending=includePending, out=syncOut)
 	#elapsedTime = time.clock() - startTime
 	
 	if args.action == 'get_state_info':
@@ -273,16 +273,25 @@ def Main(commandLineArgs=sys.argv[1:], overrideStartBlock=None, out=sys.stdout):
 			transactionType = 'Pay'
 		return CheckAndSend_Funded(transactionType, outputs, outputPubKeyHashes, details)
 
-	#elif args.action == 'counterpayment':
-		#outputs = ('change', 'destination')
-		#outputPubKeyHashes = (wallet.addKeyPairAndReturnPubKeyHash(), CheckAndReturnPubKeyHash(args.toAddress))
-		#details = {
-		#'amount':Amounts.FromString(args.amount),
-		#'maxBlock':state._currentBlockIndex + args.blocksUntilExpiry
-		#}
-		#transactionType = 'PayOnRevealSecret'
-		#details['secretAddress'] = secretsWallet.addKeyPairAndReturnPubKeyHash()
-		#return CheckAndSend_Funded(transactionType, outputs, outputPubKeyHashes, details)
+	elif args.action == 'counterpayment':
+		outputs = ('change', 'destination')
+		if args.host == args.pendingPaymentHost:
+			altState = state
+		else:
+			print("(Syncing on target blockchain.)")
+			syncResults = DoSync(dataDir=dataDir, protocol=args.pendingPaymentHost, forceRescan=False, includePending=False, out=out)
+			altState = syncResults[2]
+		if not args.pendingPaymentID in altState._pendingPays:
+			raise ExceptionReportedToUser('No pending payment with the specified ID on the target blockchain.')
+		pay = altState._pendingPays[args.pendingPaymentID]
+		outputPubKeyHashes = (wallet.addKeyPairAndReturnPubKeyHash(), CheckAndReturnPubKeyHash(args.toAddress))
+		details = {
+		'amount':Amounts.FromString(args.amount),
+		'maxBlock':state._currentBlockIndex + args.blocksUntilExpiry
+		}
+		transactionType = 'PayOnRevealSecret'
+		details['secretAddress'] = pay.secretHash
+		return CheckAndSend_Funded(transactionType, outputs, outputPubKeyHashes, details)
 
 	elif args.action == 'buy_offer':
 		transactionType = 'LTCBuyOffer'

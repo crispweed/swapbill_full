@@ -41,7 +41,8 @@ def InitHost():
 		assert path.isdir(dataDirectory)
 		shutil.rmtree(dataDirectory)
 	os.mkdir(dataDirectory)
-	return MockHost()
+	params = Constraints.paramsByHost['litecoin']
+	return MockHost(params['startBlock'], params['startBlockHash'])
 
 defaultOwner = '0'
 
@@ -59,9 +60,8 @@ def RunClient(host, args, hostBlockChain='litecoin', owner=None):
 		os.mkdir(ownerDir)
 	fullArgs = ['--dataDir', ownerDir, '--host', hostBlockChain] + convertedArgs
 	out = io.StringIO()
-	assert host.getBlockHashAtIndexOrNone(0) is not None
 	hook_HostFromPrefsByProtocol.currentHostByProtocol[hostBlockChain] = host
-	result = ClientMain.Main(overrideStartBlock=0, commandLineArgs=fullArgs, out=out)
+	result = ClientMain.Main(commandLineArgs=fullArgs, out=out)
 	return out.getvalue(), result
 
 def GetStateInfo(host, includePending=False, forceRescan=False, owner=None):
@@ -84,38 +84,40 @@ class Test(unittest.TestCase):
 
 	def test_burn_pay_and_sync_output(self):
 		host = InitHost()
+		startBlock = host._startBlock
 		self.assertRaises(InsufficientFunds, RunClient, host, ['burn', '--amount', 2*e(7)])
 		host._addUnspent(100000000)
 		RunClient(host, ['burn', '--amount', 2*e(7)])
 		info = GetStateInfo(host)
 		self.assertEqual(info['balances'], {"02:1": 2*e(7)})
-		self.assertTrue(info['syncOutput'].startswith('Loaded cached state data successfully\nState update starting from block 0\n'))
+		self.assertTrue(info['syncOutput'].startswith('Loaded cached state data successfully\nState update starting from block ' + str(startBlock) + '\n'))
 		RunClient(host, ['burn', '--amount', 35*e(6)])
 		info = GetStateInfo(host)
 		self.assertEqual(info['balances'], {"02:1": 2*e(7), "03:1": 35*e(6)})
 		output, result = RunClient(host, ['get_receive_address'], owner='recipient')
 		payTargetAddress = result['receive_address']
 		RunClient(host, ['pay', '--amount', 1*e(7), '--toAddress', payTargetAddress])
-		self.assertTrue(info['syncOutput'].startswith('Loaded cached state data successfully\nState update starting from block 0\n'))
+		self.assertTrue(info['syncOutput'].startswith('Loaded cached state data successfully\nState update starting from block ' + str(startBlock) + '\n'))
 		info = GetStateInfo(host)
 		self.assertEqual(info['balances'], {"03:1": 35*e(6), '04:2': 1*e(7), '04:1': 1*e(7)})
 		self.assertEqual(info['syncOutput'].count('in memory: Burn'), 2)
 		self.assertEqual(info['syncOutput'].count('in memory: Pay'), 1)
-		self.assertEqual(info['syncOutput'], 'Loaded cached state data successfully\nState update starting from block 0\nCommitted state updated to start of block 0\nin memory: Burn\n - 0.2 swapbill output added\nin memory: Burn\n - 0.35 swapbill output added\nin memory: Pay\n - 0.2 swapbill output consumed\n - 0.1 swapbill output added\nIn memory state updated to end of block 3\n')
+		self.assertEqual(info['syncOutput'], 'Loaded cached state data successfully\nState update starting from block ' + str(startBlock) + '\nCommitted state updated to start of block ' + str(startBlock) + '\nin memory: Burn\n - 0.2 swapbill output added\nin memory: Burn\n - 0.35 swapbill output added\nin memory: Pay\n - 0.2 swapbill output consumed\n - 0.1 swapbill output added\nIn memory state updated to end of block ' + str(startBlock+3) + '\n')
 		info = GetStateInfo(host, owner='recipient')
 		self.assertEqual(info['syncOutput'].count('in memory: Burn'), 0)
 		self.assertEqual(info['syncOutput'].count('in memory: Pay'), 1)
 		# ** following changed since change to call get_receive_address for payTargetAddress
 		# and get_receive_address then currently does a sync
-		self.assertEqual(info['syncOutput'], 'Loaded cached state data successfully\nState update starting from block 0\nCommitted state updated to start of block 0\nin memory: Pay\n - 0.1 swapbill output added\nIn memory state updated to end of block 3\n')
+		self.assertEqual(info['syncOutput'], 'Loaded cached state data successfully\nState update starting from block ' + str(startBlock) + '\nCommitted state updated to start of block ' + str(startBlock) + '\nin memory: Pay\n - 0.1 swapbill output added\nIn memory state updated to end of block ' + str(startBlock+3) + '\n')
 		#self.assertEqual(info['syncOutput'], 'Failed to load from cache, full index generation required (no cache file found)\nState update starting from block 0\nCommitted state updated to start of block 0\nin memory: Pay\n - 10000000 swapbill output added\nIn memory state updated to end of block 3\n')
 		info = GetStateInfo(host, owner='someoneElse')
 		self.assertEqual(info['syncOutput'].count('in memory: Burn'), 0)
 		self.assertEqual(info['syncOutput'].count('in memory: Pay'), 0)
-		self.assertEqual(info['syncOutput'], 'Failed to load from cache, full index generation required (no cache file found)\nState update starting from block 0\nCommitted state updated to start of block 0\nIn memory state updated to end of block 3\n')
+		self.assertEqual(info['syncOutput'], 'Failed to load from cache, full index generation required (no cache file found)\nState update starting from block ' + str(startBlock) + '\nCommitted state updated to start of block ' + str(startBlock) + '\nIn memory state updated to end of block ' + str(startBlock+3) + '\n')
 
 	def test_bad_control_address_prefix(self):
 		host = InitHost()
+		startBlock = host._startBlock
 		host._addUnspent(100000000)
 		RunClient(host, ['burn', '--amount', 2*e(7)])
 		RunClient(host, ['burn', '--amount', 3*e(7)])
@@ -136,11 +138,17 @@ class Test(unittest.TestCase):
 		host.holdNewTransactions = False
 		info = GetStateInfo(host)
 		# 'corrupted' transactions have bad control address, and should just be ignored
-		self.assertEqual(info['syncOutput'], 'Loaded cached state data successfully\nState update starting from block 0\nCommitted state updated to start of block 0\nin memory: Burn\n - 0.2 swapbill output added\nin memory: Burn\n - 0.3 swapbill output added\nIn memory state updated to end of block 3\n')
+		self.assertEqual(info['syncOutput'], 'Loaded cached state data successfully\nState update starting from block ' + str(startBlock) + '\nCommitted state updated to start of block ' + str(startBlock) + '\nin memory: Burn\n - 0.2 swapbill output added\nin memory: Burn\n - 0.3 swapbill output added\nIn memory state updated to end of block ' + str(startBlock+3) + '\n')
 		# add tests for other badly formed transactions?
 
 	def test_start_block_not_reached(self):
-		host = InitHost()
+		if path.exists(dataDirectory):
+			assert path.isdir(dataDirectory)
+			shutil.rmtree(dataDirectory)
+		os.mkdir(dataDirectory)
+		params = Constraints.paramsByHost['litecoin']
+		return MockHost(params['startBlock']-1, 'madeUpHash')
+
 		ownerDir = path.join(dataDirectory, "0")
 		if not path.exists(ownerDir):
 			os.mkdir(ownerDir)
@@ -256,6 +264,7 @@ class Test(unittest.TestCase):
 
 	def test_expired_pay(self):
 		host = InitHost()
+		startBlock = host._startBlock
 		host._addUnspent(5*e(8))
 		RunClient(host, ['burn', '--amount', 3*e(7)])
 		output, result = RunClient(host, ['get_receive_address'], owner='recipient')
@@ -264,18 +273,18 @@ class Test(unittest.TestCase):
 		RunClient(host, ['pay', '--amount', 1*e(7), '--toAddress', payTargetAddress, '--blocksUntilExpiry', '4'])
 		host.holdNewTransactions = True
 		# two blocks advanced so far, one for burn, one for pay
-		self.assertEqual(host._nextBlock, 2)
+		self.assertEqual(host._nextBlock, startBlock+2)
 		# max block for the pay is calculated as state._currentBlockIndex (which equals next block after end of synch at time of submit) + blocksUntilExpiry
 		# so this should be 6
 		host._advance(4)
-		self.assertEqual(host._nextBlock, 6)
+		self.assertEqual(host._nextBlock, startBlock+6)
 		# so didn't expire yet, on block 6
 		output, result = RunClient(host, ['get_balance', '-i'])
 		self.assertEqual(result['balance'], '0.2')
 		output, result = RunClient(host, ['get_balance', '-i'], owner='recipient')
 		self.assertEqual(result['balance'], '0.1')
 		host._advance(1)
-		self.assertEqual(host._nextBlock, 7)
+		self.assertEqual(host._nextBlock, startBlock+7)
 		# but expires on block 7
 		output, result = RunClient(host, ['get_balance', '-i'])
 		self.assertEqual(result['balance'], '0.3')
@@ -283,13 +292,14 @@ class Test(unittest.TestCase):
 		self.assertEqual(result['balance'], '0')
 		# still on block 7
 		# (transaction was added from mem pool in the above)
-		self.assertEqual(host._nextBlock, 7)
+		self.assertEqual(host._nextBlock, startBlock+7)
 		host.holdNewTransactions = False
 		output, result = RunClient(host, ['get_balance'])
 		self.assertEqual(result['balance'], '0.3')
-		self.assertEqual(host._nextBlock, 8)
+		self.assertEqual(host._nextBlock, startBlock+8)
 	def test_expired_ltc_buy(self):
 		host = InitHost()
+		startBlock = host._startBlock
 		host._addUnspent(500000000)
 		RunClient(host, ['burn', '--amount', 4*e(7)])
 		RunClient(host, ['buy_offer', '--swapBillOffered', 3*e(7), '--exchangeRate', '0.5', '--blocksUntilExpiry', '4'])
@@ -298,7 +308,7 @@ class Test(unittest.TestCase):
 		self.assertEqual(result, [('exchange rate', '0.5', {'host coin equivalent': Amounts.ToString(15*e(6)), 'mine': True, 'swapbill offered': Amounts.ToString(3*e(7))})])
 		# two blocks advanced so far, one for burn, one for sell offer
 		host._advance(4)
-		self.assertEqual(host._nextBlock, 6)
+		self.assertEqual(host._nextBlock, startBlock+6)
 		# max block for the pay is calculated as state._currentBlockIndex (which equals next block after end of synch at time of submit) + blocksUntilExpiry
 		# so this should be 6
 		# so didn't expire yet, on block 6
@@ -307,7 +317,7 @@ class Test(unittest.TestCase):
 		output, result = RunClient(host, ['get_buy_offers', '-i'])
 		self.assertEqual(result, [('exchange rate', '0.5', {'host coin equivalent': Amounts.ToString(15*e(6)), 'mine': True, 'swapbill offered': Amounts.ToString(3*e(7))})])
 		host._advance(1)
-		self.assertEqual(host._nextBlock, 7)
+		self.assertEqual(host._nextBlock, startBlock+7)
 		# but expires on block 7
 		output, result = RunClient(host, ['get_balance', '-i'])
 		self.assertEqual(result['balance'], Amounts.ToString(4*e(7)))
@@ -315,22 +325,23 @@ class Test(unittest.TestCase):
 		self.assertEqual(result, [])
 		# still on block 7
 		# (transaction was added from mem pool in the above)
-		self.assertEqual(host._nextBlock, 7)
+		self.assertEqual(host._nextBlock, startBlock+7)
 		host.holdNewTransactions = False
 		output, result = RunClient(host, ['get_balance'])
 		self.assertEqual(result['balance'], Amounts.ToString(4*e(7)))
-		self.assertEqual(host._nextBlock, 8)
+		self.assertEqual(host._nextBlock, startBlock+8)
 		output, result = RunClient(host, ['get_buy_offers'])
 		self.assertEqual(result, [])
 	def test_expired_ltc_sell(self):
 		host = InitHost()
+		startBlock = host._startBlock
 		host._addUnspent(5*e(8))
 		RunClient(host, ['burn', '--amount', 3*e(7)])
 		RunClient(host, ['sell_offer', '--hostCoinOffered', 3*e(7)//2, '--exchangeRate', '0.5', '--blocksUntilExpiry', '4'])
 		host.holdNewTransactions = True
 		# two blocks advanced so far, one for burn, one for sell offer
 		host._advance(4)
-		self.assertEqual(host._nextBlock, 6)
+		self.assertEqual(host._nextBlock, startBlock+6)
 		# max block for the pay is calculated as state._currentBlockIndex (which equals next block after end of synch at time of submit) + blocksUntilExpiry
 		# so this should be 6
 		# so didn't expire yet, on block 6
@@ -339,7 +350,7 @@ class Test(unittest.TestCase):
 		output, result = RunClient(host, ['get_sell_offers', '-i'])
 		self.assertEqual(result, [('exchange rate', '0.5', {'host coin offered': Amounts.ToString(15*e(6)), 'mine': True, 'swapbill equivalent': Amounts.ToString(3*e(7)), 'deposit': Amounts.ToString(1875000)})])
 		host._advance(1)
-		self.assertEqual(host._nextBlock, 7)
+		self.assertEqual(host._nextBlock, startBlock+7)
 		# but expires on block 7
 		output, result = RunClient(host, ['get_balance', '-i'])
 		self.assertEqual(result['balance'], '0.3')
@@ -347,11 +358,11 @@ class Test(unittest.TestCase):
 		self.assertEqual(result, [])
 		# still on block 7
 		# (transaction was added from mem pool in the above)
-		self.assertEqual(host._nextBlock, 7)
+		self.assertEqual(host._nextBlock, startBlock+7)
 		host.holdNewTransactions = False
 		output, result = RunClient(host, ['get_balance'])
 		self.assertEqual(result['balance'], '0.3')
-		self.assertEqual(host._nextBlock, 8)
+		self.assertEqual(host._nextBlock, startBlock+8)
 		output, result = RunClient(host, ['get_sell_offers'])
 		self.assertEqual(result, [])
 
@@ -539,6 +550,7 @@ class Test(unittest.TestCase):
 
 	def test_ltc_trading(self):
 		host = InitHost()
+		startBlock = host._startBlock
 		ownerList = ('alice', 'bob', 'clive', 'dave')
 		for owner in ownerList:
 			host._addUnspent(2*e(8))
@@ -593,7 +605,7 @@ class Test(unittest.TestCase):
 				'I am seller (and need to complete)': True,
 				'outstanding host coin payment amount': Amounts.ToString(2500000),
 				'swap bill paid by buyer': Amounts.ToString(10000000),
-				'expires on block': 57,
+				'expires on block': startBlock+57,
 		        'blocks until expiry': 50,
 				'I am buyer (and waiting for payment)': False,
 				'deposit paid by seller': Amounts.ToString(625000)
@@ -607,7 +619,7 @@ class Test(unittest.TestCase):
 				'I am seller (and need to complete)': False,
 				'outstanding host coin payment amount': Amounts.ToString(2500000),
 				'swap bill paid by buyer': Amounts.ToString(10000000),
-				'expires on block': 57,
+				'expires on block': startBlock+57,
 		        'blocks until expiry': 50,
 				'I am buyer (and waiting for payment)': True,
 				'deposit paid by seller': Amounts.ToString(625000)
@@ -726,48 +738,50 @@ class Test(unittest.TestCase):
 
 	def test_ltc_sells_backer_expiry(self):
 		host = InitHost()
+		startBlock = host._startBlock
 		host._addUnspent(2*e(12))
 		RunClient(host, ['burn', '--amount', 1*e(12)])
 		RunClient(host, ['back_sells', '--backingSwapBill', 1*e(12), '--transactionsBacked', '1000', '--blocksUntilExpiry', '20', '--commission', '0.625'])
 		output, info = RunClient(host, ['get_balance'])
 		self.assertDictEqual(info, {'balance': '0'})
-		self.assertEqual(host._nextBlock, 3)
+		self.assertEqual(host._nextBlock, startBlock+3)
 		# expiry block is calculated as state._currentBlockIndex (which equals next block after end of synch at time of submit) + blocksUntilExpiry
 		output, result = RunClient(host, ['get_sell_backers'])
 		expectedDetails = {
 		'commission': '0.625',
 		'backing amount': Amounts.ToString(1*e(12)), 'I am backer': True,
-		'expires on block': 22,
+		'expires on block': startBlock+22,
 		'blocks until expiry': 20,
 		'maximum per transaction': Amounts.ToString(1*e(9))
 		}
 		self.assertListEqual(result, [('host coin sell backer index', 0, expectedDetails)])
-		self.assertEqual(host._nextBlock, 3)
+		self.assertEqual(host._nextBlock, startBlock+3)
 		host._advance(19)
 		output, result = RunClient(host, ['get_sell_backers'])
 		expectedDetails['blocks until expiry'] = 1
 		self.assertListEqual(result, [('host coin sell backer index', 0, expectedDetails)])
-		self.assertEqual(host._nextBlock, 22)
+		self.assertEqual(host._nextBlock, startBlock+22)
 		host._advance(1)
-		self.assertEqual(host._nextBlock, 23)
+		self.assertEqual(host._nextBlock, startBlock+23)
 		output, result = RunClient(host, ['get_sell_backers'])
 		self.assertListEqual(result, [])
 
 	def test_backed_ltc_sell(self):
 		host = InitHost()
+		startBlock = host._startBlock
 		ownerList = ('backer', 'buyer', 'seller')
 		host._addUnspent(2*e(12))
 		RunClient(host, ['burn', '--amount', 1*e(12)], owner='backer')
 		RunClient(host, ['back_sells', '--backingSwapBill', 1*e(12), '--transactionsBacked', '1000', '--blocksUntilExpiry', '20', '--commission', '0.0625'], owner='backer')
 		output, info = RunClient(host, ['get_balance'], owner='backer')
 		self.assertDictEqual(info, {'balance': '0'})
-		self.assertEqual(host._nextBlock, 3)
+		self.assertEqual(host._nextBlock, startBlock+3)
 		output, result = RunClient(host, ['get_sell_backers'], owner='backer')
 		expectedBackingAmount = 1*e(12)
 		expectedBackerDetails = {
 		'commission': '0.0625',
 		'backing amount': Amounts.ToString(expectedBackingAmount), 'I am backer': True,
-		'expires on block': 22,
+		'expires on block': startBlock+22,
 		'blocks until expiry': 20,
 		'maximum per transaction': Amounts.ToString(1*e(9))
 		}
@@ -801,7 +815,7 @@ class Test(unittest.TestCase):
 		output, result = RunClient(host, ['get_pending_exchanges'], owner='backer')
 		expectedResult = [('pending exchange index', 0,
 		     {
-		         'expires on block': 55,
+		         'expires on block': startBlock+55,
 		         'blocks until expiry': 50,
 		         'outstanding host coin payment amount': Amounts.ToString(150000000),
 		         'I am seller (and need to complete)': True,
@@ -855,6 +869,7 @@ class Test(unittest.TestCase):
 
 	def test_backed_sell_matches_multiple(self):
 		host = InitHost()
+		startBlock = host._startBlock
 		ownerList = ['buyer', 'seller', 'backer']
 		host._addUnspent(5*e(12))
 		RunClient(host, ['burn', '--amount', 6*e(9)], owner='buyer')
@@ -881,7 +896,7 @@ class Test(unittest.TestCase):
 		self.assertDictEqual(result, {'balance': '0'})
 		ownerBalances = GetOwnerBalances(host, ownerList, info['balances'])
 		self.assertEqual(ownerBalances, {'seller':6*e(9)})
-		expectedBackerDetails = {'commission': '0.1', 'blocks until expiry': 99, 'I am backer': True, 'backing amount': Amounts.ToString(1*e(12)-6*e(9)-deposit), 'expires on block': 105, 'maximum per transaction': Amounts.ToString(1*e(11))}
+		expectedBackerDetails = {'commission': '0.1', 'blocks until expiry': 99, 'I am backer': True, 'backing amount': Amounts.ToString(1*e(12)-6*e(9)-deposit), 'expires on block': startBlock+105, 'maximum per transaction': Amounts.ToString(1*e(11))}
 		output, result = RunClient(host, ['get_sell_backers'], owner='backer')
 		self.assertListEqual(result, [('host coin sell backer index', 0, expectedBackerDetails)])
 		RunClient(host, ['complete_sell', '--pendingExchangeID', '0'], owner='backer')
@@ -948,7 +963,7 @@ class Test(unittest.TestCase):
 		output, result = RunClient(host, ['get_pending_payments'])
 		expectedResult = [
 		    ('pending payment index', 0,
-		     {'paid by me': True, 'expires on block': '10', 'amount': '1', 'paid to me': False})
+		     {'paid by me': True, 'expires on block': str(host._startBlock+10), 'amount': '1', 'paid to me': False})
 		]
 		self.assertEqual(result, expectedResult)
 

@@ -24,12 +24,14 @@ def MatchPubKeyHashAndRemovePrivateKey(pubKeyHash, privateKeys):
 
 class MockHost(object):
 
-	def __init__(self):
+	def __init__(self, startBlock, startBlockHash):
+		self._startBlock = startBlock
+		self._startBlockHash = startBlockHash
 		self._nextChange = 0
 		self._nextSwapBill = 0
-		# start block is zero, already confirmed, contains no transactions
-		# block 1 will be confirmed when it has transactions and next block is queried
-		self._nextBlock = 1
+		# block at startBlock is already confirmed, contains no transactions
+		# block at startBlock + 1 will be confirmed when it has transactions and next block is queried
+		self._nextBlock = startBlock + 1
 		self._transactionsByBlock = {0:[]}
 		self._memPool = []
 		self._nextTXID = 0
@@ -57,12 +59,20 @@ class MockHost(object):
 		txid = MakeTXID(self._nextTXID)
 		self._addTransaction_Internal(txid, txHex)
 
+	def _blockIndexFromBlockHash(self, blockHash):
+		if blockHash == self._startBlockHash:
+			return self._startBlock
+		return int(blockHash)
+			
 	def getBlockHashAtIndexOrNone(self, blockIndex):
+		assert blockIndex >= self._startBlock
+		if blockIndex == self._startBlock:
+			return self._startBlockHash
 		if blockIndex >= self._nextBlock:
 			return None
 		return str(blockIndex)
 	def getNextBlockHash(self, blockHash):
-		nextBlock = int(blockHash) + 1
+		nextBlock = self._blockIndexFromBlockHash(blockHash) + 1
 		if nextBlock < self._nextBlock:
 			return str(nextBlock)
 		assert nextBlock == self._nextBlock
@@ -78,7 +88,7 @@ class MockHost(object):
 		self._nextBlock += 1
 		return result
 	def getBlockTransactions(self, blockHash):
-		i = int(blockHash)
+		i = self._blockIndexFromBlockHash(blockHash)
 		return self._transactionsByBlock.get(i, [])
 
 	def getMemPoolTransactions(self):

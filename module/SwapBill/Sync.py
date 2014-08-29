@@ -51,16 +51,10 @@ def _processBlock(host, state, wallet, ownedAccounts, blockHash, reportPrefix, o
 	if tradeOffersChanged:
 		print('trade offer or pending exchange expired', file=out)
 
-def SyncAndReturnStateAndOwnedAccounts(cacheDirectory, protocol, overrideStartBlock, wallet, host, includePending, forceRescan, out):
+def SyncAndReturnStateAndOwnedAccounts(cacheDirectory, protocol, wallet, host, includePending, forceRescan, out):
 	params = Constraints.paramsByHost[protocol]
-	if overrideStartBlock is None:
-		startBlock = params['startBlock']
-		startBlockHash = params['startBlockHash']
-	else:
-		startBlock = overrideStartBlock
-		startBlockHash = host.getBlockHashAtIndexOrNone(startBlock)
-		assert startBlockHash is not None
-		
+	startBlock = params['startBlock']
+	startBlockHash = params['startBlockHash']		
 	blockIndex = params['startBlock']
 
 	loaded = False
