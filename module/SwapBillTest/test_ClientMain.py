@@ -1057,6 +1057,7 @@ class Test(unittest.TestCase):
 		# put through pay, and then counter_pay with the same secret
 		RunClient(['pay', '--amount', 2*e(8), '--toAddress', litecoinReceiveAddress, '--onRevealSecret'], blockChain='litecoin', owner='a')
 		RunClient(['counter_pay', '--amount', 1*e(8), '--toAddress', bitcoinReceiveAddress, '--pendingPaymentHost', 'litecoin', '--pendingPaymentID', '0'], blockChain='bitcoin', owner='b')
+
 		# check these pending payment, as reported from the various different points of view
 		output, result = RunClient(['get_pending_payments'], blockChain='litecoin', owner='a')
 		expectedResult = [
@@ -1082,3 +1083,19 @@ class Test(unittest.TestCase):
 		     {'paid by me': False, 'expires on block': str(bitcoinStartBlock+10), 'amount': '1', 'paid to me': True})
 		]
 		self.assertEqual(result, expectedResult)
+
+		# a accepts the counter payment, but must reveal their secret in this transaction
+
+		RunClient(['reveal_secret_for_pending_payment', '--pendingPaymentID', '0'], blockChain='bitcoin', owner='a')
+
+		# b's client should detect that this secret has been revealed on next update
+		info = GetStateInfo(blockChain='bitcoin', owner='b')
+		self.assertTrue('storing revealed secret with hash' in info['syncOutput'])
+		# (but this is not reported by a's client)
+		info = GetStateInfo(blockChain='bitcoin', owner='a')
+		self.assertFalse('storing revealed secret with hash' in info['syncOutput'])
+
+		# and b can now complete the first payment
+		# TODO fix secrets wallet and make the following pass!
+		#RunClient(['reveal_secret_for_pending_payment', '--pendingPaymentID', '0'], blockChain='litecoin', owner='b')
+		
