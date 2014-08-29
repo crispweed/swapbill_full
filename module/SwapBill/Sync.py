@@ -51,20 +51,22 @@ def _processBlock(host, state, wallet, ownedAccounts, blockHash, reportPrefix, o
 	if tradeOffersChanged:
 		print('trade offer or pending exchange expired', file=out)
 
-def SyncAndReturnStateAndOwnedAccounts(cacheDirectory, protocol, wallet, host, includePending, forceRescan, out):
+def ForceRescan(cacheDirectory):
+	PickledCache.Remove(cacheDirectory, 'State')
+
+def SyncAndReturnStateAndOwnedAccounts(cacheDirectory, protocol, wallet, host, includePending, out):
 	params = Constraints.paramsByHost[protocol]
 	startBlock = params['startBlock']
 	startBlockHash = params['startBlockHash']		
 	blockIndex = params['startBlock']
 
 	loaded = False
-	if not forceRescan:
-		try:
-			(blockIndex, blockHash, state) = PickledCache.Load(cacheDirectory, 'State', stateVersion)
-			ownedAccounts = PickledCache.Load(cacheDirectory, 'OwnedAccounts', ownedAccountsVersion)
-			loaded = True
-		except PickledCache.LoadFailedException as e:
-			print('Failed to load from cache, full index generation required (' + str(e) + ')', file=out)
+	try:
+		(blockIndex, blockHash, state) = PickledCache.Load(cacheDirectory, 'State', stateVersion)
+		ownedAccounts = PickledCache.Load(cacheDirectory, 'OwnedAccounts', ownedAccountsVersion)
+		loaded = True
+	except PickledCache.LoadFailedException as e:
+		print('Failed to load from cache, full index generation required (' + str(e) + ')', file=out)
 	if loaded and host.getBlockHashAtIndexOrNone(blockIndex) != blockHash:
 		print('The block corresponding with cached state has been orphaned, full index generation required.', file=out)
 		loaded = False

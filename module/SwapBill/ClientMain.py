@@ -47,8 +47,9 @@ class SourceAddressUnseeded(ExceptionReportedToUser):
 parser = argparse.ArgumentParser(prog='SwapBillClient', description='the reference implementation of the SwapBill protocol')
 parser.add_argument('--dataDir', help='the location of the data directory', default='.')
 parser.add_argument('--host', help="host blockchain, can currently be either 'litecoin' or 'bitcoin'", choices=['bitcoin', 'litecoin'], default='bitcoin')
-parser.add_argument('--forceRescan', help='force a full block chain rescan', action='store_true')
 subparsers = parser.add_subparsers(dest='action', help='the action to be taken')
+
+sp = subparsers.add_parser('force_rescan', help='delete cached state, forcing a full rescan on the next query invocation')
 
 sp = subparsers.add_parser('burn', help='destroy host coin to create swapbill')
 sp.add_argument('--amount', required=True, help='amount of host coin to be destroyed, as a decimal fraction (one satoshi is 0.00000001)')
@@ -113,7 +114,7 @@ sp.add_argument('-i', '--includepending', help='include transactions that have b
 sp = subparsers.add_parser('get_state_info', help='get some general state information')
 sp.add_argument('-i', '--includepending', help='include transactions that have been submitted but not yet confirmed (based on host memory pool)', action='store_true')
 
-def DoSync(dataDir, protocol, forceRescan, includePending, out):
+def DoSync(dataDir, protocol, includePending, out):
 	dataDir = path.join(dataDir, protocol)
 	if not path.exists(dataDir):
 		try:
@@ -122,7 +123,7 @@ def DoSync(dataDir, protocol, forceRescan, includePending, out):
 			raise ExceptionReportedToUser("Failed to create directory " + dataDir + ":", e)
 	host = HostFromPrefsByProtocol.HostFromPrefsByProtocol(protocol=protocol, dataDir=dataDir)
 	wallet = Wallet.Wallet(path.join(dataDir, 'wallet.txt'))
-	state, ownedAccounts = SyncAndReturnStateAndOwnedAccounts(dataDir, protocol, wallet, host, includePending=includePending, forceRescan=forceRescan, out=out)
+	state, ownedAccounts = SyncAndReturnStateAndOwnedAccounts(dataDir, protocol, wallet, host, includePending=includePending, out=out)
 	return host, wallet, state, ownedAccounts
 
 def Main(commandLineArgs=sys.argv[1:], out=sys.stdout):
@@ -138,6 +139,10 @@ def Main(commandLineArgs=sys.argv[1:], out=sys.stdout):
 		except Exception as e:
 			raise ExceptionReportedToUser("Failed to create directory " + dataDir + ":", e)
 
+	if args.action == 'force_rescan':
+		dataDir = path.join(dataDir, args.host)
+		return Sync.ForceRescan(dataDir)
+		
 	secretsWallet = Wallet.Wallet(path.join(dataDir, 'secretsWallet.txt'))
 
 	if args.action == 'get_state_info':
@@ -148,7 +153,7 @@ def Main(commandLineArgs=sys.argv[1:], out=sys.stdout):
 	includePending = hasattr(args, 'includepending') and args.includepending
 
 	#startTime = time.clock()
-	host, wallet, state, ownedAccounts = DoSync(dataDir=dataDir, protocol=args.host, forceRescan=args.forceRescan, includePending=includePending, out=syncOut)
+	host, wallet, state, ownedAccounts = DoSync(dataDir=dataDir, protocol=args.host, includePending=includePending, out=syncOut)
 	#elapsedTime = time.clock() - startTime
 	
 	if args.action == 'get_state_info':
@@ -279,7 +284,7 @@ def Main(commandLineArgs=sys.argv[1:], out=sys.stdout):
 			altState = state
 		else:
 			print("(Syncing on target blockchain.)")
-			syncResults = DoSync(dataDir=dataDir, protocol=args.pendingPaymentHost, forceRescan=False, includePending=False, out=out)
+			syncResults = DoSync(dataDir=dataDir, protocol=args.pendingPaymentHost, includePending=False, out=out)
 			altState = syncResults[2]
 		if not args.pendingPaymentID in altState._pendingPays:
 			raise ExceptionReportedToUser('No pending payment with the specified ID on the target blockchain.')

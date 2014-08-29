@@ -68,8 +68,11 @@ def GetStateInfo(host, includePending=False, forceRescan=False, owner=None):
 	if owner is None:
 		owner = defaultOwner
 	args = []
+
 	if forceRescan:
-		args.append('--forceRescan')
+		#args.append('--forceRescan')
+		RunClient(host, ['force_rescan'], owner=owner)
+
 	args.append('get_state_info')
 	if includePending:
 		args.append('-i')
