@@ -362,7 +362,7 @@ def Main(commandLineArgs=sys.argv[1:], out=sys.stdout):
 			raise ExceptionReportedToUser('The secret for this pending payment is not known.')		
 		details = {
 		    'pendingPayIndex':pendingPaymentID,
-		    'publicKey':secretsWallet.publicKeyForPubKeyHash(pay.secretHash)
+		    'publicKeySecret':secretsWallet.publicKeyForPubKeyHash(pay.secretHash)
 		}
 		return CheckAndSend_UnFunded(transactionType, (), (), details)
 

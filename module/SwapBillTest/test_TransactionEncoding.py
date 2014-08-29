@@ -143,7 +143,7 @@ class Test(unittest.TestCase):
 		transactionType = 'RevealPendingPaymentSecret'
 		typeCode = b'\x81'
 		keyData = (b'\x12\x34' + b'\x00'*28 + b'\x56\x78' + b'\x00'*30 + b'\x9a\xbc')
-		details = {'pendingPayIndex':7, 'publicKey':keyData}
+		details = {'pendingPayIndex':7, 'publicKeySecret':keyData}
 		# source accounts not None
 		self.assertRaises(AssertionError, TransactionEncoding.FromStateTransaction, transactionType, [], (), (), details)
 		# bad output spec
@@ -152,13 +152,13 @@ class Test(unittest.TestCase):
 		details.pop('pendingPayIndex')
 		self.assertRaises(KeyError, TransactionEncoding.FromStateTransaction, transactionType, None, (), (), details)
 		details['pendingPayIndex'] = 7
-		details.pop('publicKey')
+		details.pop('publicKeySecret')
 		self.assertRaises(KeyError, TransactionEncoding.FromStateTransaction, transactionType, None, (), (), details)
-		details['publicKey'] = keyData
+		details['publicKeySecret'] = keyData
 		# supplied key data too short
-		details['publicKey'] = keyData[:-1]
+		details['publicKeySecret'] = keyData[:-1]
 		self.assertRaises(AssertionError, TransactionEncoding.FromStateTransaction, transactionType, None, (), (), details)
-		details['publicKey'] = keyData
+		details['publicKeySecret'] = keyData
 		# successful control transaction
 		tx = TransactionEncoding.FromStateTransaction(transactionType, None, (), (), details)
 		#print(tx.__dict__.__repr__())

@@ -405,12 +405,12 @@ class State(object):
 		self._balances.removeRef(exchange.sellerAccount)
 		self._pendingExchanges.pop(pendingExchangeIndex)
 
-	def _unfundedTransaction_RevealPendingPaymentSecret(self, txID, pendingPayIndex, publicKey, outputs):
+	def _unfundedTransaction_RevealPendingPaymentSecret(self, txID, pendingPayIndex, publicKeySecret, outputs):
 		assert outputs == ()
 		if not pendingPayIndex in self._pendingPays:
 			raise TransactionFailsAgainstCurrentState('no pending payment with the specified index')
 		pay = self._pendingPays[pendingPayIndex]
-		if KeyPair.PublicKeyToPubKeyHash(publicKey) != pay.secretHash:
+		if KeyPair.PublicKeyToPubKeyHash(publicKeySecret) != pay.secretHash:
 			raise TransactionFailsAgainstCurrentState('the supplied public key does not match the public key hash associated with the pending payment')
 		if txID is None:
 			return		

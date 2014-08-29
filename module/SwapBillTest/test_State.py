@@ -1204,14 +1204,14 @@ class Test(unittest.TestCase):
 		# some proof of receipt transaction fail cases
 		proofDetails = {
 		    'pendingPayIndex':1,
-		    'publicKey':secretPubKey,
+		    'publicKeySecret':secretPubKey,
 		}
 		proofDetails['pendingPayIndex'] = 0
 		self.Apply_AssertFails(state, 'RevealPendingPaymentSecret', expectedError='no pending payment with the specified index', sourceAccounts=None, **proofDetails)
 		proofDetails['pendingPayIndex'] = 1
-		proofDetails['publicKey'] = anotherPubKey
+		proofDetails['publicKeySecret'] = anotherPubKey
 		self.Apply_AssertFails(state, 'RevealPendingPaymentSecret', expectedError='the supplied public key does not match the public key hash associated with the pending payment', sourceAccounts=None, **proofDetails)
-		proofDetails['publicKey'] = secretPubKey
+		proofDetails['publicKeySecret'] = secretPubKey
 		# but then confirmed
 		self.Apply_AssertSucceeds(state, 'RevealPendingPaymentSecret', sourceAccounts=None, **proofDetails)
 		# the pending pay is still outstanding, but flagged as confirmed
