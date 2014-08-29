@@ -9,7 +9,7 @@ from SwapBill.HardCodedProtocolConstraints import Constraints
 stateVersion = 1
 ownedAccountsVersion = 0.2
 
-def _processTransactions(state, wallet, ownedAccounts, transactions, applyToState, reportPrefix, out):
+def _processTransactions(state, wallet, ownedAccounts, secretsWatchList, secretsWallet, transactions, applyToState, reportPrefix, out):
 	for txID, hostTXBytes in transactions:
 		if RawTransaction.UnexpectedFormat_Fast(hostTXBytes, ControlAddressPrefix.prefix):
 			continue
@@ -41,9 +41,9 @@ def _processTransactions(state, wallet, ownedAccounts, transactions, applyToStat
 		if (outputsReport or inputsReport) and error is not None:
 			print(' * failed:', error, file=out)
 
-def _processBlock(host, state, wallet, ownedAccounts, blockHash, reportPrefix, out):
+def _processBlock(host, state, wallet, ownedAccounts, secretsWatchList, secretsWallet, blockHash, reportPrefix, out):
 	transactions = host.getBlockTransactions(blockHash)
-	_processTransactions(state, wallet, ownedAccounts, transactions, True, reportPrefix, out)
+	_processTransactions(state, wallet, ownedAccounts, secretsWatchList, secretsWallet, transactions, True, reportPrefix, out)
 	#inBetweenReport = ownedAccounts.checkForTradeOfferChanges(state)
 	#assert inBetweenReport == ''
 	state.advanceToNextBlock()
@@ -96,7 +96,7 @@ def SyncAndReturnStateAndOwnedAccounts(cacheDirectory, protocol, wallet, host, s
 		## hard coded value used here for number of blocks to lag behind with persistent state
 		if len(toProcess) == 20:
 			## advance cached state
-			_processBlock(host, state, wallet, ownedAccounts, blockHash, 'committed', out=out)
+			_processBlock(host, state, wallet, ownedAccounts, secretsWatchList, secretsWallet, blockHash, 'committed', out=out)
 			popped = toProcess.popleft()
 			blockIndex += 1
 			blockHash = popped
@@ -110,11 +110,11 @@ def SyncAndReturnStateAndOwnedAccounts(cacheDirectory, protocol, wallet, host, s
 
 	while len(toProcess) > 0:
 		## advance in memory state
-		_processBlock(host, state, wallet, ownedAccounts, blockHash, 'in memory', out=out)
+		_processBlock(host, state, wallet, ownedAccounts, secretsWatchList, secretsWallet, blockHash, 'in memory', out=out)
 		popped = toProcess.popleft()
 		blockIndex += 1
 		blockHash = popped
-	_processBlock(host, state, wallet, ownedAccounts, blockHash, 'in memory', out=out)
+	_processBlock(host, state, wallet, ownedAccounts, secretsWatchList, secretsWallet, blockHash, 'in memory', out=out)
 	blockIndex += 1
 
 	assert state._currentBlockIndex == blockIndex
@@ -128,7 +128,7 @@ def SyncAndReturnStateAndOwnedAccounts(cacheDirectory, protocol, wallet, host, s
 	# but we can potentially be more careful about this by checking best block chain after getting memory pool transactions
 	# and restarting the block chain traversal if this does not match up
 	memPoolTransactions = host.getMemPoolTransactions()
-	_processTransactions(state, wallet, ownedAccounts, memPoolTransactions, includePending, 'in memory pool', out)
+	_processTransactions(state, wallet, ownedAccounts, secretsWatchList, secretsWallet, memPoolTransactions, includePending, 'in memory pool', out)
 
 	return state, ownedAccounts
 
