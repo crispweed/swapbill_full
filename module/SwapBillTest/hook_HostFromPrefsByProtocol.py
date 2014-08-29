@@ -3,7 +3,7 @@ from SwapBill import HostFromPrefsByProtocol
 
 currentHostByProtocol = {}
 
-def _hook(protocol, configFile, dataDir):
+def _hook(protocol, dataDir):
 	return currentHostByProtocol[protocol]
 
 HostFromPrefsByProtocol.HostFromPrefsByProtocol = _hook

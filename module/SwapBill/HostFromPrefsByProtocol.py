@@ -3,14 +3,13 @@ import os
 from os import path
 from SwapBill import ParseConfig, Host, RPC
 
-def HostFromPrefsByProtocol(protocol, configFile, dataDir):
+def HostFromPrefsByProtocol(protocol, dataDir):
 	assert protocol in ('bitcoin', 'litecoin')
 
-	if configFile is None:
-		if os.name == 'nt':
-			configFile = path.join(path.expanduser("~"), 'AppData', 'Roaming', protocol, protocol + '.conf')
-		else:
-			configFile = path.join(path.expanduser("~"), '.' + protocol, protocol + '.conf')
+	if os.name == 'nt':
+		configFile = path.join(path.expanduser("~"), 'AppData', 'Roaming', protocol, protocol + '.conf')
+	else:
+		configFile = path.join(path.expanduser("~"), '.' + protocol, protocol + '.conf')
 
 	with open(configFile, mode='rb') as f:
 		configFileBuffer = f.read()

@@ -45,7 +45,6 @@ class SourceAddressUnseeded(ExceptionReportedToUser):
 	pass
 
 parser = argparse.ArgumentParser(prog='SwapBillClient', description='the reference implementation of the SwapBill protocol')
-parser.add_argument('--configFile', help='the location of the configuration file')
 parser.add_argument('--dataDir', help='the location of the data directory', default='.')
 parser.add_argument('--host', help="host blockchain, can currently be either 'litecoin' or 'bitcoin'", choices=['bitcoin', 'litecoin'], default='bitcoin')
 parser.add_argument('--forceRescan', help='force a full block chain rescan', action='store_true')
@@ -114,31 +113,45 @@ sp.add_argument('-i', '--includepending', help='include transactions that have b
 sp = subparsers.add_parser('get_state_info', help='get some general state information')
 sp.add_argument('-i', '--includepending', help='include transactions that have been submitted but not yet confirmed (based on host memory pool)', action='store_true')
 
+def DoSync(dataDir, protocol, overrideStartBlock, forceRescan, includePending, out):
+	dataDir = path.join(dataDir, protocol)
+	if not path.exists(dataDir):
+		try:
+			os.mkdir(dataDir)
+		except Exception as e:
+			raise ExceptionReportedToUser("Failed to create directory " + dataDir + ":", e)
+	host = HostFromPrefsByProtocol.HostFromPrefsByProtocol(protocol=protocol, dataDir=dataDir)
+	wallet = Wallet.Wallet(path.join(dataDir, 'wallet.txt'))
+	state, ownedAccounts = SyncAndReturnStateAndOwnedAccounts(dataDir, protocol, overrideStartBlock, wallet, host, includePending=includePending, forceRescan=forceRescan, out=out)
+	return host, wallet, state, ownedAccounts
+
 def Main(commandLineArgs=sys.argv[1:], overrideStartBlock=None, out=sys.stdout):
 	args = parser.parse_args(commandLineArgs)
 
 	if not path.isdir(args.dataDir):
 		raise ExceptionReportedToUser("The following path (specified for data directory parameter) is not a valid path to an existing directory: " + args.dataDir)
 
-	dataDir = path.join(args.dataDir, 'swapBillData_' + args.host)
+	dataDir = path.join(args.dataDir, 'swapBillData')
 	if not path.exists(dataDir):
 		try:
 			os.mkdir(dataDir)
 		except Exception as e:
 			raise ExceptionReportedToUser("Failed to create directory " + dataDir + ":", e)
 
-	host = HostFromPrefsByProtocol.HostFromPrefsByProtocol(protocol=args.host, configFile=args.configFile, dataDir=dataDir)
-
-	wallet = Wallet.Wallet(path.join(dataDir, 'wallet.txt'))
 	secretsWallet = Wallet.Wallet(path.join(dataDir, 'secretsWallet.txt'))
-
-	includePending = hasattr(args, 'includepending') and args.includepending
 
 	if args.action == 'get_state_info':
 		syncOut = io.StringIO()
-		startTime = time.clock()
-		state, ownedAccounts = SyncAndReturnStateAndOwnedAccounts(dataDir, args.host, overrideStartBlock, wallet, host, includePending=includePending, forceRescan=args.forceRescan, out=syncOut)
-		elapsedTime = time.clock() - startTime
+	else:
+		syncOut = out
+
+	includePending = hasattr(args, 'includepending') and args.includepending
+
+	#startTime = time.clock()
+	host, wallet, state, ownedAccounts = DoSync(dataDir=dataDir, protocol=args.host, overrideStartBlock=overrideStartBlock, forceRescan=args.forceRescan, includePending=includePending, out=syncOut)
+	#elapsedTime = time.clock() - startTime
+	
+	if args.action == 'get_state_info':
 		formattedBalances = {}
 		for account in state._balances.balances:
 			key = host.formatAccountForEndUser(account)
@@ -146,15 +159,13 @@ def Main(commandLineArgs=sys.argv[1:], overrideStartBlock=None, out=sys.stdout):
 		info = {
 		    'totalCreated':state._totalCreated,
 		    'atEndOfBlock':state._currentBlockIndex - 1, 'balances':formattedBalances, 'syncOutput':syncOut.getvalue(),
-		    'syncTime':elapsedTime,
+		    #'syncTime':elapsedTime,
 		    'numberOfHostCoinBuyOffers':state._ltcBuys.size(),
 		    'numberOfHostCoinSellOffers':state._ltcSells.size(),
 		    'numberOfPendingExchanges':len(state._pendingExchanges),
 		    'numberOfOutputs':len(ownedAccounts.accounts)
 		}
 		return info
-
-	state, ownedAccounts = SyncAndReturnStateAndOwnedAccounts(dataDir, args.host, overrideStartBlock, wallet, host, includePending=includePending, forceRescan=args.forceRescan, out=out)
 
 	transactionBuildLayer = TransactionBuildLayer.TransactionBuildLayer(host, ownedAccounts)
 
