@@ -16,7 +16,7 @@ class Test(unittest.TestCase):
 			self.assertTrue(wallet.hasKeyPairForPubKeyHash(address))
 		privateKeys1 = wallet._privateKeys
 		self.assertEqual(len(privateKeys1), 2)
-		wallet = Wallet.Wallet(walletFile) # litecoin testnet private key address version)
+		wallet = Wallet.Wallet(walletFile)
 		addresses.append(wallet.addKeyPairAndReturnPubKeyHash())
 		for address in addresses:
 			self.assertTrue(wallet.hasKeyPairForPubKeyHash(address))

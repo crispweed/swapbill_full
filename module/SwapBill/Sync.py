@@ -54,7 +54,7 @@ def _processBlock(host, state, wallet, ownedAccounts, blockHash, reportPrefix, o
 def ForceRescan(cacheDirectory):
 	PickledCache.Remove(cacheDirectory, 'State')
 
-def SyncAndReturnStateAndOwnedAccounts(cacheDirectory, protocol, wallet, host, includePending, out):
+def SyncAndReturnStateAndOwnedAccounts(cacheDirectory, protocol, wallet, host, secretsWatchList, secretsWallet, includePending, out):
 	params = Constraints.paramsByHost[protocol]
 	startBlock = params['startBlock']
 	startBlockHash = params['startBlockHash']		

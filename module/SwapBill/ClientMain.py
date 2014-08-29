@@ -16,6 +16,7 @@ try:
 	from SwapBill import RawTransaction, Address, TransactionFee, ParseConfig, RPC, Amounts
 	from SwapBill import TransactionEncoding, BuildHostedTransaction, Sync, Host, TransactionBuildLayer, Wallet
 	from SwapBill import FormatTransactionForUserDisplay
+	from SwapBill import FileBackedList
 	from SwapBill.Sync import SyncAndReturnStateAndOwnedAccounts
 	from SwapBill.ExceptionReportedToUser import ExceptionReportedToUser
 	from SwapBill.State import InsufficientFundsForTransaction, BadlyFormedTransaction, TransactionFailsAgainstCurrentState
@@ -114,7 +115,7 @@ sp.add_argument('-i', '--includepending', help='include transactions that have b
 sp = subparsers.add_parser('get_state_info', help='get some general state information')
 sp.add_argument('-i', '--includepending', help='include transactions that have been submitted but not yet confirmed (based on host memory pool)', action='store_true')
 
-def DoSync(dataDir, protocol, includePending, out):
+def DoSync(dataDir, protocol, includePending, secretsWatchList, secretsWallet, out):
 	dataDir = path.join(dataDir, protocol)
 	if not path.exists(dataDir):
 		try:
@@ -123,7 +124,7 @@ def DoSync(dataDir, protocol, includePending, out):
 			raise ExceptionReportedToUser("Failed to create directory " + dataDir + ":", e)
 	host = HostFromPrefsByProtocol.HostFromPrefsByProtocol(protocol=protocol, dataDir=dataDir)
 	wallet = Wallet.Wallet(path.join(dataDir, 'wallet.txt'))
-	state, ownedAccounts = SyncAndReturnStateAndOwnedAccounts(dataDir, protocol, wallet, host, includePending=includePending, out=out)
+	state, ownedAccounts = SyncAndReturnStateAndOwnedAccounts(dataDir, protocol, wallet, host, secretsWatchList=secretsWatchList, secretsWallet=secretsWallet, includePending=includePending, out=out)
 	return host, wallet, state, ownedAccounts
 
 def Main(commandLineArgs=sys.argv[1:], out=sys.stdout):
@@ -141,9 +142,11 @@ def Main(commandLineArgs=sys.argv[1:], out=sys.stdout):
 
 	if args.action == 'force_rescan':
 		dataDir = path.join(dataDir, args.host)
-		return Sync.ForceRescan(dataDir)
+		Sync.ForceRescan(dataDir)
+		return
 		
 	secretsWallet = Wallet.Wallet(path.join(dataDir, 'secretsWallet.txt'))
+	secretsWatchList = FileBackedList.FileBackedList(path.join(dataDir, 'secretsWatchList.txt'))
 
 	if args.action == 'get_state_info':
 		syncOut = io.StringIO()
@@ -153,7 +156,7 @@ def Main(commandLineArgs=sys.argv[1:], out=sys.stdout):
 	includePending = hasattr(args, 'includepending') and args.includepending
 
 	#startTime = time.clock()
-	host, wallet, state, ownedAccounts = DoSync(dataDir=dataDir, protocol=args.host, includePending=includePending, out=syncOut)
+	host, wallet, state, ownedAccounts = DoSync(dataDir=dataDir, protocol=args.host, includePending=includePending, secretsWatchList=secretsWatchList, secretsWallet=secretsWallet, out=syncOut)
 	#elapsedTime = time.clock() - startTime
 	
 	if args.action == 'get_state_info':
@@ -284,7 +287,7 @@ def Main(commandLineArgs=sys.argv[1:], out=sys.stdout):
 			altState = state
 		else:
 			print("(Syncing on target blockchain.)", file=out)
-			syncResults = DoSync(dataDir=dataDir, protocol=args.pendingPaymentHost, includePending=False, out=out)
+			syncResults = DoSync(dataDir=dataDir, protocol=args.pendingPaymentHost, secretsWatchList=secretsWatchList, secretsWallet=secretsWallet, includePending=False, out=out)
 			altState = syncResults[2]
 		if not int(args.pendingPaymentID) in altState._pendingPays:
 			raise ExceptionReportedToUser('No pending payment with the specified ID on the target blockchain.')
@@ -296,6 +299,7 @@ def Main(commandLineArgs=sys.argv[1:], out=sys.stdout):
 		}
 		transactionType = 'PayOnRevealSecret'
 		details['secretAddress'] = pay.secretHash
+		secretsWatchList.addEntry(pay.secretHash)
 		return CheckAndSend_Funded(transactionType, outputs, outputPubKeyHashes, details)
 
 	elif args.action == 'buy_offer':
