@@ -393,6 +393,8 @@ class Test(unittest.TestCase):
 
 	def test_bad_invocations(self):
 		host = InitHost()
+		#... following prints stuff before exit, TODO suppress this somehow, or catch and check?
+		#self.assertRaises(SystemExit, RunClient, host, ['made_up_action'])
 		self.assertRaisesRegexp(ExceptionReportedToUser, 'No pending exchange with the specified ID', RunClient, host, ['complete_sell', '--pendingExchangeID', '123'])
 		self.assertRaisesRegexp(ExceptionReportedToUser, 'The following path [(]specified for data directory parameter[)] is not a valid path to an existing directory', RunClient, host, ['--dataDir=dontMakeADirectoryCalledThis', 'get_balance'])
 
@@ -970,6 +972,17 @@ class Test(unittest.TestCase):
 		]
 		self.assertEqual(result, expectedResult)
 
+		# bad counter_pay invocations
+		args = ['counter_pay', '--amount', 5*e(7), '--toAddress', payTargetAddress, '--pendingPaymentHost', 'litecoin', '--pendingPaymentID', '1']
+		expectedError = "No pending payment with the specified ID on the target blockchain"
+		self.assertRaisesRegexp(ExceptionReportedToUser, expectedError, RunClient, host, args)
+		args = ['counter_pay', '--amount', 12*e(7), '--toAddress', payTargetAddress, '--pendingPaymentHost', 'litecoin', '--pendingPaymentID', '0']
+		expectedError = "Insufficient swapbill for transaction"
+		self.assertRaisesRegexp(ExceptionReportedToUser, expectedError, RunClient, host, args)
+		args = ['counter_pay', '--amount', 12*e(7), '--toAddress', payTargetAddress+'_not', '--pendingPaymentHost', 'litecoin', '--pendingPaymentID', '0']
+		expectedError = "An address argument is not valid"
+		self.assertRaisesRegexp(ExceptionReportedToUser, expectedError, RunClient, host, args)
+
 		# bad provide secret invocations
 		self.assertRaisesRegexp(ExceptionReportedToUser, "The secret for this pending payment is not known", RunClient, host, ['reveal_secret_for_pending_payment', '--pendingPaymentID', 0], owner='someoneElse')
 		self.assertRaisesRegexp(ExceptionReportedToUser, "No pending payment with the specified ID", RunClient, host, ['reveal_secret_for_pending_payment', '--pendingPaymentID', '1'])
@@ -986,3 +999,4 @@ class Test(unittest.TestCase):
 		self.assertDictEqual(result, {'balance': '1'})
 		output, result = RunClient(host, ['get_pending_payments'])
 		self.assertEqual(result, [])
+

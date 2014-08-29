@@ -60,7 +60,7 @@ sp.add_argument('--toAddress', required=True, help='pay to this address')
 sp.add_argument('--blocksUntilExpiry', type=int, default=8, help='if the transaction takes longer than this to go through then the transaction expires (in which case no payment is made and the full amount is returned as change)')
 sp.add_argument('--onRevealSecret', action='store_true', help='makes the payment dependant on a secret (generated for the transaction and stored locally)')
 
-sp = subparsers.add_parser('counterpayment', help='make a swapbill payment that depends on the same secret as another payment')
+sp = subparsers.add_parser('counter_pay', help='make a swapbill payment that depends on the same secret as another payment')
 sp.add_argument('--amount', required=True, help='amount of swapbill to be paid, as a decimal fraction (one satoshi is 0.00000001)')
 sp.add_argument('--toAddress', required=True, help='pay to this address')
 sp.add_argument('--blocksUntilExpiry', type=int, default=8, help='if the transaction takes longer than this to go through then the transaction expires (in which case no payment is made and the full amount is returned as change)')
@@ -278,17 +278,17 @@ def Main(commandLineArgs=sys.argv[1:], out=sys.stdout):
 			transactionType = 'Pay'
 		return CheckAndSend_Funded(transactionType, outputs, outputPubKeyHashes, details)
 
-	elif args.action == 'counterpayment':
+	elif args.action == 'counter_pay':
 		outputs = ('change', 'destination')
 		if args.host == args.pendingPaymentHost:
 			altState = state
 		else:
-			print("(Syncing on target blockchain.)")
+			print("(Syncing on target blockchain.)", out)
 			syncResults = DoSync(dataDir=dataDir, protocol=args.pendingPaymentHost, includePending=False, out=out)
 			altState = syncResults[2]
-		if not args.pendingPaymentID in altState._pendingPays:
+		if not int(args.pendingPaymentID) in altState._pendingPays:
 			raise ExceptionReportedToUser('No pending payment with the specified ID on the target blockchain.')
-		pay = altState._pendingPays[args.pendingPaymentID]
+		pay = altState._pendingPays[int(args.pendingPaymentID)]
 		outputPubKeyHashes = (wallet.addKeyPairAndReturnPubKeyHash(), CheckAndReturnPubKeyHash(args.toAddress))
 		details = {
 		'amount':Amounts.FromString(args.amount),
