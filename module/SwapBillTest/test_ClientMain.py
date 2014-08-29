@@ -60,7 +60,7 @@ def RunClient(host, args, hostBlockChain='litecoin', owner=None):
 	fullArgs = ['--dataDir', ownerDir, '--host', hostBlockChain] + convertedArgs
 	out = io.StringIO()
 	assert host.getBlockHashAtIndexOrNone(0) is not None
-	hook_HostFromPrefsByProtocol.currentHost = host
+	hook_HostFromPrefsByProtocol.currentHostByProtocol[hostBlockChain] = host
 	result = ClientMain.Main(overrideStartBlock=0, commandLineArgs=fullArgs, out=out)
 	return out.getvalue(), result
 
@@ -146,7 +146,7 @@ class Test(unittest.TestCase):
 			os.mkdir(ownerDir)
 		args = ['--dataDir', ownerDir, 'get_balance']
 		out = io.StringIO()
-		hook_HostFromPrefsByProtocol.currentHost = host
+		hook_HostFromPrefsByProtocol.currentHostByProtocol['bitcoin'] = host
 		self.assertRaisesRegexp(ExceptionReportedToUser, 'Block chain has not reached the swapbill start block', ClientMain.Main, commandLineArgs=args, out=out)
 
 	def test_minimum_balance(self):
