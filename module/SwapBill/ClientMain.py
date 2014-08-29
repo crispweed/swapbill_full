@@ -283,7 +283,7 @@ def Main(commandLineArgs=sys.argv[1:], out=sys.stdout):
 		if args.host == args.pendingPaymentHost:
 			altState = state
 		else:
-			print("(Syncing on target blockchain.)", out)
+			print("(Syncing on target blockchain.)", file=out)
 			syncResults = DoSync(dataDir=dataDir, protocol=args.pendingPaymentHost, includePending=False, out=out)
 			altState = syncResults[2]
 		if not int(args.pendingPaymentID) in altState._pendingPays:

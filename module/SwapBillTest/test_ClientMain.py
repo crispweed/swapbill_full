@@ -46,12 +46,15 @@ def InitHosts():
 	ResetDataDir()
 	hook_HostFromPrefsByProtocol.Reset()
 
-def GetHost(protocol='litecoin'):
-	return hook_HostFromPrefsByProtocol.currentHostByProtocol[protocol]
+def GetHost(blockChain='litecoin'):
+	return hook_HostFromPrefsByProtocol.currentHostByProtocol[blockChain]
+
+def AddUnspent(amount, blockChain='litecoin'):
+	GetHost(blockChain)._addUnspent(amount)
 
 defaultOwner = '0'
 
-def RunClient(args, hostBlockChain='litecoin', owner=None):
+def RunClient(args, blockChain='litecoin', owner=None):
 	if owner is None:
 		owner = defaultOwner
 	convertedArgs = []
@@ -63,28 +66,28 @@ def RunClient(args, hostBlockChain='litecoin', owner=None):
 	ownerDir = path.join(dataDirectory, owner)
 	if not path.exists(ownerDir):
 		os.mkdir(ownerDir)
-	fullArgs = ['--dataDir', ownerDir, '--host', hostBlockChain] + convertedArgs
+	fullArgs = ['--dataDir', ownerDir, '--host', blockChain] + convertedArgs
 	out = io.StringIO()
 	result = ClientMain.Main(commandLineArgs=fullArgs, out=out)
 	return out.getvalue(), result
 
-def GetStateInfo(hostBlockChain='litecoin', includePending=False, forceRescan=False, owner=None):
+def GetStateInfo(blockChain='litecoin', includePending=False, forceRescan=False, owner=None):
 	if owner is None:
 		owner = defaultOwner
 	args = []
 
 	if forceRescan:
-		RunClient(args=['force_rescan'], hostBlockChain=hostBlockChain, owner=owner)
+		RunClient(args=['force_rescan'], blockChain=blockChain, owner=owner)
 
 	args.append('get_state_info')
 	if includePending:
 		args.append('-i')
-	output, info = RunClient(args=args, hostBlockChain=hostBlockChain, owner=owner)
+	output, info = RunClient(args=args, blockChain=blockChain, owner=owner)
 	return info
 
 class Test(unittest.TestCase):
-	def assertBalancesEqual(self, expected, hostBlockChain='litecoin', includePending=False):
-		info = GetStateInfo(hostBlockChain=hostBlockChain, includePending=includePending)
+	def assertBalancesEqual(self, expected, blockChain='litecoin', includePending=False):
+		info = GetStateInfo(blockChain=blockChain, includePending=includePending)
 		self.assertSetEqual(set(info['balances'].values()), set(expected))
 
 	def test_start_block_not_reached(self):
@@ -1033,3 +1036,49 @@ class Test(unittest.TestCase):
 		output, result = RunClient(['get_pending_payments'])
 		self.assertEqual(result, [])
 
+	def test_cross_chain_exchange(self):
+		InitHosts()
+		litecoinStartBlock = GetHost(blockChain='litecoin')._startBlock
+		bitcoinStartBlock = GetHost(blockChain='bitcoin')._startBlock
+		AddUnspent(22*e(7), 'litecoin')
+		AddUnspent(12*e(7), 'bitcoin')
+		RunClient(['burn', '--amount', 2*e(8)], blockChain='litecoin', owner='a')
+		RunClient(['burn', '--amount', 1*e(8)], blockChain='bitcoin', owner='b')
+		# check balances (just because working with multiple blockchains is new at this point)
+		output, result = RunClient(['get_balance'], blockChain='litecoin', owner='a')
+		self.assertDictEqual(result, {'balance': '2'})
+		output, result = RunClient(['get_balance'], blockChain='bitcoin', owner='b')
+		self.assertDictEqual(result, {'balance': '1'})
+		# generate receive addresses
+		output, result = RunClient(['get_receive_address'], blockChain='litecoin', owner='b')
+		litecoinReceiveAddress = result['receive_address']
+		output, result = RunClient(['get_receive_address'], blockChain='bitcoin', owner='a')
+		bitcoinReceiveAddress = result['receive_address']
+		# put through pay, and then counter_pay with the same secret
+		RunClient(['pay', '--amount', 2*e(8), '--toAddress', litecoinReceiveAddress, '--onRevealSecret'], blockChain='litecoin', owner='a')
+		RunClient(['counter_pay', '--amount', 1*e(8), '--toAddress', bitcoinReceiveAddress, '--pendingPaymentHost', 'litecoin', '--pendingPaymentID', '0'], blockChain='bitcoin', owner='b')
+		# check these pending payment, as reported from the various different points of view
+		output, result = RunClient(['get_pending_payments'], blockChain='litecoin', owner='a')
+		expectedResult = [
+		    ('pending payment index', 0,
+		     {'paid by me': True, 'expires on block': str(litecoinStartBlock+10), 'amount': '2', 'paid to me': False})
+		]
+		self.assertEqual(result, expectedResult)
+		output, result = RunClient(['get_pending_payments'], blockChain='litecoin', owner='b')
+		expectedResult = [
+		    ('pending payment index', 0,
+		     {'paid by me': False, 'expires on block': str(litecoinStartBlock+10), 'amount': '2', 'paid to me': True})
+		]
+		self.assertEqual(result, expectedResult)
+		output, result = RunClient(['get_pending_payments'], blockChain='bitcoin', owner='b')
+		expectedResult = [
+		    ('pending payment index', 0,
+		     {'paid by me': True, 'expires on block': str(bitcoinStartBlock+10), 'amount': '1', 'paid to me': False})
+		]
+		self.assertEqual(result, expectedResult)
+		output, result = RunClient(['get_pending_payments'], blockChain='bitcoin', owner='a')
+		expectedResult = [
+		    ('pending payment index', 0,
+		     {'paid by me': False, 'expires on block': str(bitcoinStartBlock+10), 'amount': '1', 'paid to me': True})
+		]
+		self.assertEqual(result, expectedResult)
