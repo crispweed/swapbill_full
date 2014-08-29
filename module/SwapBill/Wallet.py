@@ -32,6 +32,18 @@ class Wallet(object):
 			f.write('\n')
 		return pubKeyHash
 
+	def addPublicKeySecret(self, publicKey):
+		# private key not known, in this case!
+		# TODO reorganise around this..
+		privateKey = KeyPair.GeneratePrivateKey() # doesn't correspond to public key!
+		privateKeyHex = binascii.hexlify(privateKey).decode('ascii')
+		pubKeyHash = KeyPair.PublicKeyToPubKeyHash(publicKey)
+		self._privateKeys.append(privateKey)
+		self._pubKeyHashes.append(pubKeyHash)
+		with open(self._fileName, mode='a') as f:
+			f.write(privateKeyHex)
+			f.write('\n')
+
 	def hasKeyPairForPubKeyHash(self, pubKeyHash):
 		return pubKeyHash in self._pubKeyHashes
 	def privateKeyForPubKeyHash(self, pubKeyHash):

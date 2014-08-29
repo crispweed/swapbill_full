@@ -1,8 +1,8 @@
 from __future__ import print_function
-import sys
+import sys, binascii
 from os import path
 from collections import deque
-from SwapBill import State, RawTransaction, TransactionEncoding, PickledCache, OwnedAccounts, ControlAddressPrefix
+from SwapBill import State, RawTransaction, TransactionEncoding, PickledCache, OwnedAccounts, ControlAddressPrefix, KeyPair
 from SwapBill.ExceptionReportedToUser import ExceptionReportedToUser
 from SwapBill.HardCodedProtocolConstraints import Constraints
 
@@ -23,6 +23,14 @@ def _processTransactions(state, wallet, ownedAccounts, secretsWatchList, secrets
 				print(reportPrefix + ': <invalid transaction>', file=out)
 				print(inputsReport, end="", file=out)
 			continue
+		if 'publicKeySecret' in transactionDetails:
+			secret = transactionDetails['publicKeySecret']
+			if secretsWatchList.hasEntry(secret):
+				secretHash = KeyPair.PublicKeyToPubKeyHash(secret)
+				if not secretsWallet.hasKeyPairForPubKeyHash(secretHash):
+					secretHashHex = binascii.hexlify(secretHash).decode('ascii')
+					print(reportPrefix + ': storing revealed secret with hash ' + secretHash, file=out)
+					secretsWallet.addPublicKeySecret(secret)
 		if inputsReport != '':
 			print(reportPrefix + ': ' + transactionType, file=out)
 			print(inputsReport, end="", file=out)
