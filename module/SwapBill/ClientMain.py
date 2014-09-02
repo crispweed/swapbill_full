@@ -299,7 +299,7 @@ def Main(commandLineArgs=sys.argv[1:], out=sys.stdout):
 		}
 		transactionType = 'PayOnRevealSecret'
 		details['secretAddress'] = pay.secretHash
-		secretsWatchList.addEntry(pay.secretHash)
+		secretsWatchList.append(pay.secretHash)
 		return CheckAndSend_Funded(transactionType, outputs, outputPubKeyHashes, details)
 
 	elif args.action == 'buy_offer':

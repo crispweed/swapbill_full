@@ -26,10 +26,10 @@ def _processTransactions(state, wallet, ownedAccounts, secretsWatchList, secrets
 		if 'publicKeySecret' in transactionDetails:
 			secret = transactionDetails['publicKeySecret']
 			secretHash = KeyPair.PublicKeyToPubKeyHash(secret)
-			if secretsWatchList.hasEntry(secretHash):
+			if secretHash in secretsWatchList:
 				if not secretsWallet.hasKeyPairForPubKeyHash(secretHash):
 					secretHashHex = binascii.hexlify(secretHash).decode('ascii')
-					print(reportPrefix + ': storing revealed secret with hash ' + secretHash, file=out)
+					print(reportPrefix + ': storing revealed secret with hash ' + secretHashHex, file=out)
 					secretsWallet.addPublicKeySecret(secret)
 		if inputsReport != '':
 			print(reportPrefix + ': ' + transactionType, file=out)

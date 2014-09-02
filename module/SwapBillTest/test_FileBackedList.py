@@ -11,15 +11,15 @@ class Test(unittest.TestCase):
 		l = FileBackedList.FileBackedList(file)
 		entries = [b'123', b'456']
 		for entry in entries:
-			l.addEntry(entry)
+			l.append(entry)
 		for entry in entries:
-			self.assertTrue(l.hasEntry(entry))
-		self.assertFalse(l.hasEntry(b'notAdded'))
+			self.assertTrue(entry in l)
+		self.assertFalse(b'notAdded' in l)
 		entries.append(b'78')
-		l.addEntry(b'78')
+		l.append(b'78')
 		l = FileBackedList.FileBackedList(file)
 		for entry in entries:
-			self.assertTrue(l.hasEntry(entry))
-		self.assertFalse(l.hasEntry(b'notAdded'))
+			self.assertTrue(entry in l)
+		self.assertFalse(b'notAdded' in l)
 		os.remove(file)
 
