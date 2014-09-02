@@ -14,9 +14,9 @@ else:
 from os import path
 try:
 	from SwapBill import RawTransaction, Address, TransactionFee, ParseConfig, RPC, Amounts
-	from SwapBill import TransactionEncoding, BuildHostedTransaction, Sync, Host, TransactionBuildLayer, Wallet
+	from SwapBill import TransactionEncoding, BuildHostedTransaction, Sync, Host, TransactionBuildLayer
 	from SwapBill import FormatTransactionForUserDisplay
-	from SwapBill import FileBackedList
+	from SwapBill import FileBackedList, Wallet, SecretsWallet
 	from SwapBill.Sync import SyncAndReturnStateAndOwnedAccounts
 	from SwapBill.ExceptionReportedToUser import ExceptionReportedToUser
 	from SwapBill.State import InsufficientFundsForTransaction, BadlyFormedTransaction, TransactionFailsAgainstCurrentState
@@ -145,7 +145,7 @@ def Main(commandLineArgs=sys.argv[1:], out=sys.stdout):
 		Sync.ForceRescan(dataDir)
 		return
 		
-	secretsWallet = Wallet.Wallet(path.join(dataDir, 'secretsWallet.txt'))
+	secretsWallet = SecretsWallet.SecretsWallet(path.join(dataDir, 'secretsWallet.txt'))
 	secretsWatchList = FileBackedList.FileBackedList(path.join(dataDir, 'secretsWatchList.txt'))
 
 	if args.action == 'get_state_info':
@@ -275,7 +275,7 @@ def Main(commandLineArgs=sys.argv[1:], out=sys.stdout):
 		}
 		if args.onRevealSecret:
 			transactionType = 'PayOnRevealSecret'
-			details['secretAddress'] = secretsWallet.addKeyPairAndReturnPubKeyHash()
+			details['secretAddress'] = secretsWallet.addPublicKeySecret()
 		else:
 			# standard pay transaction
 			transactionType = 'Pay'

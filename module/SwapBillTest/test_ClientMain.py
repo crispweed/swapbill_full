@@ -1096,6 +1096,5 @@ class Test(unittest.TestCase):
 		self.assertFalse('storing revealed secret with hash' in info['syncOutput'])
 
 		# and b can now complete the first payment
-		# TODO fix secrets wallet and make the following pass!
-		#RunClient(['reveal_secret_for_pending_payment', '--pendingPaymentID', '0'], blockChain='litecoin', owner='b')
+		RunClient(['reveal_secret_for_pending_payment', '--pendingPaymentID', '0'], blockChain='litecoin', owner='b')
 		

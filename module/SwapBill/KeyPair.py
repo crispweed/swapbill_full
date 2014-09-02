@@ -2,6 +2,8 @@ import ecdsa, hashlib, os
 
 def _generatePrivateKey():
 	return os.urandom(32)
+def _generateRandomPublicKeyForUseAsSecret():
+	return os.urandom(64)
 def _privateKeyToPublicKey(privateKey):
 	assert type(privateKey) is type(b'')
 	assert len(privateKey) == 32
@@ -19,6 +21,8 @@ def _publicKeyToPubKeyHash(publicKey):
 
 def GeneratePrivateKey():
 	return _generatePrivateKey()
+def GenerateRandomPublicKeyForUseAsSecret():
+	return _generateRandomPublicKeyForUseAsSecret()
 def PrivateKeyToPublicKey(privateKey):
 	return _privateKeyToPublicKey(privateKey)
 def PublicKeyToPubKeyHash(publicKey):
