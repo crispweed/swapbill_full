@@ -146,7 +146,8 @@ def Main(commandLineArgs=sys.argv[1:], out=sys.stdout):
 		Sync.ForceRescan(dataDir)
 		return
 		
-	secretsWallet = SecretsWallet.SecretsWallet(path.join(dataDir, 'secretsWallet.txt'))
+	secretsWalletSecrets = FileBackedList.FileBackedList(path.join(dataDir, 'secretsWallet.txt'))
+	secretsWallet = SecretsWallet.SecretsWallet(secretsWalletSecrets)
 	secretsWatchList = FileBackedList.FileBackedList(path.join(dataDir, 'secretsWatchList.txt'))
 
 	if args.action == 'get_state_info':
