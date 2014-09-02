@@ -24,7 +24,7 @@ class FileBackedList(object):
 	def __len__(self):
 		return len(self._l)
 	def __getitem__(self, key):
-		return __getitem__(self._l, key)
+		return self._l.__getitem__(key)
 	def __iter__(self):
 		#return __iter__(self._l)
 		for entry in self._l:

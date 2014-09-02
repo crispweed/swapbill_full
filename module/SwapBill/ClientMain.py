@@ -123,7 +123,8 @@ def DoSync(dataDir, protocol, includePending, secretsWatchList, secretsWallet, o
 		except Exception as e:
 			raise ExceptionReportedToUser("Failed to create directory " + dataDir + ":", e)
 	host = HostFromPrefsByProtocol.HostFromPrefsByProtocol(protocol=protocol, dataDir=dataDir)
-	wallet = Wallet.Wallet(path.join(dataDir, 'wallet.txt'))
+	walletPrivateKeys = FileBackedList.FileBackedList(path.join(dataDir, 'wallet.txt'))
+	wallet = Wallet.Wallet(walletPrivateKeys)
 	state, ownedAccounts = SyncAndReturnStateAndOwnedAccounts(dataDir, protocol, wallet, host, secretsWatchList=secretsWatchList, secretsWallet=secretsWallet, includePending=includePending, out=out)
 	return host, wallet, state, ownedAccounts
 
