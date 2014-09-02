@@ -1,6 +1,6 @@
 from __future__ import print_function
-import ecdsa, hashlib, os, binascii
-from SwapBill import KeyPair
+import ecdsa, hashlib, os
+from SwapBill import KeyPair, FileBackedList, Util
 
 class SecretsWallet(object):
 	def __init__(self, fileName):
@@ -12,7 +12,7 @@ class SecretsWallet(object):
 				lines = f.readlines()
 				for line in lines:
 					publicKeyHex = line.strip()
-					publicKey = binascii.unhexlify(publicKeyHex.encode('ascii'))
+					publicKey = Util.fromHex(publicKeyHex)
 					assert type(publicKey) is type(b'')
 					assert len(publicKey) == 64
 					self._publicKeys.append(publicKey)
@@ -22,7 +22,7 @@ class SecretsWallet(object):
 	def addPublicKeySecret(self, publicKey=None):
 		if publicKey is None:
 			publicKey = KeyPair.GenerateRandomPublicKeyForUseAsSecret()
-		publicKeyHex = binascii.hexlify(publicKey).decode('ascii')
+		publicKeyHex = Util.toHex(publicKey)
 		pubKeyHash = KeyPair.PublicKeyToPubKeyHash(publicKey)
 		self._publicKeys.append(publicKey)
 		self._pubKeyHashes.append(pubKeyHash)

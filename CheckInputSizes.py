@@ -1,5 +1,5 @@
 from __future__ import print_function
-import sys, argparse, binascii, traceback, struct
+import sys, argparse, traceback, struct
 PY3 = sys.version_info.major > 2
 from os import path
 scriptPath = path.dirname(path.abspath(__file__))

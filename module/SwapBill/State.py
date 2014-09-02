@@ -1,5 +1,4 @@
 from __future__ import print_function
-import binascii
 from SwapBill import TradeOfferHeap, TradeOffer, Balances, Amounts, KeyPair
 from SwapBill.HardCodedProtocolConstraints import Constraints
 from SwapBill.Amounts import e

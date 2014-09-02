@@ -1,5 +1,6 @@
 from __future__ import print_function
-import ecdsa, hashlib, os, binascii
+import ecdsa, hashlib, os
+from SwapBill import Util
 
 class FileBackedList(object):
 	def __init__(self, fileName):
@@ -11,13 +12,13 @@ class FileBackedList(object):
 				for line in lines:
 					assert line[-1:] == '\n'
 					lineHex = line[:-1]
-					byteBuffer = binascii.unhexlify(lineHex.encode('ascii'))
+					byteBuffer = Util.fromHex(lineHex)
 					self._l.append(byteBuffer)
 
 	def append(self, byteBuffer):
 		self._l.append(byteBuffer)
 		with open(self._fileName, mode='a') as f:
-			f.write(binascii.hexlify(byteBuffer).decode('ascii'))
+			f.write(Util.toHex(byteBuffer))
 			f.write('\n')
 
 	def __len__(self):

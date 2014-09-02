@@ -1,13 +1,12 @@
-import binascii
-from SwapBill import RawTransaction, TransactionFee, KeyPair
+from SwapBill import RawTransaction, TransactionFee, KeyPair, Util
 from SwapBill import Host, Address # these just for exceptions, at time of writing
 from SwapBill.ExceptionReportedToUser import ExceptionReportedToUser
 
 def MakeTXID(i):
 	assert i < 65536
 	txid = '00' * 30 + '{:04X}'.format(i)
-	# make case consistent with hexlify!
-	txid = binascii.hexlify(binascii.unhexlify(txid.encode('ascii'))).decode('ascii')
+	# make case consistent with toHex!
+	txid = Util.toHex(Util.fromHex(txid))
 	return txid
 
 def MatchPubKeyHashAndRemovePrivateKey(pubKeyHash, privateKeys):
@@ -53,7 +52,7 @@ class MockHost(object):
 		self._unspent.append(toAdd)
 
 	def _addTransaction_Internal(self, txid, txHex):
-		self._memPool.append((txid, RawTransaction.FromHex(txHex)))
+		self._memPool.append((txid, Util.fromHex(txHex)))
 	def _addThirdPartyTransaction(self, txHex):
 		self._nextTXID += 1
 		txid = MakeTXID(self._nextTXID)
@@ -144,7 +143,7 @@ class MockHost(object):
 		signedSize = unsignedSize * 30 // 25 # arbitrary increase here to simulate an increase in size when signing transactions
 		if signedSize > maximumSignedSize:
 			raise Host.MaximumSignedSizeExceeded()
-		unsignedTransactionBytes = RawTransaction.FromHex(unsignedTransactionHex)
+		unsignedTransactionBytes = Util.fromHex(unsignedTransactionHex)
 		decoded, scriptPubKeys = RawTransaction.Decode(unsignedTransactionBytes)
 		sumOfInputs = 0
 		pubKeyHashesToBeSigned = []

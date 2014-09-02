@@ -1,4 +1,4 @@
-import struct
+import struct, binascii
 
 def intFromBytes(data):
 	multiplier = 1
@@ -9,3 +9,14 @@ def intFromBytes(data):
 		result += byteValue * multiplier
 		multiplier = multiplier << 8
 	return result
+
+def toHex(data):
+	assert type(data) is type(b'')
+	return binascii.hexlify(data).decode('ascii')
+
+def fromHex(s):
+	try:	
+		return binascii.unhexlify(s.encode('ascii'))
+	except binascii.Error:
+		raise TypeError
+	

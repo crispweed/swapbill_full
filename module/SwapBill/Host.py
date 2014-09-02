@@ -3,7 +3,7 @@ import os, sys
 if sys.version > '3':
 	long = int
 from os import path
-from SwapBill import RawTransaction, Address, Amounts, RPC
+from SwapBill import RawTransaction, Address, Amounts, RPC, Util
 from SwapBill.ExceptionReportedToUser import ExceptionReportedToUser
 
 class SigningFailed(ExceptionReportedToUser):
@@ -94,7 +94,7 @@ class Host(object):
 		return self._cachedBlock
 	def _getBlockData_Cached(self, blockHash):
 		if self._cachedBlockDataHash != blockHash:
-			self._cachedBlockData = RawTransaction.FromHex(self._rpcHost.call('getblock', blockHash, False))
+			self._cachedBlockData = Util.fromHex(self._rpcHost.call('getblock', blockHash, False))
 			self._cachedBlockDataHash = blockHash
 		return self._cachedBlockData
 
@@ -115,7 +115,7 @@ class Host(object):
 		result = []
 		for txHash in mempool:
 			txHex = self._rpcHost.call('getrawtransaction', txHash)
-			result.append((txHash, RawTransaction.FromHex(txHex)))
+			result.append((txHash, Util.fromHex(txHex)))
 		return result
 
 # convenience

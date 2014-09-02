@@ -5,7 +5,7 @@ thisVersion = str(sys.version_info.major) + '.' + str(sys.version_info.minor)
 if not thisVersion in supportedVersions:
 	print('This version of python (' + thisVersion + ') is not supported. Supported versions are:', supportedVersions)
 	exit()
-import argparse, binascii, traceback, struct, time, os
+import argparse, traceback, struct, time, os
 PY3 = sys.version_info.major > 2
 if PY3:
 	import io
@@ -13,7 +13,7 @@ else:
 	import StringIO as io
 from os import path
 try:
-	from SwapBill import RawTransaction, Address, TransactionFee, ParseConfig, RPC, Amounts
+	from SwapBill import RawTransaction, Address, TransactionFee, ParseConfig, RPC, Amounts, Util
 	from SwapBill import TransactionEncoding, BuildHostedTransaction, Sync, Host, TransactionBuildLayer
 	from SwapBill import FormatTransactionForUserDisplay
 	from SwapBill import FileBackedList, Wallet, SecretsWallet
@@ -252,8 +252,8 @@ def Main(commandLineArgs=sys.argv[1:], out=sys.stdout):
 
 	def CheckedConvertFromHex(hexString):
 		try:
-			return binascii.unhexlify(hexString.encode('ascii'))
-		except (binascii.Error, TypeError):
+			return Util.fromHex(hexString)
+		except TypeError:
 			raise ExceptionReportedToUser("Bad hex string '" + hexString + "'")
 
 	if args.action == 'burn':
