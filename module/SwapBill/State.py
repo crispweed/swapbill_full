@@ -25,13 +25,15 @@ class PendingPay(object):
 	pass
 
 class State(object):
-	def __init__(self, startBlockIndex, startBlockHash, minimumHostExchangeAmount=1000000, blocksForExchangeCompletion=50):
+	def __init__(self, startBlockIndex, startBlockHash, minimumHostExchangeAmount=1000000, blocksForExchangeCompletion=50, seedAccount=None, seedAmount=0):
 		## state is initialised at the start of the block with startBlockIndex
 		self._startBlockHash = startBlockHash
 		self._minimumHostExchangeAmount = minimumHostExchangeAmount
 		self._blocksForExchangeCompletion = blocksForExchangeCompletion
 		self._currentBlockIndex = startBlockIndex
 		self._balances = Balances.Balances()
+		if seedAccount is not None:
+			self._balances.add(seedAccount, seedAmount)
 		self._totalCreated = 0
 		self._totalForwarded = 0
 		self._ltcBuys = TradeOfferHeap.Heap(startBlockIndex, False) # lower exchange rate is better offer

@@ -2,7 +2,7 @@ from __future__ import print_function
 import sys, binascii
 from os import path
 from collections import deque
-from SwapBill import State, RawTransaction, TransactionEncoding, PickledCache, OwnedAccounts, ControlAddressPrefix, KeyPair
+from SwapBill import State, RawTransaction, TransactionEncoding, PickledCache, OwnedAccounts, ControlAddressPrefix, KeyPair, SeedAccounts
 from SwapBill.ExceptionReportedToUser import ExceptionReportedToUser
 from SwapBill.HardCodedProtocolConstraints import Constraints
 
@@ -90,7 +90,8 @@ def SyncAndReturnStateAndOwnedAccounts(cacheDirectory, protocol, wallet, host, s
 			raise ExceptionReportedToUser('Block chain has not reached the swapbill start block (' + str(startBlock) + ').')
 		if blockHash != startBlockHash:
 			raise ExceptionReportedToUser('Block hash for swapbill start block does not match.')
-		state = State.State(blockIndex, blockHash, minimumHostExchangeAmount=params['minimumHostExchangeAmount'], blocksForExchangeCompletion=params['blocksForExchangeCompletion'])
+		seedAccount,seedAmount = SeedAccounts.GetSeedAccountInfo(protocol)
+		state = State.State(blockIndex, blockHash, minimumHostExchangeAmount=params['minimumHostExchangeAmount'], blocksForExchangeCompletion=params['blocksForExchangeCompletion'], seedAccount=seedAccount, seedAmount=seedAmount)
 		ownedAccounts = OwnedAccounts.OwnedAccounts()
 
 	print('State update starting from block', blockIndex, file=out)

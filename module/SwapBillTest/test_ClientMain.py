@@ -8,7 +8,7 @@ else:
 from os import path
 from SwapBill import ClientMain, Amounts, TransactionFee
 from SwapBillTest.MockHost import MockHost
-from SwapBillTest import hook_HostFromPrefsByProtocol
+from SwapBillTest import hook_HostFromPrefsByProtocol, hook_SeedAccounts
 from SwapBill.Amounts import e
 from SwapBill.BuildHostedTransaction import InsufficientFunds
 from SwapBill.ClientMain import TransactionNotSuccessfulAgainstCurrentState
