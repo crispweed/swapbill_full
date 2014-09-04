@@ -3,8 +3,8 @@ class Constraints(object):
 	depositDivisor = 16
 	paramsByHost = {
 	    'bitcoin':{
-	        'startBlock':278806,
-	        'startBlockHash':'0000000041c3b90e37151337a4c24c122ffa4293741fe0091829a56bcbcb25ec',
+	        'startBlock':278805,
+	        'startBlockHash':'00000000bb5d8d67e1fa3935f1c8015def141008bc8b0c1aa35f4c6eabe42f6c',
 	        'minimumHostExchangeAmount':10000,
 	        'blocksForExchangeCompletion':15
 	    },
