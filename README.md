@@ -39,7 +39,9 @@ Create a litecoin.conf file in this default location (if not already present), a
 (Note that starting from preview version 0.3 a full transaction index, and therefore the txindex option, is no longer required. Change the password!)
 
 To start the server you can then either launch litecoinQT (the graphical client) normally, or run litecoind from the command line.
-If running litecoind, the -printtoconsole option can be used to get console output about what the server is doing.
+
+A good setup for this on Linux can be to tell litecoind to run in the background (e.g. by adding daemon=1 to the conf file),
+and use 'tail -f' to watch the end of the generated log file ('tail -f ~/.litecoin/testnet3/debug.log').
 
 You can test the RPC server by making RPC queries from the command line, e.g.:
 
