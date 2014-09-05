@@ -91,10 +91,10 @@ def SyncAndReturnStateAndOwnedAccounts(cacheDirectory, protocol, wallet, host, s
 		if blockHash != startBlockHash:
 			raise ExceptionReportedToUser('Block hash for swapbill start block does not match.')
 		ownedAccounts = OwnedAccounts.OwnedAccounts()
-		seedAccount,seedAmount,seedPubKeyHash,seedAccountScriptPubKey = SeedAccounts.GetSeedAccountInfo(protocol)
+		seedAccount,seedOutputAmount,seedPubKeyHash,seedAccountScriptPubKey,seedAmount = SeedAccounts.GetSeedAccountInfo(protocol)
 		if wallet.hasKeyPairForPubKeyHash(seedPubKeyHash):
 			seedAccountPrivateKey = wallet.privateKeyForPubKeyHash(seedPubKeyHash)
-			ownedAccounts.addSeedOutput(seedAccount, seedAmount, seedAccountPrivateKey, seedAccountScriptPubKey)
+			ownedAccounts.addSeedOutput(seedAccount, seedOutputAmount, seedAccountPrivateKey, seedAccountScriptPubKey)
 		state = State.State(blockIndex, blockHash, minimumHostExchangeAmount=params['minimumHostExchangeAmount'], blocksForExchangeCompletion=params['blocksForExchangeCompletion'], seedAccount=seedAccount, seedAmount=seedAmount)
 
 	print('State update starting from block', blockIndex, file=out)
