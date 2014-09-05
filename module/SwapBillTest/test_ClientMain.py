@@ -1004,7 +1004,15 @@ class Test(unittest.TestCase):
 		output, result = RunClient(['get_pending_payments'])
 		expectedResult = [
 		    ('pending payment index', 0,
-		     {'paid by me': True, 'expires on block': str(host._startBlock+10), 'amount': '1', 'paid to me': False})
+		     {
+		         'paid by me': True,
+		         'expires on block': host._startBlock+10,
+		         'confirmations': 1,
+		         'blocks until expiry': 8,
+		         'amount': '1',
+		         'paid to me':False,
+		         'I hold secret':True
+		     })
 		]
 		self.assertEqual(result, expectedResult)
 
@@ -1062,25 +1070,45 @@ class Test(unittest.TestCase):
 		output, result = RunClient(['get_pending_payments'], blockChain='litecoin', owner='a')
 		expectedResult = [
 		    ('pending payment index', 0,
-		     {'paid by me': True, 'expires on block': str(litecoinStartBlock+10), 'amount': '2', 'paid to me': False})
+		     {
+		         'paid by me': True, 'expires on block': litecoinStartBlock+10,
+		         'amount': '2', 'paid to me': False,
+		         'I hold secret': True,
+		         'confirmations': 1,
+		         'blocks until expiry': 8
+		    })
 		]
 		self.assertEqual(result, expectedResult)
 		output, result = RunClient(['get_pending_payments'], blockChain='litecoin', owner='b')
 		expectedResult = [
 		    ('pending payment index', 0,
-		     {'paid by me': False, 'expires on block': str(litecoinStartBlock+10), 'amount': '2', 'paid to me': True})
+		     {
+		         'paid by me': False, 'expires on block': litecoinStartBlock+10, 'amount': '2', 'paid to me': True,
+		         'confirmations': 1,
+		         'blocks until expiry': 8
+		     })
 		]
 		self.assertEqual(result, expectedResult)
 		output, result = RunClient(['get_pending_payments'], blockChain='bitcoin', owner='b')
 		expectedResult = [
 		    ('pending payment index', 0,
-		     {'paid by me': True, 'expires on block': str(bitcoinStartBlock+10), 'amount': '1', 'paid to me': False})
+		     {
+		         'paid by me': True, 'expires on block': bitcoinStartBlock+10, 'amount': '1', 'paid to me': False,
+		         'confirmations': 1,
+		         'blocks until expiry': 8
+		     })
 		]
 		self.assertEqual(result, expectedResult)
 		output, result = RunClient(['get_pending_payments'], blockChain='bitcoin', owner='a')
 		expectedResult = [
 		    ('pending payment index', 0,
-		     {'paid by me': False, 'expires on block': str(bitcoinStartBlock+10), 'amount': '1', 'paid to me': True})
+		     {
+		         'paid by me': False, 'expires on block': bitcoinStartBlock+10,
+		         'amount': '1', 'paid to me': True,
+		         'I hold secret': True,
+		         'confirmations': 1,
+		         'blocks until expiry': 8
+		     })
 		]
 		self.assertEqual(result, expectedResult)
 

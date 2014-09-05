@@ -464,9 +464,12 @@ def Main(commandLineArgs=sys.argv[1:], out=sys.stdout):
 			pay = state._pendingPays[key]
 			d['paid by me'] = pay.refundAccount in ownedAccounts.tradeOfferChangeCounts
 			d['paid to me'] = pay.destinationAccount in ownedAccounts.tradeOfferChangeCounts
-			#d['secret hash'] = pay.secretHash ## TODO format for user (as hex public key hash?)
 			d['amount'] = Amounts.ToString(pay.amount)
-			d['expires on block'] = str(pay.expiry)
+			d['expires on block'] = pay.expiry
+			d['blocks until expiry'] = pay.expiry - state._currentBlockIndex + 1
+			d['confirmations'] = state._currentBlockIndex - pay.confirmedOnBlock
+			if secretsWallet.hasKeyPairForPubKeyHash(pay.secretHash):
+				d['I hold secret'] = True
 			result.append(('pending payment index', key, d))
 		return result
 

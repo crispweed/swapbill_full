@@ -1177,7 +1177,8 @@ class Test(unittest.TestCase):
 		    'secretHash': secretHash,
 		    'destinationAccount': destination,
 		    'expiry': 150,
-		    'refundAccount': change
+		    'refundAccount': change,
+		    'confirmedOnBlock': 100
 		}
 		self.assertDictEqual(state._pendingPays[0].__dict__, expectedDetails)
 		# advance to just before expiry
@@ -1200,6 +1201,7 @@ class Test(unittest.TestCase):
 		expectedDetails['expiry'] = 200
 		expectedDetails['destinationAccount'] = destination
 		expectedDetails['refundAccount'] = change
+		expectedDetails['confirmedOnBlock'] = 151
 		self.assertDictEqual(state._pendingPays[1].__dict__, expectedDetails)
 		# some proof of receipt transaction fail cases
 		proofDetails = {

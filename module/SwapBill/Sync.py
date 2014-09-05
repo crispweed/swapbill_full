@@ -6,8 +6,8 @@ from SwapBill import State, RawTransaction, TransactionEncoding, PickledCache, O
 from SwapBill.ExceptionReportedToUser import ExceptionReportedToUser
 from SwapBill.HardCodedProtocolConstraints import Constraints
 
-stateVersion = 1
-ownedAccountsVersion = 0.2
+stateVersion = 2
+ownedAccountsVersion = 1
 
 def _processTransactions(state, wallet, ownedAccounts, secretsWatchList, secretsWallet, transactions, applyToState, reportPrefix, out):
 	for txID, hostTXBytes in transactions:
