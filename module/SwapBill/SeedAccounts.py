@@ -2,7 +2,17 @@ from SwapBill import Util
 
 def GetSeedAccountInfo(protocol):
 	infoByProtocol = {
-        'bitcoin':(('75ed9fe49c67de7cefa5b5f87b6ddf09be75cad4be992640c5118789cec4c422',1),20000000000,Util.fromHex('4df3b872247f30b65c92c35a00573f8993ceb25f'), '76a9141060f72f86f6f3bb7a91b2064bc5671adcc0fcd988ac'),
-        'litecoin':(('f92b02286e7b1c1e776cea0a67f48cec0f89243ddd6c4cfbbd43feefc6e73f94',1),2000000000000,Util.fromHex('1060f72f86f6f3bb7a91b2064bc5671adcc0fcd9'), '76a9144df3b872247f30b65c92c35a00573f8993ceb25f88ac'),
+        'bitcoin':(
+	        ('22b88bd6e123d2207ebcee1d2134ecfafee4c84858eecd80bc0c2ba5bb2949f9',0),
+	        20000000000,
+	        Util.fromHex('a7e1b5ee524d075ec433a7d1329a209d723ba199'),
+	        '76a914a7e1b5ee524d075ec433a7d1329a209d723ba19988ac'
+	        ),
+        'litecoin':(
+	        ('ca85714ebe76bd64e7c2b1284e8f3ef91e2db90a1447cb278ac2900c9143debf',0),
+	        2000000000000,
+	        Util.fromHex('391f828e816ede9281ef45b9f967b24097263503'), 
+	        '76a914391f828e816ede9281ef45b9f967b2409726350388ac'
+	        ),
     }
 	return infoByProtocol[protocol]

@@ -17,6 +17,7 @@ try:
 	from SwapBill import TransactionEncoding, BuildHostedTransaction, Sync, Host, TransactionBuildLayer
 	from SwapBill import FormatTransactionForUserDisplay
 	from SwapBill import FileBackedList, Wallet, SecretsWallet
+	from SwapBill import HostTransaction
 	from SwapBill.Sync import SyncAndReturnStateAndOwnedAccounts
 	from SwapBill.ExceptionReportedToUser import ExceptionReportedToUser
 	from SwapBill.State import InsufficientFundsForTransaction, BadlyFormedTransaction, TransactionFailsAgainstCurrentState
@@ -91,6 +92,8 @@ sp.add_argument('--backingSwapBill', required=True, help='amount of swapbill to 
 sp.add_argument('--transactionsBacked', required=True, help='the number of transactions you want to back, which then implies a maximum backing amount per transaction')
 sp.add_argument('--blocksUntilExpiry', type=int, default=200, help='number of blocks for which the backing amount should remain committed')
 sp.add_argument('--commission', required=True, help='the rate of commission for backed transactions, as a decimal fraction (must be greater than 0.0 and less than 1.0)')
+
+subparsers.add_parser('make_seed_output', help='make a transaction for use as a seed output')
 
 subparsers.add_parser('get_receive_address', help='generate a new key pair for the swapbill wallet and display the corresponding public payment address')
 
@@ -193,7 +196,6 @@ def Main(commandLineArgs=sys.argv[1:], out=sys.stdout):
 				transactionFee += TransactionFee.feeStep
 
 	def CheckAndSend_Common(transactionType, sourceAccounts, outputs, outputPubKeys, details):
-		change = host.getManagedAddress()
 		print('attempting to send ' + FormatTransactionForUserDisplay.Format(host, transactionType, outputs, outputPubKeys, details), file=out)
 		baseTX = TransactionEncoding.FromStateTransaction(transactionType, sourceAccounts, outputs, outputPubKeys, details)
 		backingUnspent = transactionBuildLayer.getUnspent()
@@ -380,6 +382,15 @@ def Main(commandLineArgs=sys.argv[1:], out=sys.stdout):
 		    'maxBlock':state._currentBlockIndex + args.blocksUntilExpiry
 		}
 		return CheckAndSend_Funded(transactionType, outputs, outputPubKeyHashes, details)
+
+	elif args.action == 'make_seed_output':
+		tx = HostTransaction.InMemoryTransaction()
+		pubKeyHash = wallet.addKeyPairAndReturnPubKeyHash()
+		tx.addOutput(pubKeyHash, 0)
+		transactionBuildLayer.startTransactionConstruction()
+		backingUnspent = transactionBuildLayer.getUnspent()		
+		txID = SetFeeAndSend(tx, 0, backingUnspent)
+		return {'transaction id':txID, 'pubKeyHash':Util.toHex(pubKeyHash)}
 
 	elif args.action == 'get_receive_address':
 		pubKeyHash = wallet.addKeyPairAndReturnPubKeyHash()

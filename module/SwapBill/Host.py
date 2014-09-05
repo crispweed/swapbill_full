@@ -59,6 +59,8 @@ class Host(object):
 				privateKeys_WIF.append(Address.PrivateKeyToWIF(privateKey, self._privateKeyAddressVersion))
 			signingResult = self._rpcHost.call('signrawtransaction', signingResult['hex'], None, privateKeys_WIF)
 		if signingResult['complete'] != True:
+			#print(unsignedTransactionHex)
+			#print(privateKeys)
 			raise SigningFailed("RPC call to signrawtransaction did not set 'complete' to True")
 		signedHex = signingResult['hex']
 		byteSize = len(signedHex) / 2
