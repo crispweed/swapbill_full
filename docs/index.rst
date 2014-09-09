@@ -5,14 +5,22 @@ SwapBill documentation root
 Explanation:
 
 .. toctree::
-    :glob:
+    :maxdepth: 1
 
-    explanation/*
+    introduction
+    requirements
+    terminology
+    hostsetup
+    runningtheclient
+    walletorganisation
+    currencysupply
 
 Worked examples:
 
 .. toctree::
     :maxdepth: 1
-    :glob:
 
-    workedexample/*
+    example/burn
+    example/pay
+    example/trading
+    example/backedsell
