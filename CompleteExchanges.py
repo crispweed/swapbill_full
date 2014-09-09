@@ -35,7 +35,7 @@ while True:
 		continue
 	# go ahead and complete
 	try:
-		result = ClientMain.Main(commandLineArgs=['complete_ltc_sell', '--pendingExchangeID', str(exchangeID)], startBlockIndex=startBlockIndex, startBlockHash=startBlockHash)
+		result = ClientMain.Main(commandLineArgs=['complete_sell', '--pendingExchangeID', str(exchangeID)], startBlockIndex=startBlockIndex, startBlockHash=startBlockHash)
 	except ExceptionReportedToUser as e:
-		print("complete_ltc_sell failed:", e)
+		print("complete_sell failed:", e)
 	time.sleep(40)
