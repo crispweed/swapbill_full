@@ -450,10 +450,14 @@ def Main(commandLineArgs=sys.argv[1:], out=sys.stdout):
 			backer = state._ltcSellBackers[key]
 			d['I am backer'] = backer.refundAccount in ownedAccounts.tradeOfferChangeCounts
 			d['backing amount'] = Amounts.ToString(backer.backingAmount)
-			d['maximum per transaction'] = Amounts.ToString(backer.transactionMax)
+			d['backing amount per transaction'] = Amounts.ToString(backer.transactionMax)
 			d['expires on block'] = backer.expiry
 			d['blocks until expiry'] = backer.expiry - state._currentBlockIndex + 1
 			d['commission'] = Amounts.PercentToString(backer.commission)
+			maximumExchange = backer.transactionMax - Constraints.minimumSwapBillBalance
+			maximumExchange *= Constraints.depositDivisor
+			maximumExchange //= (Constraints.depositDivisor + 1)
+			d['maximum exchange'] = Amounts.ToString(maximumExchange)
 			result.append(('host coin sell backer index', key, d))
 		return result
 

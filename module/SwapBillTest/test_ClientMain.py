@@ -8,7 +8,7 @@ else:
 from os import path
 from SwapBill import ClientMain, Amounts, TransactionFee
 from SwapBillTest.MockHost import MockHost
-from SwapBillTest import hook_HostFromPrefsByProtocol, hook_SeedAccounts
+from SwapBillTest import hook_HostFromPrefsByProtocol, hook_SeedAccounts, hook_KeyPair
 from SwapBill.Amounts import e
 from SwapBill.BuildHostedTransaction import InsufficientFunds
 from SwapBill.ClientMain import TransactionNotSuccessfulAgainstCurrentState
@@ -783,7 +783,8 @@ class Test(unittest.TestCase):
 		'backing amount': Amounts.ToString(1*e(12)), 'I am backer': True,
 		'expires on block': startBlock+22,
 		'blocks until expiry': 20,
-		'maximum per transaction': Amounts.ToString(1*e(9))
+		'backing amount per transaction': '10',
+		'maximum exchange': '9.31764705'
 		}
 		self.assertListEqual(result, [('host coin sell backer index', 0, expectedDetails)])
 		self.assertEqual(host._nextBlock, startBlock+3)
@@ -815,7 +816,8 @@ class Test(unittest.TestCase):
 		'backing amount': Amounts.ToString(expectedBackingAmount), 'I am backer': True,
 		'expires on block': startBlock+22,
 		'blocks until expiry': 20,
-		'maximum per transaction': Amounts.ToString(1*e(9))
+		'backing amount per transaction': '10',
+		'maximum exchange': '9.31764705'
 		}
 		self.assertListEqual(result, [('host coin sell backer index', 0, expectedBackerDetails)])
 		RunClient(['burn', '--amount', 3*e(8)], owner='buyer')
@@ -855,6 +857,49 @@ class Test(unittest.TestCase):
 		         'I am buyer (and waiting for payment)': False,
 		         'swap bill paid by buyer': Amounts.ToString(300000000),
 		         'deposit paid by seller': Amounts.ToString(18750000)
+		     }
+		)]
+		self.assertEqual(result, expectedResult)
+
+	def test_backed_sell_max_exchange(self):
+		InitHosts()
+		host = GetHost()
+		startBlock = host._startBlock
+		ownerList = ('backer', 'buyer', 'seller')
+		host._addUnspent(2*e(12))
+		RunClient(['burn', '--amount', 1*e(12)], owner='backer')
+		RunClient(['back_sells', '--backingSwapBill', 1*e(12), '--transactionsBacked', '1000', '--blocksUntilExpiry', '20', '--commission', '0.0625'], owner='backer')
+		output, info = RunClient(['get_balance'], owner='backer')
+		self.assertDictEqual(info, {'balance': '0'})
+		self.assertEqual(host._nextBlock, startBlock+3)
+		output, result = RunClient(['get_sell_backers'], owner='backer')
+		expectedBackingAmount = 1*e(12)
+		expectedBackerDetails = {
+		'commission': '0.0625',
+		'backing amount': Amounts.ToString(expectedBackingAmount), 'I am backer': True,
+		'expires on block': startBlock+22,
+		'blocks until expiry': 20,
+		'backing amount per transaction': '10',
+		'maximum exchange': '9.31764705'
+		}
+		self.assertListEqual(result, [('host coin sell backer index', 0, expectedBackerDetails)])
+		RunClient(['burn', '--amount', '8'], owner='buyer')
+		RunClient(['buy_offer', '--swapBillOffered', '8', '--exchangeRate', '0.5', '--blocksUntilExpiry', '100'], owner='buyer')
+		exception = ClientMain.TransactionNotSuccessfulAgainstCurrentState
+		expectedMessage = 'backing amount required for this transaction is larger than the maximum allowed per transaction by the backer'
+		self.assertRaisesRegexp(exception, expectedMessage, RunClient, ['sell_offer', '--hostCoinOffered', '4.65882353', '--exchangeRate', '0.5', '--backerID', 0], owner='seller')
+		RunClient(['sell_offer', '--hostCoinOffered', '4.65882352', '--exchangeRate', '0.5', '--backerID', 0], owner='seller')
+		output, result = RunClient(['get_pending_exchanges'], owner='backer')
+		expectedResult = [('pending exchange index', 0,
+		     {
+		         'expires on block': startBlock+55,
+		         'blocks until expiry': 50,
+		         'outstanding host coin payment amount': '4',
+		         'I am seller (and need to complete)': True,
+		         'backer id': 0,
+		         'I am buyer (and waiting for payment)': False,
+		         'swap bill paid by buyer': '8',
+		         'deposit paid by seller': '0.5'
 		     }
 		)]
 		self.assertEqual(result, expectedResult)
@@ -932,7 +977,13 @@ class Test(unittest.TestCase):
 		self.assertDictEqual(result, {'balance': '0'})
 		ownerBalances = GetOwnerBalances(host, ownerList, info['balances'])
 		self.assertEqual(ownerBalances, {'seller':6*e(9)})
-		expectedBackerDetails = {'commission': '0.1', 'blocks until expiry': 99, 'I am backer': True, 'backing amount': Amounts.ToString(1*e(12)-6*e(9)-deposit), 'expires on block': startBlock+105, 'maximum per transaction': Amounts.ToString(1*e(11))}
+		expectedBackerDetails = {
+		    'commission': '0.1', 'blocks until expiry': 99, 'I am backer': True,
+		    'expires on block': startBlock+105,
+		    'backing amount': Amounts.ToString(1*e(12)-6*e(9)-deposit),
+		    'backing amount per transaction': Amounts.ToString(1*e(11)),
+		    'maximum exchange': '941.08235294'
+		}
 		output, result = RunClient(['get_sell_backers'], owner='backer')
 		self.assertListEqual(result, [('host coin sell backer index', 0, expectedBackerDetails)])
 		RunClient(['complete_sell', '--pendingExchangeID', '0'], owner='backer')

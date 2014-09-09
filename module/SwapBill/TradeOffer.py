@@ -66,6 +66,7 @@ class BuyOffer(object):
 class SellOffer(object):
 	def __init__(self, minimumHostExchangeAmount, swapBillDeposit, ltcOffered, rate):
 		if ltcOffered < MinimumSellOfferWithRate(minimumHostExchangeAmount, rate):
+			#print(MinimumSellOfferWithRate(minimumHostExchangeAmount, rate))
 			raise OfferIsBelowMinimumExchange()
 		self._swapBillDeposit = swapBillDeposit
 		self._ltcOffered = ltcOffered

@@ -302,7 +302,9 @@ class State(object):
 		if not backerIndex in self._ltcSellBackers:
 			raise TransactionFailsAgainstCurrentState('no ltc sell backer with the specified index')
 		backer = self._ltcSellBackers[backerIndex]
-		ltcOffered = ltcOfferedPlusCommission * Amounts.percentDivisor // (Amounts.percentDivisor + backer.commission)
+		# we make sure that commission is rounded down here, to make this correspond with commission added to exchange amounts specified by user
+		commission = ltcOfferedPlusCommission * backer.commission // (Amounts.percentDivisor + backer.commission)
+		ltcOffered = ltcOfferedPlusCommission - commission
 		swapBillDeposit = TradeOffer.DepositRequiredForLTCSell(rate=exchangeRate, ltcOffered=ltcOffered)
 		try:
 			sell = TradeOffer.SellOffer(minimumHostExchangeAmount=self._minimumHostExchangeAmount, swapBillDeposit=swapBillDeposit, ltcOffered=ltcOffered, rate=exchangeRate)
