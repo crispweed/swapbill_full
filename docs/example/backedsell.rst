@@ -52,22 +52,22 @@ Listing buy offers
 
 The next step is to check the buy offers currently posted to the blockchain, to get an idea of the current excange rate:
 
-```
-~/git/swapbill $ python Client.py get_buy_offers
-...
-Operation successful
-exchange rate : 0.92
-    ltc equivalent : 1.104
-    mine : False
-    swapbill offered : 1.2
-exchange rate : 0.95
-    ltc equivalent : 0.38
-    mine : False
-    swapbill offered : 0.4
-```
 
-The best offer comes first, with 1.2 swapbill offered at an exchange rate of 0.92 litecoin per swapbill.
-So let's assume we're ok with making an exchange at this rate, but we actually want to exchange a bit more than 1.104 litecoin.
+    ~/git/swapbill $ python Client.py get_buy_offers
+    ...
+    Operation successful
+    exchange rate : 0.92
+        mine : True
+        swapbill offered : 1.1
+        host coin equivalent : 1.012
+    exchange rate : 0.95
+        mine : True
+        swapbill offered : 2
+        host coin equivalent : 1.9
+
+
+The best offer comes first, with 1.1 swapbill offered at an exchange rate of 0.92 host coin per swapbill.
+So let's assume we're ok with making an exchange at this rate, but we actually want to exchange a bit more than 1.1 host coin.
 
 ```
 ~/git/swapbill $ python Client.py post_ltc_sell --ltcOffered 4 --exchangeRate 0.92 --backerID 0
