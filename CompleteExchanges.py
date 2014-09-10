@@ -6,13 +6,12 @@ sys.path.append(path.join(scriptPath, 'module'))
 sys.dont_write_bytecode = True
 from SwapBill import ClientMain
 from SwapBill.ExceptionReportedToUser import ExceptionReportedToUser
-from SwapBill.HardCodedProtocolConstraints import Constraints
 
 def getMatchingExchange(result, backerID):
 	for s, key, d in result:
 		if d.get('backer id', None) != backerID:
 			continue
-		if d['blocks until expiry'] > Constraints.blocksForExchangeCompletion - 10:
+		if d['blocks until expiry'] > 40:
 			# not enough confirmations
 			continue
 		return key, d
