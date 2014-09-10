@@ -492,3 +492,8 @@ class State(object):
 		maximumExchange *= depositDivisor
 		maximumExchange //= (depositDivisor + 1)
 		return maximumExchange
+
+	def calculateBackerMaximumExchangeInHostCoin(self, backer, rate):
+		maximumExchange = self.calculateBackerMaximumExchange(backer)
+		return TradeOffer.swapBillToLTC_RoundedDown(rate, maximumExchange)
+	

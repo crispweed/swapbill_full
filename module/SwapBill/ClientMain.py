@@ -109,6 +109,7 @@ sp = subparsers.add_parser('get_pending_exchanges', help='get current SwapBill p
 sp.add_argument('-i', '--includepending', help='include transactions that have been submitted but not yet confirmed (based on host memory pool)', action='store_true')
 
 sp = subparsers.add_parser('get_sell_backers', help='get information about funds currently commited to backing host coin sell transactions')
+sp.add_argument('--withExchangeRate', help='an exchange rate (host coin/swapbill, as a decimal fraction), if specified maximum exchange amounts will also be displayed in host currency based on this exchange rate')
 sp.add_argument('-i', '--includepending', help='include transactions that have been submitted but not yet confirmed (based on host memory pool)', action='store_true')
 
 sp = subparsers.add_parser('get_pending_payments', help='get information payments currently pending proof of receipt')
@@ -453,7 +454,10 @@ def Main(commandLineArgs=sys.argv[1:], out=sys.stdout):
 			d['expires on block'] = backer.expiry
 			d['blocks until expiry'] = backer.expiry - state._currentBlockIndex + 1
 			d['commission'] = Amounts.PercentToString(backer.commission)
-			d['maximum exchange'] = Amounts.ToString(state.calculateBackerMaximumExchange(backer))
+			d['maximum exchange swapbill'] = Amounts.ToString(state.calculateBackerMaximumExchange(backer))
+			if args.withExchangeRate is not None:
+				rate = Amounts.PercentFromString(args.withExchangeRate)
+				d['maximum exchange host coin'] = Amounts.ToString(state.calculateBackerMaximumExchangeInHostCoin(backer, rate))
 			result.append(('host coin sell backer index', key, d))
 		return result
 

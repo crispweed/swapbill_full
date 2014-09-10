@@ -29,6 +29,9 @@ def swapBillToLTC_RoundedUp(rate, swapBill):
 	if rounded:
 		ltc += 1
 	return ltc
+def swapBillToLTC_RoundedDown(rate, swapBill):
+	ltc, rounded = _swapBillToLTC(rate, swapBill)
+	return ltc
 
 def MinimumBuyOfferWithRate(protocolParams, rate):
 	swapBillForMinLTC = ltcToSwapBill_RoundedUp(rate, protocolParams['minimumHostExchangeAmount'])
