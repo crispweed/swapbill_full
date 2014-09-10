@@ -163,9 +163,9 @@ The two parties for the exchange will need 'bitcoin swapbill' and 'litecoin swap
 (To exchange 'native' bitcoin and litecoin, these should first be converted into 'bitcoin swapbill' and 'litecoin swapbill' with the on-chain
 exchange mechanisms described in the previous examples.)
 
-For this example we'll give 'a' a balance of 3.5 bitcoin swapbill, and 'b' a balance of 350 litecoin swapbill, which they need to exchange.
+For this example we'll give **a** a balance of 3.5 bitcoin swapbill, and **b** a balance of 350 litecoin swapbill, which they then want to exchange.
 
-For 'a'::
+For **a**::
 
     ~/git/swapbill $ python Client.py --dataDir a get_receive_address
     ...
@@ -181,7 +181,7 @@ For 'a'::
     Operation successful
     balance : 3.5
 
-And for 'b'::
+And for **b**::
 
     ~/git/swapbill $ python Client.py --dataDir b --host litecoin get_receive_address
     ...
@@ -197,9 +197,10 @@ And for 'b'::
     Operation successful
     balance : 350
 
-For this to work, we need *both* litecoind *and* bitcoind running and set up as RPC servers, see :doc:`hostsetup`.
+For this to work, note that we need *both* litecoind *and* bitcoind running and set up as RPC servers.
+(See :doc:`hostsetup`.)
 
-Note that we used payments from the default swapbill wallet, in each case, but you could also use burn transactions or exchanges to
+We used payments from the default swapbill wallet, in each case, but you could also use burn transactions or exchanges to
 create these initial balances.
 
 Procedure for exchange
@@ -207,11 +208,167 @@ Procedure for exchange
 
 The basic procedure for the exchange will be as follows:
 
-* **b** creates a bitcoin swapbill receive address and sends this to **a**
 * **a** creates a litecoin swapbill receive address and sends this to **b**
+* **b** creates a bitcoin swapbill receive address and sends this to **a**
 * **a** submits a pay on reveal secret transaction (to **b**'s receive address), with quite a long time until expiry
 * **b** checks the details for this payment, and makes sure this is confirmed, and then, if everything is ok, submits a counter_pay transaction (to **a**'s receive address), with a much shorter time until expiry
 * both payments are now dependant on the same secret, which is currently known only to **a**
 * **a** can now submit a reveal secret transaction, enabling the counter_pay to go through
 * **b** then obtains the secret (during a subsequent syncronisation), and can submit a reveal secret transaction to enable the first payment to go through
 
+Let's see how this works out, though, in concrete SwapBill client invocations..
+
+Generate receive addresses
+----------------------------
+
+The parties generate receive addresses (and send these to each other)::
+
+    ~/git/swapbill $ python Client.py --dataDir a --host litecoin get_receive_address
+    ...
+    Operation successful
+    receive_address : n3QncHC6iAGPo5G4bFNZ9BeAfcb5KWAaEq
+    ~/git/swapbill $ python Client.py --dataDir b get_receive_address
+    ...
+    Operation successful
+    receive_address : mu9uDM3r571d198iaqznBfZFEtHfxCEpDA
+
+
+First payment, **a** to **b**
+-------------------------------
+
+**a** submits a first pay on reveal secret transaction::
+
+    ~/git/swapbill $ python Client.py --dataDir a pay --amount 3.5 --toAddress mu9uDM3r571d198iaqznBfZFEtHfxCEpDA --onRevealSecret --blocksUntilExpiry 18
+    Loaded cached state data successfully
+    State update starting from block 279597
+    Committed state updated to start of block 279597
+    in memory: Pay
+     - 3.5 swapbill output added
+    In memory state updated to end of block 279617
+    attempting to send PayOnRevealSecret, change output address=n1YrUfwjZkKPjgpVViuBzaTtTahjWBwtwE, destination output address=mu9uDM3r571d198iaqznBfZFEtHfxCEpDA, amount=350000000, maxBlock=279636, secretAddress=mnMx4UJMUkdKw1drYXqG3N9SfoynSymbsV
+    Operation successful
+    transaction id : db7913fda875b3dbf94f1a09e272f0d2279175be27b3133a3f97f4b45ce63828
+
+Note that we specified 18 for '--blocksUntilExpiry' here, which, based on approximately 10 minutes per block for bitcoin,
+works out at approximately 3 hours.
+
+A different number could be used here, but:
+
+* This needs to allow plenty of time for **b** to set up a counter payment, with shorter expiry period, and checks for a certain number of confirmations.
+* If **b** doesn't play ball, and doesn't move forward with their part of the exchange, **a**'s swapbill will be locked up until the end of this expiry period.
+
+**b** checks this payment::
+
+    ~/git/swapbill $ python Client.py --dataDir b get_pending_payments
+    ...
+    Operation successful
+    pending payment index : 2
+        paid to me : True
+        confirmations : 1
+        paid by me : False
+        expires on block : 279636
+        blocks until expiry : 17
+        amount : 3.5
+
+but then waits until the payment has a reasonable number of confirmations before making a counter payment.
+
+Counter payment, **b** to **a**
+-------------------------------
+
+Once **b** is satisfied that there are enough confirmations for the first payment
+(and confident that this first payment won't be backed out by a blockchain reorganisation), **b** proceeds with the counterpayment, as follows::
+
+    ~/git/swapbill $ python Client.py --dataDir b --host litecoin counter_pay --amount 350 --toAddress n3QncHC6iAGPo5G4bFNZ9BeAfcb5KWAaEq --blocksUntilExpiry 36 --pendingPaymentHost bitcoin --pendingPaymentID 2
+    ...
+    attempting to send PayOnRevealSecret, change output address=mzy6QnsqiQjFAritKoqKUGvRyeJuy7bo1J, destination output address=n3QncHC6iAGPo5G4bFNZ9BeAfcb5KWAaEq, amount=35000000000, maxBlock=383216, secretAddress=mnMx4UJMUkdKw1drYXqG3N9SfoynSymbsV
+    Operation successful
+    transaction id : cbcbfdbf6d1d60750bfe4f2eed07cdf7abfcfadf9d87e765e9a5de9f151a1df3
+
+The value of 36 for '--blocksUntilExpiry' here, based on approximately 2.5 minutes per block for litecoin,
+works out at approximately 1.5 hours.
+
+This expiry delay needs to be:
+* long enough to give **a** enough time to accept the counter payment (including waiting for enough confirmations), but
+* short enough that, even if **a** waits until this is nearly expired before accepting, **b** still has plenty of time to accept the first payment.
+
+**a** checks this counter payment::
+
+    ~/git/swapbill $ python Client.py --dataDir a --host litecoin get_pending_payments
+    ...
+    Operation successful
+    pending payment index : 3
+        blocks until expiry : 36
+        paid to me : True
+        confirmations : 1
+        amount : 350
+        paid by me : False
+        I hold secret : True
+        expires on block : 383216
+
+Note that both 'paid to me' and 'I hold secret' show True, which shows that **a** can now go ahead and accept this counter payment.
+
+Counter payment accepted by **a**
+----------------------------------
+
+Once **a** is satisfied that there are enough confirmations for the counterpayment, **a** goes ahead and reveals the secret, to accept this::
+
+    ~/git/swapbill $ python Client.py --dataDir a --host litecoin reveal_secret_for_pending_payment --pendingPaymentID 3
+    ...
+    attempting to send RevealPendingPaymentSecret, pendingPayIndex=3, publicKeySecret=b'\xa5D\xa5q\xa5\x7f\x12\x92^\x02\x91\x01\xcc\x023@\xae\xc5\x04\xe9o!\xd09\xe2\x8d~<B.\xeebr\x9fZ\x95\xf3\xb9c\x05\xd8Ia>\xfd2\xd1z\xba=\x1eu\xf7\xa1\x88ox\xe9\xb4\x1bv\x81\xe0\x0f'
+    Operation successful
+    transaction id : 38fa2ab46a26466d2b31e0921e4e76858655e4736565d4c98dc9925099cce955
+
+The counterpayment goes through, and **a** receives the litecoin part of the exchange::
+
+    ~/git/swapbill $ python Client.py --dataDir a --host litecoin get_balance
+    ...
+    Operation successful
+    balance : 350
+
+But, for this, **a** was forced to reveal their secret.
+
+First payment completed by **b**
+----------------------------------
+
+When **b** next synchronises, this secret is detected and added to their secrets wallet::
+
+    ~/git/swapbill $ python Client.py --dataDir b --host litecoin get_balance
+    Loaded cached state data successfully
+    State update starting from block 383159
+    Committed state updated to start of block 383160
+    ...
+    in memory: storing revealed secret with hash 4b14f0fc03d9aca2509688e3da04678bc418aad1
+    In memory state updated to end of block 383181
+    Operation successful
+    balance : 0
+
+And, if we now check the status for the first payment, on the bitcoin blockchain::
+
+    ~/git/swapbill $ python Client.py --dataDir b get_pending_payments
+    ...
+    Operation successful
+    pending payment index : 2
+        paid by me : False
+        paid to me : True
+        I hold secret : True
+        blocks until expiry : 15
+        confirmations : 3
+        amount : 3.5
+        expires on block : 279636
+
+We can see that **b** is now able to complete this payment, as follows::
+
+    ~/git/swapbill $ python Client.py --dataDir b reveal_secret_for_pending_payment --pendingPaymentID 2
+    ...
+    attempting to send RevealPendingPaymentSecret, pendingPayIndex=2, publicKeySecret=b'\xa5D\xa5q\xa5\x7f\x12\x92^\x02\x91\x01\xcc\x023@\xae\xc5\x04\xe9o!\xd09\xe2\x8d~<B.\xeebr\x9fZ\x95\xf3\xb9c\x05\xd8Ia>\xfd2\xd1z\xba=\x1eu\xf7\xa1\x88ox\xe9\xb4\x1bv\x81\xe0\x0f'
+    Operation successful
+    transaction id : d2c9d58948e23a21d655d89c1de7d2688a97e6360409a0e839f91ba97054d55c
+
+And **b** receives the bitcoin part of the exchange::
+
+    ~/git/swapbill $ python Client.py --dataDir b get_balance
+    ...
+    in memory: RevealPendingPaymentSecret
+    In memory state updated to end of block 279622
+    Operation successful
+    balance : 3.5
