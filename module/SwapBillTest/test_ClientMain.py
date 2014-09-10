@@ -633,6 +633,7 @@ class Test(unittest.TestCase):
 				'swap bill paid by buyer': Amounts.ToString(10000000),
 				'expires on block': startBlock+57,
 		        'blocks until expiry': 50,
+		        'confirmations': 1,
 				'I am buyer (and waiting for payment)': False,
 				'deposit paid by seller': Amounts.ToString(625000)
 			})]
@@ -647,6 +648,7 @@ class Test(unittest.TestCase):
 				'swap bill paid by buyer': Amounts.ToString(10000000),
 				'expires on block': startBlock+57,
 		        'blocks until expiry': 50,
+		        'confirmations': 1,
 				'I am buyer (and waiting for payment)': True,
 				'deposit paid by seller': Amounts.ToString(625000)
 			})]
@@ -853,6 +855,7 @@ class Test(unittest.TestCase):
 		     {
 		         'expires on block': startBlock+55,
 		         'blocks until expiry': 50,
+		         'confirmations': 1,
 		         'outstanding host coin payment amount': Amounts.ToString(150000000),
 		         'I am seller (and need to complete)': True,
 		         'backer id': 0,
@@ -898,6 +901,7 @@ class Test(unittest.TestCase):
 		     {
 		         'expires on block': startBlock+55,
 		         'blocks until expiry': 50,
+		         'confirmations': 1,
 		         'outstanding host coin payment amount': '4',
 		         'I am seller (and need to complete)': True,
 		         'backer id': 0,

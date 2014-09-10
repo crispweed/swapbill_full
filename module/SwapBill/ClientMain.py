@@ -438,6 +438,7 @@ def Main(commandLineArgs=sys.argv[1:], out=sys.stdout):
 			d['outstanding host coin payment amount'] = Amounts.ToString(exchange.ltc)
 			d['expires on block'] = exchange.expiry
 			d['blocks until expiry'] = exchange.expiry - state._currentBlockIndex + 1
+			d['confirmations'] = state._protocolParams['blocksForExchangeCompletion'] - (exchange.expiry - state._currentBlockIndex)
 			if exchange.backerIndex != -1:
 				d['backer id'] = exchange.backerIndex
 			result.append(('pending exchange index', key, d))

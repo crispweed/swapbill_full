@@ -24,3 +24,5 @@ Worked examples:
     example/pay
     example/trading
     example/backedsell
+    example/buy
+    example/unbackedsell

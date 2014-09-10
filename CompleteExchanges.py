@@ -11,7 +11,7 @@ def getMatchingExchange(result, backerID):
 	for s, key, d in result:
 		if d.get('backer id', None) != backerID:
 			continue
-		if d['blocks until expiry'] > 40:
+		if d['confirmations'] < 7:
 			# not enough confirmations
 			continue
 		return key, d
