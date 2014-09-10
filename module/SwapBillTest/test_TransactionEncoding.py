@@ -82,7 +82,7 @@ class Test(unittest.TestCase):
 		self.assertDictEqual(tx.__dict__, {'_inputs': [('sourceTXID', 4)], '_outputs': [(b'SB\x01\x14\x00\x00\x00\x00\x00d\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00', 0), ('changePKH', 0), ('destinationPKH', 0)]})
 		self.checkIgnoredBytes(tx, 7)
 		tx = TransactionEncoding.FromStateTransaction(
-		    'LTCBuyOffer',
+		    'BuyOffer',
 		    [('sourceTXID',5)],
 		    ('ltcBuy',), ('ltcBuyPKH',),
 		    {'receivingAddress':'ltcReceivePKH', 'swapBillOffered':22, 'maxBlock':0, 'exchangeRate':123}
@@ -90,7 +90,7 @@ class Test(unittest.TestCase):
 		self.assertDictEqual(tx.__dict__, {'_outputs': [(b'SB\x02\x16\x00\x00\x00\x00\x00\x00\x00\x00\x00{\x00\x00\x00\x00\x00\x00', 0), ('ltcBuyPKH', 0), ('ltcReceivePKH', 0)], '_inputs': [('sourceTXID', 5)]} )
 		self.checkIgnoredBytes(tx, 3)
 		tx = TransactionEncoding.FromStateTransaction(
-		    'LTCSellOffer',
+		    'SellOffer',
 		    [('sourceTXID',3)],
 		    ('ltcSell',), ('ltcSellPKH',),
 		    {'ltcOffered':22, 'maxBlock':0, 'exchangeRate':123}

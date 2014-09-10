@@ -76,7 +76,7 @@ Loaded cached state data successfully
 State update starting from block 306244
 Committed state updated to start of block 306247
 In memory state updated to end of block 306267
-attempting to send BackedLTCSellOffer, sellerReceive output address=msUkYfCkH8vdQGp1TmsnEm8Pm5vgEARBHb, backerIndex=0, backerLTCReceiveAddress=mo4DLT1a7ZhBRZTrXYXs9BRu6efyzrXmM1, exchangeRate=920000000, ltcOfferedPlusCommission=404000000
+attempting to send BackedSellOffer, sellerReceive output address=msUkYfCkH8vdQGp1TmsnEm8Pm5vgEARBHb, backerIndex=0, backerLTCReceiveAddress=mo4DLT1a7ZhBRZTrXYXs9BRu6efyzrXmM1, exchangeRate=920000000, ltcOfferedPlusCommission=404000000
 Operation successful
 transaction id : 81e8bd072c386fa3b0744779083e98626de6f57719a025b8ae1115230c902fed
 ```
@@ -92,7 +92,7 @@ After a short delay, this transaction goes through:
 Loaded cached state data successfully
 State update starting from block 306248
 Committed state updated to start of block 306249
-in memory: BackedLTCSellOffer
+in memory: BackedSellOffer
  - 1.2 swapbill output added
 In memory state updated to end of block 306269
 Operation successful
@@ -147,9 +147,9 @@ Fortunately someone comes along and makes a matching buy offer:
 Loaded cached state data successfully
 State update starting from block 306252
 Committed state updated to start of block 306253
-in memory: BackedLTCSellOffer
+in memory: BackedSellOffer
  - 1.2 swapbill output added
-in memory: LTCBuyOffer
+in memory: BuyOffer
  - trade offer completed
 In memory state updated to end of block 306273
 Operation successful

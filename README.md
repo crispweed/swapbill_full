@@ -402,7 +402,7 @@ Loaded cached state data successfully
 State update starting from block 306244
 Committed state updated to start of block 306247
 In memory state updated to end of block 306267
-attempting to send BackedLTCSellOffer, sellerReceive output address=msUkYfCkH8vdQGp1TmsnEm8Pm5vgEARBHb, backerIndex=0, backerLTCReceiveAddress=mo4DLT1a7ZhBRZTrXYXs9BRu6efyzrXmM1, exchangeRate=920000000, ltcOfferedPlusCommission=404000000
+attempting to send BackedSellOffer, sellerReceive output address=msUkYfCkH8vdQGp1TmsnEm8Pm5vgEARBHb, backerIndex=0, backerLTCReceiveAddress=mo4DLT1a7ZhBRZTrXYXs9BRu6efyzrXmM1, exchangeRate=920000000, ltcOfferedPlusCommission=404000000
 Operation successful
 transaction id : 81e8bd072c386fa3b0744779083e98626de6f57719a025b8ae1115230c902fed
 ```
@@ -418,7 +418,7 @@ After a short delay, this transaction goes through:
 Loaded cached state data successfully
 State update starting from block 306248
 Committed state updated to start of block 306249
-in memory: BackedLTCSellOffer
+in memory: BackedSellOffer
  - 1.2 swapbill output added
 In memory state updated to end of block 306269
 Operation successful
@@ -473,9 +473,9 @@ Fortunately someone comes along and makes a matching buy offer:
 Loaded cached state data successfully
 State update starting from block 306252
 Committed state updated to start of block 306253
-in memory: BackedLTCSellOffer
+in memory: BackedSellOffer
  - 1.2 swapbill output added
-in memory: LTCBuyOffer
+in memory: BuyOffer
  - trade offer completed
 In memory state updated to end of block 306273
 Operation successful
@@ -527,7 +527,7 @@ So, we'll try and match that top offer first:
 ```
 ~/git/swapbill $ python Client.py post_ltc_buy --swapBillOffered 3.84615385 --blocksUntilExpiry 1 --exchangeRate 0.91
 ...
-attempting to send LTCBuyOffer, ltcBuy output address=mo4ceReHzLCh4i9Bb4tCPEvShvGfiakvus, exchangeRate=910000000, maxBlock=306282, receivingAddress=mr8EojsG7Rh2jvxt6gEaKd3zufFHXCXESa, swapBillOffered=384615385
+attempting to send BuyOffer, ltcBuy output address=mo4ceReHzLCh4i9Bb4tCPEvShvGfiakvus, exchangeRate=910000000, maxBlock=306282, receivingAddress=mr8EojsG7Rh2jvxt6gEaKd3zufFHXCXESa, swapBillOffered=384615385
 Operation successful
 transaction id : dcf2b207a33d26f58c429f47ac0cae654a0581bc61f0c0baf08c7b98c836250e
 ```
@@ -548,7 +548,7 @@ No other offers come in before our buy offer, then, and this matches the top off
 ```
 ~/git/swapbill $ python Client.py get_balance
 ...
-in memory: LTCBuyOffer
+in memory: BuyOffer
  - 5 swapbill output consumed
  - 1.15384615 swapbill output added
 In memory state updated to end of block 306281
@@ -561,7 +561,7 @@ We decide to post the remaining funds again, in another buy offer:
 ```
 ~/git/swapbill $ python Client.py post_ltc_buy --swapBillOffered 1.15384615 --exchangeRate 0.9
 ...
-attempting to send LTCBuyOffer, ltcBuy output address=mo4ceReHzLCh4i9Bb4tCPEvShvGfiakvus, exchangeRate=910000000, maxBlock=306282, receivingAddress=mr8EojsG7Rh2jvxt6gEaKd3zufFHXCXESa, swapBillOffered=384615385
+attempting to send BuyOffer, ltcBuy output address=mo4ceReHzLCh4i9Bb4tCPEvShvGfiakvus, exchangeRate=910000000, maxBlock=306282, receivingAddress=mr8EojsG7Rh2jvxt6gEaKd3zufFHXCXESa, swapBillOffered=384615385
 Operation successful
 transaction id : dcf2b207a33d26f58c429f47ac0cae654a0581bc61f0c0baf08c7b98c836250e
 ```
@@ -581,7 +581,7 @@ This offer doesn't match any existing sell offer, and is initially left as an ou
 ```
 ~/git/swapbill $ python Client.py get_buy_offers
 ...
-in memory: LTCBuyOffer
+in memory: BuyOffer
  - 1.15384615 swapbill output consumed
  - 0 swapbill output added
 In memory state updated to end of block 306286
@@ -602,12 +602,12 @@ But, as it is, a couple of sell offers come along in the next few blocks, and ma
 ```
 ~/git/swapbill $ python Client.py get_buy_offers
 ...
-in memory: LTCBuyOffer
+in memory: BuyOffer
  - 1.15384615 swapbill output consumed
  - 0 swapbill output added
-in memory: BackedLTCSellOffer
+in memory: BackedSellOffer
  - trade offer updated
-in memory: BackedLTCSellOffer
+in memory: BackedSellOffer
  - trade offer updated
 In memory state updated to end of block 306289
 Operation successful
@@ -666,15 +666,15 @@ A bit later we can see that one of the exchanges has been completed:
 ```
 ~/git/swapbill $ python Client.py get_pending_exchanges
 ...
-in memory: LTCBuyOffer
+in memory: BuyOffer
  - 5 swapbill output consumed
  - 1.15384615 swapbill output added
-in memory: LTCBuyOffer
+in memory: BuyOffer
  - 1.15384615 swapbill output consumed
  - 0 swapbill output added
-in memory: BackedLTCSellOffer
+in memory: BackedSellOffer
  - trade offer updated
-in memory: BackedLTCSellOffer
+in memory: BackedSellOffer
  - trade offer updated
 in memory: LTCExchangeCompletion
  - trade offer completed
@@ -710,12 +710,12 @@ Some time later, all of the exchanges have been completed, and we should have re
 ```
 ~/git/swapbill $ python Client.py get_pending_exchanges
 ...
-in memory: LTCBuyOffer
+in memory: BuyOffer
  - 1.15384615 swapbill output consumed
  - 0 swapbill output added
-in memory: BackedLTCSellOffer
+in memory: BackedSellOffer
  - trade offer updated
-in memory: BackedLTCSellOffer
+in memory: BackedSellOffer
  - trade offer updated
 in memory: LTCExchangeCompletion
  - trade offer completed
@@ -780,7 +780,7 @@ Let's try and match the top offer:
 ```
 ~/git/swapbill $ python Client.py post_ltc_sell --ltcOffered 0.38 --exchangeRate 0.95
 ...
-attempting to send LTCSellOffer, ltcSell output address=mrshs7hscqVPHCiFshM3cetm4JHomiEsKQ, exchangeRate=950000000, ltcOffered=38000000, maxBlock=306302
+attempting to send SellOffer, ltcSell output address=mrshs7hscqVPHCiFshM3cetm4JHomiEsKQ, exchangeRate=950000000, ltcOffered=38000000, maxBlock=306302
 Operation successful
 transaction id : 650a80a27c9170f9f0d0a59c7646db91e874bb84edfda24d69aaecfe76eae64b
 ```
@@ -790,7 +790,7 @@ This goes through successfully, and we can see that the buy offer has been match
 ```
 ~/git/swapbill $ python Client.py get_buy_offers
 ...
-in memory: LTCSellOffer
+in memory: SellOffer
  - 0.1 swapbill output consumed
  - 4.34782609 swapbill output consumed
  - 4.42282609 swapbill output added
@@ -808,7 +808,7 @@ seed amount equivalent to the minimum balance protocol constraint (currently set
 ```
 ~/git/swapbill $ python Client.py get_balance
 ...
-in memory: LTCSellOffer
+in memory: SellOffer
  - 0.1 swapbill output consumed
  - 4.34782609 swapbill output consumed
  - 4.42282609 swapbill output added
@@ -823,7 +823,7 @@ We can see the pending exchange with get_pending_exchanges:
 ```
  ~/git/swapbill $ python Client.py get_pending_exchanges
 ...
-in memory: LTCSellOffer
+in memory: SellOffer
  - 0.1 swapbill output consumed
  - 4.34782609 swapbill output consumed
  - 4.42282609 swapbill output added
@@ -848,7 +848,7 @@ A bit later on we can see the pending exchange with 47 blocks left to expiry, an
 ```
  ~/git/swapbill $ python Client.py get_pending_exchanges
 ...
-in memory: LTCSellOffer
+in memory: SellOffer
  - 0.1 swapbill output consumed
  - 4.34782609 swapbill output consumed
  - 4.42282609 swapbill output added

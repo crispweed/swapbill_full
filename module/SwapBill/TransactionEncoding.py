@@ -20,12 +20,12 @@ _fundedMappingByTypeCode = (
      ('amount', 6, 'maxBlock', 4),
      ('change','destination'), ()
     ),
-    ('LTCBuyOffer',
+    ('BuyOffer',
      ('swapBillOffered', 6, 'maxBlock', 4, 'exchangeRate', 4),
      ('ltcBuy',),
      (('receivingAddress', None),)
 	),
-    ('LTCSellOffer',
+    ('SellOffer',
      ('ltcOffered', 6, 'maxBlock', 4, 'exchangeRate', 4),
      ('ltcSell',),
      ()
@@ -35,7 +35,7 @@ _fundedMappingByTypeCode = (
      ('ltcSellBacker',),
      (('ltcReceiveAddress', None),)
 	),
-    ('BackedLTCSellOffer',
+    ('BackedSellOffer',
      ('exchangeRate', 4, 'backerIndex', 6),
      ('sellerReceive',),
      (('backerLTCReceiveAddress', 'ltcOfferedPlusCommission'),)

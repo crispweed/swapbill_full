@@ -217,7 +217,7 @@ class State(object):
 		self._balances.add((txID, 2), amount)
 		return change
 
-	def _fundedTransaction_LTCBuyOffer(self, txID, swapBillInput, swapBillOffered, exchangeRate, receivingAddress, maxBlock, outputs):
+	def _fundedTransaction_BuyOffer(self, txID, swapBillInput, swapBillOffered, exchangeRate, receivingAddress, maxBlock, outputs):
 		assert outputs == ('ltcBuy',)
 		if exchangeRate == 0 or exchangeRate >= Amounts.percentDivisor:
 			raise BadlyFormedTransaction('invalid exchange rate value')
@@ -240,7 +240,7 @@ class State(object):
 		self._newBuyOffer(buy)
 		return change
 
-	def _fundedTransaction_LTCSellOffer(self, txID, swapBillInput, ltcOffered, exchangeRate, maxBlock, outputs):
+	def _fundedTransaction_SellOffer(self, txID, swapBillInput, ltcOffered, exchangeRate, maxBlock, outputs):
 		assert outputs == ('ltcSell',)
 		if exchangeRate == 0 or exchangeRate >= Amounts.percentDivisor:
 			raise BadlyFormedTransaction('invalid exchange rate value')
@@ -293,7 +293,7 @@ class State(object):
 		self._ltcSellBackers[key] = backer
 		return change
 
-	def _fundedTransaction_BackedLTCSellOffer(self, txID, swapBillInput, exchangeRate, backerIndex, backerLTCReceiveAddress, ltcOfferedPlusCommission, outputs):
+	def _fundedTransaction_BackedSellOffer(self, txID, swapBillInput, exchangeRate, backerIndex, backerLTCReceiveAddress, ltcOfferedPlusCommission, outputs):
 		assert outputs == ('sellerReceive',)
 		if exchangeRate == 0 or exchangeRate >= Amounts.percentDivisor:
 			raise BadlyFormedTransaction('invalid exchange rate value')

@@ -307,7 +307,7 @@ def Main(commandLineArgs=sys.argv[1:], out=sys.stdout):
 		return CheckAndSend_Funded(transactionType, outputs, outputPubKeyHashes, details)
 
 	elif args.action == 'buy_offer':
-		transactionType = 'LTCBuyOffer'
+		transactionType = 'BuyOffer'
 		outputs = ('ltcBuy',)
 		outputPubKeyHashes = (wallet.addKeyPairAndReturnPubKeyHash(),)
 		details = {
@@ -321,7 +321,7 @@ def Main(commandLineArgs=sys.argv[1:], out=sys.stdout):
 	elif args.action == 'sell_offer':
 		details = {'exchangeRate':Amounts.PercentFromString(args.exchangeRate)}
 		if args.backerID is None:
-			transactionType = 'LTCSellOffer'
+			transactionType = 'SellOffer'
 			outputs = ('ltcSell',)
 			details['maxBlock'] = state._currentBlockIndex + args.blocksUntilExpiry
 			details['ltcOffered'] = Amounts.FromString(args.hostCoinOffered)
@@ -330,7 +330,7 @@ def Main(commandLineArgs=sys.argv[1:], out=sys.stdout):
 			if not backerID in state._ltcSellBackers:
 				raise ExceptionReportedToUser('No backer with the specified ID.')
 			backer = state._ltcSellBackers[backerID]
-			transactionType = 'BackedLTCSellOffer'
+			transactionType = 'BackedSellOffer'
 			outputs = ('sellerReceive',)
 			ltc = Amounts.FromString(args.hostCoinOffered)
 			if args.includesCommission:
