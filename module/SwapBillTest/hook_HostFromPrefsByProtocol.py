@@ -1,7 +1,7 @@
 from __future__ import print_function
 from SwapBillTest import MockHost
 from SwapBill import HostFromPrefsByProtocol
-from SwapBill.HardCodedProtocolConstraints import Constraints
+from SwapBill import ProtocolParameters
 
 currentHostByProtocol = {}
 
@@ -11,8 +11,13 @@ def _hook(protocol, dataDir):
 HostFromPrefsByProtocol.HostFromPrefsByProtocol = _hook
 
 def Reset():
-	for key in Constraints.paramsByHost:
-		params = Constraints.paramsByHost[key]
+	for key in ProtocolParameters.byHost:
+		params = ProtocolParameters.byHost[key]
 		currentHostByProtocol[key] = MockHost.MockHost(params['startBlock'], params['startBlockHash'])
+
+def Reset_BeforeStartBlock():
+	for key in ProtocolParameters.byHost:
+		params = ProtocolParameters.byHost[key]
+		currentHostByProtocol[key] = MockHost.MockHost(params['startBlock']-1, 'madeUpBlockHash')
 	
 Reset()

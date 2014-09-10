@@ -1,6 +1,5 @@
 from __future__ import print_function
 from SwapBill import TradeOfferHeap, TradeOffer, Balances, Amounts, KeyPair
-from SwapBill.HardCodedProtocolConstraints import Constraints
 from SwapBill.Amounts import e
 
 # these assertions are used to communicate whether or not a transaction is possible to the user
@@ -25,11 +24,10 @@ class PendingPay(object):
 	pass
 
 class State(object):
-	def __init__(self, startBlockIndex, startBlockHash, minimumHostExchangeAmount=1000000, blocksForExchangeCompletion=50, seedAccount=None, seedAmount=0):
+	def __init__(self, protocolParams, seedAccount=None, seedAmount=0):
 		## state is initialised at the start of the block with startBlockIndex
-		self._startBlockHash = startBlockHash
-		self._minimumHostExchangeAmount = minimumHostExchangeAmount
-		self._blocksForExchangeCompletion = blocksForExchangeCompletion
+		self._protocolParams = protocolParams
+		startBlockIndex = protocolParams['startBlock']
 		self._currentBlockIndex = startBlockIndex
 		self._balances = Balances.Balances()
 		if seedAccount is not None:
@@ -45,8 +43,8 @@ class State(object):
 		self._nextPendingPayIndex = 0
 		self._pendingPays = {}
 
-	def parametersMatch(self, startBlockHash, minimumHostExchangeAmount=1000000, blocksForExchangeCompletion=50):
-		return self._startBlockHash == startBlockHash and self._minimumHostExchangeAmount == minimumHostExchangeAmount and self._blocksForExchangeCompletion == blocksForExchangeCompletion
+	def parametersMatch(self, protocolParams):
+		return protocolParams == self._protocolParams
 
 	def advanceToNextBlock(self):
 		expired = self._ltcBuys.advanceToNextBlock()
@@ -57,7 +55,7 @@ class State(object):
 		expired = self._ltcSells.advanceToNextBlock()
 		for sell in expired:
 			self._balances.addStateChange(sell.receivingAccount)
-			self._balances.addTo_Forwarded(sell.receivingAccount, Constraints.minimumSwapBillBalance + sell._swapBillDeposit)
+			self._balances.addTo_Forwarded(sell.receivingAccount, self._protocolParams['minimumSwapBillBalance'] + sell._swapBillDeposit)
 			if sell.isBacked:
 				self._balances.addTo_Forwarded(sell.receivingAccount, sell.backingSwapBill)
 				self._balances.addStateChange(sell.backingReceiveAccount)
@@ -106,10 +104,10 @@ class State(object):
 	def _matchOffersAndAddExchange(self, buy, sell):
 		assert buy.refundAccount in self._balances.changeCounts
 		assert sell.receivingAccount in self._balances.changeCounts
-		exchange = TradeOffer.MatchOffers(self._minimumHostExchangeAmount, buy=buy, sell=sell)
+		exchange = TradeOffer.MatchOffers(protocolParams=self._protocolParams, buy=buy, sell=sell)
 		self._balances.addStateChange(sell.receivingAccount)
 		self._balances.addStateChange(buy.refundAccount)
-		exchange.expiry = self._currentBlockIndex + self._blocksForExchangeCompletion
+		exchange.expiry = self._currentBlockIndex + self._protocolParams['blocksForExchangeCompletion']
 		exchange.buyerLTCReceive = buy.ltcReceiveAddress
 		exchange.buyerAccount = buy.refundAccount
 		exchange.sellerAccount = sell.receivingAccount
@@ -135,10 +133,10 @@ class State(object):
 			backer = self._ltcSellBackers.get(exchange.backerIndex, None)
 			if backer is None:
 				# unbacked exchange, or backer expired
-				self._balances.addTo_Forwarded(sell.receivingAccount, Constraints.minimumSwapBillBalance)
+				self._balances.addTo_Forwarded(sell.receivingAccount, self._protocolParams['minimumSwapBillBalance'])
 			else:
 				#refund back into the backer object
-				backer.backingAmount += Constraints.minimumSwapBillBalance
+				backer.backingAmount += self._protocolParams['minimumSwapBillBalance']
 			if sell.isBacked:
 				self._balances.removeRef(sell.backingReceiveAccount)
 			sell = None
@@ -194,12 +192,12 @@ class State(object):
 	def _checkChange(self, change):
 		if change < 0:
 			raise InsufficientFundsForTransaction()
-		if change > 0 and change < Constraints.minimumSwapBillBalance:
+		if change > 0 and change < self._protocolParams['minimumSwapBillBalance']:
 			raise InsufficientFundsForTransaction()
 
 	def _fundedTransaction_Burn(self, txID, swapBillInput, amount, outputs):
 		assert outputs == ('destination',)
-		if swapBillInput + amount < Constraints.minimumSwapBillBalance:
+		if swapBillInput + amount < self._protocolParams['minimumSwapBillBalance']:
 			raise BadlyFormedTransaction('burn output is below minimum balance')
 		if txID is None:
 			return
@@ -208,7 +206,7 @@ class State(object):
 
 	def _fundedTransaction_Pay(self, txID, swapBillInput, amount, maxBlock, outputs):
 		assert outputs == ('change', 'destination')
-		if amount < Constraints.minimumSwapBillBalance:
+		if amount < self._protocolParams['minimumSwapBillBalance']:
 			raise BadlyFormedTransaction('amount is below minimum balance')
 		if maxBlock < self._currentBlockIndex:
 			raise TransactionFailsAgainstCurrentState('max block for transaction has been exceeded')
@@ -224,7 +222,7 @@ class State(object):
 		if exchangeRate == 0 or exchangeRate >= Amounts.percentDivisor:
 			raise BadlyFormedTransaction('invalid exchange rate value')
 		try:
-			buy = TradeOffer.BuyOffer(minimumHostExchangeAmount=self._minimumHostExchangeAmount, swapBillOffered=swapBillOffered, rate=exchangeRate)
+			buy = TradeOffer.BuyOffer(protocolParams=self._protocolParams, swapBillOffered=swapBillOffered, rate=exchangeRate)
 		except TradeOffer.OfferIsBelowMinimumExchange:
 			raise BadlyFormedTransaction('does not satisfy minimum exchange amount')
 		if maxBlock < self._currentBlockIndex:
@@ -246,15 +244,15 @@ class State(object):
 		assert outputs == ('ltcSell',)
 		if exchangeRate == 0 or exchangeRate >= Amounts.percentDivisor:
 			raise BadlyFormedTransaction('invalid exchange rate value')
-		swapBillDeposit = TradeOffer.DepositRequiredForLTCSell(rate=exchangeRate, ltcOffered=ltcOffered)
+		swapBillDeposit = TradeOffer.DepositRequiredForLTCSell(protocolParams=self._protocolParams, rate=exchangeRate, ltcOffered=ltcOffered)
 		try:
-			sell = TradeOffer.SellOffer(minimumHostExchangeAmount=self._minimumHostExchangeAmount, swapBillDeposit=swapBillDeposit, ltcOffered=ltcOffered, rate=exchangeRate)
+			sell = TradeOffer.SellOffer(protocolParams=self._protocolParams, swapBillDeposit=swapBillDeposit, ltcOffered=ltcOffered, rate=exchangeRate)
 		except TradeOffer.OfferIsBelowMinimumExchange:
 			raise BadlyFormedTransaction('does not satisfy minimum exchange amount')
 		if maxBlock < self._currentBlockIndex:
 			raise TransactionFailsAgainstCurrentState('max block for transaction has been exceeded')
 		# note that a seed amount (minimum balance) is assigned to the sell offer, in addition to the deposit
-		change = swapBillInput - swapBillDeposit - Constraints.minimumSwapBillBalance
+		change = swapBillInput - swapBillDeposit - self._protocolParams['minimumSwapBillBalance']
 		self._checkChange(change)
 		if txID is None:
 			return
@@ -270,10 +268,10 @@ class State(object):
 		assert outputs == ('ltcSellBacker',)
 		if commission == 0 or commission >= Amounts.percentDivisor:
 			raise BadlyFormedTransaction('invalid commission value')
-		if backingAmount < Constraints.minimumSwapBillBalance:
+		if backingAmount < self._protocolParams['minimumSwapBillBalance']:
 			raise BadlyFormedTransaction('backing amount is below minimum balance')
 		transactionMax = backingAmount // transactionsBacked
-		if transactionMax < Constraints.minimumSwapBillBalance:
+		if transactionMax < self._protocolParams['minimumSwapBillBalance']:
 			raise BadlyFormedTransaction('transaction max is below minimum balance')
 		if maxBlock < self._currentBlockIndex:
 			raise TransactionFailsAgainstCurrentState('max block for transaction has been exceeded')
@@ -305,22 +303,22 @@ class State(object):
 		# we make sure that commission is rounded down here, to make this correspond with commission added to exchange amounts specified by user
 		commission = ltcOfferedPlusCommission * backer.commission // (Amounts.percentDivisor + backer.commission)
 		ltcOffered = ltcOfferedPlusCommission - commission
-		swapBillDeposit = TradeOffer.DepositRequiredForLTCSell(rate=exchangeRate, ltcOffered=ltcOffered)
+		swapBillDeposit = TradeOffer.DepositRequiredForLTCSell(protocolParams=self._protocolParams, rate=exchangeRate, ltcOffered=ltcOffered)
 		try:
-			sell = TradeOffer.SellOffer(minimumHostExchangeAmount=self._minimumHostExchangeAmount, swapBillDeposit=swapBillDeposit, ltcOffered=ltcOffered, rate=exchangeRate)
+			sell = TradeOffer.SellOffer(protocolParams=self._protocolParams, swapBillDeposit=swapBillDeposit, ltcOffered=ltcOffered, rate=exchangeRate)
 		except TradeOffer.OfferIsBelowMinimumExchange:
 			raise TransactionFailsAgainstCurrentState('does not satisfy minimum exchange amount')
 		if backerLTCReceiveAddress != backer.ltcReceiveAddress:
 			raise TransactionFailsAgainstCurrentState('destination address does not match backer receive address for ltc sell backer with the specified index')
 		swapBillEquivalent = TradeOffer.ltcToSwapBill_RoundedUp(rate=exchangeRate, ltc=ltcOffered)
 		# note that minimum balance amount is implicitly seeded into sell offers
-		transactionBackingAmount = Constraints.minimumSwapBillBalance + swapBillDeposit + swapBillEquivalent
+		transactionBackingAmount = self._protocolParams['minimumSwapBillBalance'] + swapBillDeposit + swapBillEquivalent
 		if transactionBackingAmount > backer.transactionMax:
 			raise TransactionFailsAgainstCurrentState('backing amount required for this transaction is larger than the maximum allowed per transaction by the backer')
 		backerChange = backer.backingAmount - transactionBackingAmount
 		if backerChange < 0:
 			raise TransactionFailsAgainstCurrentState('insufficient backing funds')
-		if backerChange > 0 and backerChange < Constraints.minimumSwapBillBalance:
+		if backerChange > 0 and backerChange < self._protocolParams['minimumSwapBillBalance']:
 			raise TransactionFailsAgainstCurrentState('insufficient backing funds')
 		if txID is None:
 			return
@@ -339,7 +337,7 @@ class State(object):
 
 	def _fundedTransaction_PayOnRevealSecret(self, txID, swapBillInput, amount, maxBlock, secretAddress, outputs):
 		assert outputs == ('change', 'destination')
-		if amount < Constraints.minimumSwapBillBalance:
+		if amount < self._protocolParams['minimumSwapBillBalance']:
 			raise BadlyFormedTransaction('amount is below minimum balance')
 		if maxBlock < self._currentBlockIndex:
 			raise TransactionFailsAgainstCurrentState('max block for transaction has been exceeded')
@@ -366,7 +364,7 @@ class State(object):
 
 	def _fundedTransaction_ForwardToFutureNetworkVersion(self, txID, swapBillInput, amount, maxBlock, outputs):
 		assert outputs == ('change',)
-		if amount < Constraints.minimumSwapBillBalance:
+		if amount < self._protocolParams['minimumSwapBillBalance']:
 			raise BadlyFormedTransaction('amount is below minimum balance')
 		if maxBlock < self._currentBlockIndex:
 			raise TransactionFailsAgainstCurrentState('max block for transaction has been exceeded')
@@ -453,7 +451,7 @@ class State(object):
 			errorReport = str(e)
 		except InsufficientFundsForTransaction:
 			errorReport = 'insufficient funds'
-		assert change == 0 or change >= Constraints.minimumSwapBillBalance
+		assert change == 0 or change >= self._protocolParams['minimumSwapBillBalance']
 		self._balances.addTo(changeAccount, change)
 		self._balances.consumeAndForward(sourceAccounts, changeAccount)
 		self._balances.removeIfZeroBalanceAndUnreferenced(changeAccount)
@@ -489,7 +487,8 @@ class State(object):
 		return self.applyFundedTransaction(transactionType, txID, sourceAccounts, transactionDetails, outputs)
 
 	def calculateBackerMaximumExchange(self, backer):
-		maximumExchange = backer.transactionMax - Constraints.minimumSwapBillBalance
-		maximumExchange *= Constraints.depositDivisor
-		maximumExchange //= (Constraints.depositDivisor + 1)
+		maximumExchange = backer.transactionMax - self._protocolParams['minimumSwapBillBalance']
+		depositDivisor = self._protocolParams['depositDivisor']
+		maximumExchange *= depositDivisor
+		maximumExchange //= (depositDivisor + 1)
 		return maximumExchange

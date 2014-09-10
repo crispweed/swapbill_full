@@ -21,7 +21,6 @@ try:
 	from SwapBill.Sync import SyncAndReturnStateAndOwnedAccounts
 	from SwapBill.ExceptionReportedToUser import ExceptionReportedToUser
 	from SwapBill.State import InsufficientFundsForTransaction, BadlyFormedTransaction, TransactionFailsAgainstCurrentState
-	from SwapBill.HardCodedProtocolConstraints import Constraints
 	from SwapBill import HostFromPrefsByProtocol
 except ImportError as e:
 	message = str(e)

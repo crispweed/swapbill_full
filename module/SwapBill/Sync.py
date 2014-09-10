@@ -3,8 +3,8 @@ import sys, binascii
 from os import path
 from collections import deque
 from SwapBill import State, RawTransaction, TransactionEncoding, PickledCache, OwnedAccounts, ControlAddressPrefix, KeyPair, SeedAccounts
+from SwapBill import ProtocolParameters
 from SwapBill.ExceptionReportedToUser import ExceptionReportedToUser
-from SwapBill.HardCodedProtocolConstraints import Constraints
 
 stateVersion = 2
 ownedAccountsVersion = 1
@@ -63,10 +63,7 @@ def ForceRescan(cacheDirectory):
 	PickledCache.Remove(cacheDirectory, 'State')
 
 def SyncAndReturnStateAndOwnedAccounts(cacheDirectory, protocol, wallet, host, secretsWatchList, secretsWallet, includePending, out):
-	params = Constraints.paramsByHost[protocol]
-	startBlock = params['startBlock']
-	startBlockHash = params['startBlockHash']		
-	blockIndex = params['startBlock']
+	params = ProtocolParameters.byHost[protocol]
 
 	loaded = False
 	try:
@@ -78,24 +75,24 @@ def SyncAndReturnStateAndOwnedAccounts(cacheDirectory, protocol, wallet, host, s
 	if loaded and host.getBlockHashAtIndexOrNone(blockIndex) != blockHash:
 		print('The block corresponding with cached state has been orphaned, full index generation required.', file=out)
 		loaded = False
-	if loaded and not state.parametersMatch(startBlockHash, minimumHostExchangeAmount=params['minimumHostExchangeAmount'], blocksForExchangeCompletion=params['blocksForExchangeCompletion']):
+	if loaded and not state.parametersMatch(params):
 		print('Start config does not match config from loaded state, full index generation required.', file=out)
 		loaded = False
 	if loaded:
 		print('Loaded cached state data successfully', file=out)
 	else:
-		blockIndex = startBlock
+		blockIndex = params['startBlock']
 		blockHash = host.getBlockHashAtIndexOrNone(blockIndex)
 		if blockHash is None:
-			raise ExceptionReportedToUser('Block chain has not reached the swapbill start block (' + str(startBlock) + ').')
-		if blockHash != startBlockHash:
+			raise ExceptionReportedToUser('Block chain has not reached the swapbill start block (' + str(blockIndex) + ').')
+		if blockHash != params['startBlockHash']:
 			raise ExceptionReportedToUser('Block hash for swapbill start block does not match.')
 		ownedAccounts = OwnedAccounts.OwnedAccounts()
 		seedAccount,seedOutputAmount,seedPubKeyHash,seedAccountScriptPubKey,seedAmount = SeedAccounts.GetSeedAccountInfo(protocol)
 		if wallet.hasKeyPairForPubKeyHash(seedPubKeyHash):
 			seedAccountPrivateKey = wallet.privateKeyForPubKeyHash(seedPubKeyHash)
 			ownedAccounts.addSeedOutput(seedAccount, seedOutputAmount, seedAccountPrivateKey, seedAccountScriptPubKey)
-		state = State.State(blockIndex, blockHash, minimumHostExchangeAmount=params['minimumHostExchangeAmount'], blocksForExchangeCompletion=params['blocksForExchangeCompletion'], seedAccount=seedAccount, seedAmount=seedAmount)
+		state = State.State(params, seedAccount=seedAccount, seedAmount=seedAmount)
 
 	print('State update starting from block', blockIndex, file=out)
 
