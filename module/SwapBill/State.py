@@ -34,12 +34,12 @@ class State(object):
 			self._balances.add(seedAccount, seedAmount)
 		self._totalCreated = 0
 		self._totalForwarded = 0
-		self._ltcBuys = TradeOfferHeap.Heap(startBlockIndex, False) # lower exchange rate is better offer
-		self._ltcSells = TradeOfferHeap.Heap(startBlockIndex, True) # higher exchange rate is better offer
+		self._hostCoinBuys = TradeOfferHeap.Heap(startBlockIndex, False) # lower exchange rate is better offer
+		self._hostCoinSells = TradeOfferHeap.Heap(startBlockIndex, True) # higher exchange rate is better offer
 		self._nextExchangeIndex = 0
 		self._pendingExchanges = {}
 		self._nextBackerIndex = 0
-		self._ltcSellBackers = {}
+		self._hostCoinSellBackers = {}
 		self._nextPendingPayIndex = 0
 		self._pendingPays = {}
 
@@ -47,12 +47,12 @@ class State(object):
 		return protocolParams == self._protocolParams
 
 	def advanceToNextBlock(self):
-		expired = self._ltcBuys.advanceToNextBlock()
+		expired = self._hostCoinBuys.advanceToNextBlock()
 		for buy in expired:
 			self._balances.addStateChange(buy.refundAccount)
 			self._balances.addTo_Forwarded(buy.refundAccount, buy._swapBillOffered)
 			self._balances.removeRef(buy.refundAccount)
-		expired = self._ltcSells.advanceToNextBlock()
+		expired = self._hostCoinSells.advanceToNextBlock()
 		for sell in expired:
 			self._balances.addStateChange(sell.receivingAccount)
 			self._balances.addTo_Forwarded(sell.receivingAccount, self._protocolParams['minimumSwapBillBalance'] + sell._swapBillDeposit)
@@ -79,8 +79,8 @@ class State(object):
 		# ** currently iterates through all entries each block added
 		# are there scaling issues with this?
 		toDelete = []
-		for key in self._ltcSellBackers:
-			backer = self._ltcSellBackers[key]
+		for key in self._hostCoinSellBackers:
+			backer = self._hostCoinSellBackers[key]
 			if backer.expiry == self._currentBlockIndex:
 				# refund remaining amount
 				self._balances.addTo_Forwarded(backer.refundAccount, backer.backingAmount)
@@ -88,7 +88,7 @@ class State(object):
 				self._balances.removeRef(backer.refundAccount)
 				toDelete.append(key)
 		for key in toDelete:
-				self._ltcSellBackers.pop(key)
+				self._hostCoinSellBackers.pop(key)
 		toDelete = []
 		for key in self._pendingPays:
 			pendingPay = self._pendingPays[key]
@@ -108,7 +108,7 @@ class State(object):
 		self._balances.addStateChange(sell.receivingAccount)
 		self._balances.addStateChange(buy.refundAccount)
 		exchange.expiry = self._currentBlockIndex + self._protocolParams['blocksForExchangeCompletion']
-		exchange.buyerLTCReceive = buy.ltcReceiveAddress
+		exchange.buyerLTCReceive = buy.hostCoinReceiveAddress
 		exchange.buyerAccount = buy.refundAccount
 		exchange.sellerAccount = sell.receivingAccount
 		exchange.backerIndex= -1
@@ -130,7 +130,7 @@ class State(object):
 			self._balances.addRef(buy.refundAccount)
 		if sell.hasBeenConsumed():
 			# seller (or backer) gets seed amount (which was locked up implicitly in the sell offer) refunded
-			backer = self._ltcSellBackers.get(exchange.backerIndex, None)
+			backer = self._hostCoinSellBackers.get(exchange.backerIndex, None)
 			if backer is None:
 				# unbacked exchange, or backer expired
 				self._balances.addTo_Forwarded(sell.receivingAccount, self._protocolParams['minimumSwapBillBalance'])
@@ -147,11 +147,11 @@ class State(object):
 	def _newBuyOffer(self, buy):
 		toReAdd = []
 		while True:
-			if self._ltcSells.empty() or not TradeOffer.OffersMeetOrOverlap(buy=buy, sell=self._ltcSells.peekCurrentBest()):
+			if self._hostCoinSells.empty() or not TradeOffer.OffersMeetOrOverlap(buy=buy, sell=self._hostCoinSells.peekCurrentBest()):
 				# no more matchable sell offers
-				self._ltcBuys.addOffer(buy)
+				self._hostCoinBuys.addOffer(buy)
 				break
-			sell = self._ltcSells.popCurrentBest()
+			sell = self._hostCoinSells.popCurrentBest()
 			try:
 				buyRemainder, sellRemainder = self._matchOffersAndAddExchange(buy=buy, sell=sell)
 			except TradeOffer.OfferIsBelowMinimumExchange:
@@ -165,15 +165,15 @@ class State(object):
 			# new offer is fully matched
 			break
 		for entry in toReAdd:
-			self._ltcSells.addOffer(entry)
+			self._hostCoinSells.addOffer(entry)
 	def _newSellOffer(self, sell):
 		toReAdd = []
 		while True:
-			if self._ltcBuys.empty() or not TradeOffer.OffersMeetOrOverlap(buy=self._ltcBuys.peekCurrentBest(), sell=sell):
+			if self._hostCoinBuys.empty() or not TradeOffer.OffersMeetOrOverlap(buy=self._hostCoinBuys.peekCurrentBest(), sell=sell):
 				# no more matchable buy offers
-				self._ltcSells.addOffer(sell)
+				self._hostCoinSells.addOffer(sell)
 				break
-			buy = self._ltcBuys.popCurrentBest()
+			buy = self._hostCoinBuys.popCurrentBest()
 			try:
 				buyRemainder, sellRemainder = self._matchOffersAndAddExchange(buy=buy, sell=sell)
 			except TradeOffer.OfferIsBelowMinimumExchange:
@@ -187,7 +187,7 @@ class State(object):
 			# new offer is fully matched
 			break
 		for entry in toReAdd:
-			self._ltcBuys.addOffer(entry)
+			self._hostCoinBuys.addOffer(entry)
 
 	def _checkChange(self, change):
 		if change < 0:
@@ -218,7 +218,7 @@ class State(object):
 		return change
 
 	def _fundedTransaction_BuyOffer(self, txID, swapBillInput, swapBillOffered, exchangeRate, receivingAddress, maxBlock, outputs):
-		assert outputs == ('ltcBuy',)
+		assert outputs == ('hostCoinBuy',)
 		if exchangeRate == 0 or exchangeRate >= Amounts.percentDivisor:
 			raise BadlyFormedTransaction('invalid exchange rate value')
 		try:
@@ -234,19 +234,19 @@ class State(object):
 		refundAccount = (txID, 1) # same as change account and already created
 		#print("refundAccount:", refundAccount)
 		self._balances.addFirstRef(refundAccount)
-		buy.ltcReceiveAddress = receivingAddress
+		buy.hostCoinReceiveAddress = receivingAddress
 		buy.refundAccount = refundAccount
 		buy.expiry = maxBlock
 		self._newBuyOffer(buy)
 		return change
 
-	def _fundedTransaction_SellOffer(self, txID, swapBillInput, ltcOffered, exchangeRate, maxBlock, outputs):
-		assert outputs == ('ltcSell',)
+	def _fundedTransaction_SellOffer(self, txID, swapBillInput, hostCoinOffered, exchangeRate, maxBlock, outputs):
+		assert outputs == ('hostCoinSell',)
 		if exchangeRate == 0 or exchangeRate >= Amounts.percentDivisor:
 			raise BadlyFormedTransaction('invalid exchange rate value')
-		swapBillDeposit = TradeOffer.DepositRequiredForLTCSell(protocolParams=self._protocolParams, rate=exchangeRate, ltcOffered=ltcOffered)
+		swapBillDeposit = TradeOffer.DepositRequiredForLTCSell(protocolParams=self._protocolParams, rate=exchangeRate, hostCoinOffered=hostCoinOffered)
 		try:
-			sell = TradeOffer.SellOffer(protocolParams=self._protocolParams, swapBillDeposit=swapBillDeposit, ltcOffered=ltcOffered, rate=exchangeRate)
+			sell = TradeOffer.SellOffer(protocolParams=self._protocolParams, swapBillDeposit=swapBillDeposit, hostCoinOffered=hostCoinOffered, rate=exchangeRate)
 		except TradeOffer.OfferIsBelowMinimumExchange:
 			raise BadlyFormedTransaction('does not satisfy minimum exchange amount')
 		if maxBlock < self._currentBlockIndex:
@@ -264,8 +264,8 @@ class State(object):
 		self._newSellOffer(sell)
 		return change
 
-	def _fundedTransaction_BackLTCSells(self, txID, swapBillInput, backingAmount, transactionsBacked, commission, ltcReceiveAddress, maxBlock, outputs):
-		assert outputs == ('ltcSellBacker',)
+	def _fundedTransaction_BackLTCSells(self, txID, swapBillInput, backingAmount, transactionsBacked, commission, hostCoinReceiveAddress, maxBlock, outputs):
+		assert outputs == ('hostCoinSellBacker',)
 		if commission == 0 or commission >= Amounts.percentDivisor:
 			raise BadlyFormedTransaction('invalid commission value')
 		if backingAmount < self._protocolParams['minimumSwapBillBalance']:
@@ -285,32 +285,32 @@ class State(object):
 		backer.backingAmount = backingAmount
 		backer.transactionMax = transactionMax
 		backer.commission = commission
-		backer.ltcReceiveAddress = ltcReceiveAddress
+		backer.hostCoinReceiveAddress = hostCoinReceiveAddress
 		backer.refundAccount = refundAccount
 		backer.expiry = maxBlock
 		key = self._nextBackerIndex
 		self._nextBackerIndex += 1
-		self._ltcSellBackers[key] = backer
+		self._hostCoinSellBackers[key] = backer
 		return change
 
-	def _fundedTransaction_BackedSellOffer(self, txID, swapBillInput, exchangeRate, backerIndex, backerLTCReceiveAddress, ltcOfferedPlusCommission, outputs):
+	def _fundedTransaction_BackedSellOffer(self, txID, swapBillInput, exchangeRate, backerIndex, backerHostCoinReceiveAddress, hostCoinOfferedPlusCommission, outputs):
 		assert outputs == ('sellerReceive',)
 		if exchangeRate == 0 or exchangeRate >= Amounts.percentDivisor:
 			raise BadlyFormedTransaction('invalid exchange rate value')
-		if not backerIndex in self._ltcSellBackers:
+		if not backerIndex in self._hostCoinSellBackers:
 			raise TransactionFailsAgainstCurrentState('no ltc sell backer with the specified index')
-		backer = self._ltcSellBackers[backerIndex]
+		backer = self._hostCoinSellBackers[backerIndex]
 		# we make sure that commission is rounded down here, to make this correspond with commission added to exchange amounts specified by user
-		commission = ltcOfferedPlusCommission * backer.commission // (Amounts.percentDivisor + backer.commission)
-		ltcOffered = ltcOfferedPlusCommission - commission
-		swapBillDeposit = TradeOffer.DepositRequiredForLTCSell(protocolParams=self._protocolParams, rate=exchangeRate, ltcOffered=ltcOffered)
+		commission = hostCoinOfferedPlusCommission * backer.commission // (Amounts.percentDivisor + backer.commission)
+		hostCoinOffered = hostCoinOfferedPlusCommission - commission
+		swapBillDeposit = TradeOffer.DepositRequiredForLTCSell(protocolParams=self._protocolParams, rate=exchangeRate, hostCoinOffered=hostCoinOffered)
 		try:
-			sell = TradeOffer.SellOffer(protocolParams=self._protocolParams, swapBillDeposit=swapBillDeposit, ltcOffered=ltcOffered, rate=exchangeRate)
+			sell = TradeOffer.SellOffer(protocolParams=self._protocolParams, swapBillDeposit=swapBillDeposit, hostCoinOffered=hostCoinOffered, rate=exchangeRate)
 		except TradeOffer.OfferIsBelowMinimumExchange:
 			raise TransactionFailsAgainstCurrentState('does not satisfy minimum exchange amount')
-		if backerLTCReceiveAddress != backer.ltcReceiveAddress:
+		if backerHostCoinReceiveAddress != backer.hostCoinReceiveAddress:
 			raise TransactionFailsAgainstCurrentState('destination address does not match backer receive address for ltc sell backer with the specified index')
-		swapBillEquivalent = TradeOffer.ltcToSwapBill_RoundedUp(rate=exchangeRate, ltc=ltcOffered)
+		swapBillEquivalent = TradeOffer.ltcToSwapBill_RoundedUp(rate=exchangeRate, ltc=hostCoinOffered)
 		# note that minimum balance amount is implicitly seeded into sell offers
 		transactionBackingAmount = self._protocolParams['minimumSwapBillBalance'] + swapBillDeposit + swapBillEquivalent
 		if transactionBackingAmount > backer.transactionMax:
@@ -377,7 +377,7 @@ class State(object):
 		self._totalForwarded += amount
 		return change
 
-	def _unfundedTransaction_LTCExchangeCompletion(self, txID, pendingExchangeIndex, destinationAddress, destinationAmount, outputs):
+	def _unfundedTransaction_ExchangeCompletion(self, txID, pendingExchangeIndex, destinationAddress, destinationAmount, outputs):
 		assert outputs == ()
 		if not pendingExchangeIndex in self._pendingExchanges:
 			raise TransactionFailsAgainstCurrentState('no pending exchange with the specified index')
@@ -392,7 +392,7 @@ class State(object):
 			return
 		# the seller completed their side of the exchange, so credit them the buyers swapbill
 		# and the seller is also refunded their deposit here
-		backer = self._ltcSellBackers.get(exchange.backerIndex, None)
+		backer = self._hostCoinSellBackers.get(exchange.backerIndex, None)
 		if backer is None:
 			# unbacked exchange, or backer expired
 			self._balances.addTo_Forwarded(exchange.sellerAccount, exchange.swapBillAmount + exchange.swapBillDeposit)

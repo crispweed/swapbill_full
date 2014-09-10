@@ -13,12 +13,12 @@ defaultParams = {
 
 class Test(unittest.TestCase):
 	def MinimumSellOffer(self, rate, protocolParams=defaultParams):
-		ltcOffered = TradeOffer.MinimumSellOfferWithRate(protocolParams, rate=rate)
-		deposit = TradeOffer.DepositRequiredForLTCSell(protocolParams, rate, ltcOffered)
-		return TradeOffer.SellOffer(protocolParams, deposit, ltcOffered, rate)
-	def SellOffer(self, rate, ltcOffered, protocolParams=defaultParams):
-		deposit = TradeOffer.DepositRequiredForLTCSell(protocolParams, rate=rate, ltcOffered=ltcOffered)
-		return TradeOffer.SellOffer(protocolParams, swapBillDeposit=deposit, ltcOffered=ltcOffered, rate=rate)
+		hostCoinOffered = TradeOffer.MinimumSellOfferWithRate(protocolParams, rate=rate)
+		deposit = TradeOffer.DepositRequiredForLTCSell(protocolParams, rate, hostCoinOffered)
+		return TradeOffer.SellOffer(protocolParams, deposit, hostCoinOffered, rate)
+	def SellOffer(self, rate, hostCoinOffered, protocolParams=defaultParams):
+		deposit = TradeOffer.DepositRequiredForLTCSell(protocolParams, rate=rate, hostCoinOffered=hostCoinOffered)
+		return TradeOffer.SellOffer(protocolParams, swapBillDeposit=deposit, hostCoinOffered=hostCoinOffered, rate=rate)
 
 	def test_offer_requirements(self):
 		# (based on current protocol constraints)
@@ -35,11 +35,11 @@ class Test(unittest.TestCase):
 		self.assertEqual(TradeOffer.DepositRequiredForLTCSell(defaultParams, 500000000, 1*e(7)-1), 1*e(7)*2//defaultParams['depositDivisor'])
 		self.assertEqual(TradeOffer.DepositRequiredForLTCSell(defaultParams, 250000000, 1*e(7)-1), 1*e(7)*4//defaultParams['depositDivisor'])
 		# (based on current protocol constraints)
-		self.assertEqual(TradeOffer.DepositRequiredForLTCSell(defaultParams, rate=500000000, ltcOffered=0), 0)
-		self.assertEqual(TradeOffer.DepositRequiredForLTCSell(defaultParams, rate=500000000, ltcOffered=1), 1)
-		self.assertEqual(TradeOffer.DepositRequiredForLTCSell(defaultParams, rate=500000000, ltcOffered=7), 1)
-		self.assertEqual(TradeOffer.DepositRequiredForLTCSell(defaultParams, rate=500000000, ltcOffered=8), 1)
-		self.assertEqual(TradeOffer.DepositRequiredForLTCSell(defaultParams, rate=500000000, ltcOffered=9), 2)
+		self.assertEqual(TradeOffer.DepositRequiredForLTCSell(defaultParams, rate=500000000, hostCoinOffered=0), 0)
+		self.assertEqual(TradeOffer.DepositRequiredForLTCSell(defaultParams, rate=500000000, hostCoinOffered=1), 1)
+		self.assertEqual(TradeOffer.DepositRequiredForLTCSell(defaultParams, rate=500000000, hostCoinOffered=7), 1)
+		self.assertEqual(TradeOffer.DepositRequiredForLTCSell(defaultParams, rate=500000000, hostCoinOffered=8), 1)
+		self.assertEqual(TradeOffer.DepositRequiredForLTCSell(defaultParams, rate=500000000, hostCoinOffered=9), 2)
 
 	def test_internal(self):
 		self.assertEqual(TradeOffer.swapBillToLTC_RoundedUp(500000000, 122), 61)
@@ -57,11 +57,11 @@ class Test(unittest.TestCase):
 		self.assertRaises(OfferIsBelowMinimumExchange, TradeOffer.SellOffer, defaultParams, 100, defaultParams['minimumHostExchangeAmount']-1, 437500000)
 		self.assertRaises(OfferIsBelowMinimumExchange, TradeOffer.SellOffer, defaultParams, 2*e(6)//16, 1*e(6), 500000000) # swapbill equivalent below minimum balance
 		rate = 437500000
-		ltcOffered = TradeOffer.MinimumSellOfferWithRate(defaultParams, rate)
-		deposit = TradeOffer.DepositRequiredForLTCSell(defaultParams, rate=rate, ltcOffered=ltcOffered)
-		sell = TradeOffer.SellOffer(defaultParams, deposit, ltcOffered, rate)
-		self.assertDictEqual(sell.__dict__, {'_swapBillDeposit': deposit, 'rate': rate, '_ltcOffered': ltcOffered})
-		self.assertRaises(OfferIsBelowMinimumExchange, TradeOffer.SellOffer, defaultParams, deposit, ltcOffered-1, rate)
+		hostCoinOffered = TradeOffer.MinimumSellOfferWithRate(defaultParams, rate)
+		deposit = TradeOffer.DepositRequiredForLTCSell(defaultParams, rate=rate, hostCoinOffered=hostCoinOffered)
+		sell = TradeOffer.SellOffer(defaultParams, deposit, hostCoinOffered, rate)
+		self.assertDictEqual(sell.__dict__, {'_swapBillDeposit': deposit, 'rate': rate, '_hostCoinOffered': hostCoinOffered})
+		self.assertRaises(OfferIsBelowMinimumExchange, TradeOffer.SellOffer, defaultParams, deposit, hostCoinOffered-1, rate)
 
 	def test_meet_or_overlap(self):
 		buy = TradeOffer.BuyOffer(defaultParams, 1*e(7), 500000000)
@@ -79,7 +79,7 @@ class Test(unittest.TestCase):
 		self.assertRaises(AssertionError, TradeOffer.MatchOffers, defaultParams, buy=buy, sell=sell)
 		# offer adjustments and match call
 		buy = TradeOffer.BuyOffer(defaultParams, 2*e(7), 500000000)
-		sell = self.SellOffer(rate=500000000, ltcOffered=1*e(7))
+		sell = self.SellOffer(rate=500000000, hostCoinOffered=1*e(7))
 		exchange = TradeOffer.MatchOffers(defaultParams, buy=buy, sell=sell)
 		# offers should match exactly
 		self.assertTrue(buy.hasBeenConsumed())
@@ -103,7 +103,7 @@ class Test(unittest.TestCase):
 		exchange = TradeOffer.MatchOffers(defaultParams, buy=buy, sell=sell)
 		# buy should be consumed, and sell remainder left outstanding
 		self.assertTrue(buy.hasBeenConsumed())
-		self.assertDictEqual(sell.__dict__, {'rate': 500000000, '_swapBillDeposit': 4*e(7)//16, '_ltcOffered': 2*e(7)})
+		self.assertDictEqual(sell.__dict__, {'rate': 500000000, '_swapBillDeposit': 4*e(7)//16, '_hostCoinOffered': 2*e(7)})
 		self.assertDictEqual(exchange.__dict__, {'swapBillAmount': 2*e(7), 'ltc': 1*e(7), 'swapBillDeposit': 2*e(7)//16})
 		# similar set of tests, but with different buy and sell rates
 		# offer setup and match call
@@ -132,7 +132,7 @@ class Test(unittest.TestCase):
 		exchange = TradeOffer.MatchOffers(defaultParams, buy=buy, sell=sell)
 		# buy should be consumed, and sell remainder left outstanding
 		self.assertTrue(buy.hasBeenConsumed())
-		self.assertDictEqual(sell.__dict__, {'rate': 562500000, '_swapBillDeposit': 2222223, '_ltcOffered': 2*e(7)})
+		self.assertDictEqual(sell.__dict__, {'rate': 562500000, '_swapBillDeposit': 2222223, '_hostCoinOffered': 2*e(7)})
 		self.assertDictEqual(exchange.__dict__, {'swapBillAmount': 2*e(7), 'ltc': 1*e(7), 'swapBillDeposit': 1111111})
 
 	def test_match_remainder_too_small(self):
@@ -154,34 +154,34 @@ class Test(unittest.TestCase):
 		buyRate = 250000000
 		buy = TradeOffer.BuyOffer(defaultParams, 1*e(7), buyRate)
 		sellRate = 0x45 * 3906250
-		ltcOffered = 2*e(7) * sellRate // Amounts.percentDivisor
+		hostCoinOffered = 2*e(7) * sellRate // Amounts.percentDivisor
 		deposit = 2*e(7) // 16
-		sell = TradeOffer.SellOffer(defaultParams, deposit, ltcOffered, sellRate)
+		sell = TradeOffer.SellOffer(defaultParams, deposit, hostCoinOffered, sellRate)
 		appliedRate = (buyRate + sellRate) // 2
 		ltcInExchange = 1*e(7) * appliedRate // Amounts.percentDivisor
-		assert ltcInExchange < ltcOffered // 2
+		assert ltcInExchange < hostCoinOffered // 2
 		self.assertEqual(ltcInExchange, 2597656)
 		n = ltcInExchange
-		d = ltcOffered
+		d = hostCoinOffered
 		exchangeFractionAsFloat = float(n)/d
 		assert exchangeFractionAsFloat < 0.482 and exchangeFractionAsFloat > 0.481
 		depositInExchange = deposit * n // d
 		exchange = TradeOffer.MatchOffers(defaultParams, buy=buy, sell=sell)
 		self.assertTrue(buy.hasBeenConsumed())
-		self.assertDictEqual(sell.__dict__, {'rate': sellRate, '_swapBillDeposit': deposit-depositInExchange, '_ltcOffered': ltcOffered-ltcInExchange})
+		self.assertDictEqual(sell.__dict__, {'rate': sellRate, '_swapBillDeposit': deposit-depositInExchange, '_hostCoinOffered': hostCoinOffered-ltcInExchange})
 		self.assertDictEqual(exchange.__dict__, {'swapBillAmount': 1*e(7), 'ltc': ltcInExchange, 'swapBillDeposit': depositInExchange})
 
 	def test_attempt_break_deposit_invariant(self):
 		# set up sell which is split exactly in half by partially matching buy
 		# the idea being that one half of the split has to lose the rounding up unit
 		buy = TradeOffer.BuyOffer(defaultParams, 1*e(7)+2, 500000000)
-		deposit = TradeOffer.DepositRequiredForLTCSell(defaultParams, rate=500000000, ltcOffered=1*e(7)+2)
+		deposit = TradeOffer.DepositRequiredForLTCSell(defaultParams, rate=500000000, hostCoinOffered=1*e(7)+2)
 		sell = TradeOffer.SellOffer(defaultParams, deposit, 1*e(7)+2, 500000000)
 		# attempted to break the invariant for deposit always being the exact required deposit, by division rounded up
 		# but it turns out the invariant holds here, because *the exchange* loses the rounding up unit, not the outstanding sell
 		exchange= TradeOffer.MatchOffers(defaultParams, buy=buy, sell=sell)
 		# buy should be consumed, and sell remainder left outstanding
 		self.assertTrue(buy.hasBeenConsumed)
-		self.assertDictEqual(sell.__dict__, {'_swapBillDeposit': 625001, 'rate': 500000000, '_ltcOffered': 5000001})
+		self.assertDictEqual(sell.__dict__, {'_swapBillDeposit': 625001, 'rate': 500000000, '_hostCoinOffered': 5000001})
 		self.assertDictEqual(exchange.__dict__, {'swapBillAmount': 10000002, 'ltc': 5000001, 'swapBillDeposit': 625000})
 

@@ -22,23 +22,23 @@ _fundedMappingByTypeCode = (
     ),
     ('BuyOffer',
      ('swapBillOffered', 6, 'maxBlock', 4, 'exchangeRate', 4),
-     ('ltcBuy',),
+     ('hostCoinBuy',),
      (('receivingAddress', None),)
 	),
     ('SellOffer',
-     ('ltcOffered', 6, 'maxBlock', 4, 'exchangeRate', 4),
-     ('ltcSell',),
+     ('hostCoinOffered', 6, 'maxBlock', 4, 'exchangeRate', 4),
+     ('hostCoinSell',),
      ()
 	),
     ('BackLTCSells',
      ('backingAmount', 6, 'transactionsBacked', 3, 'maxBlock', 4, 'commission', 4),
-     ('ltcSellBacker',),
-     (('ltcReceiveAddress', None),)
+     ('hostCoinSellBacker',),
+     (('hostCoinReceiveAddress', None),)
 	),
     ('BackedSellOffer',
      ('exchangeRate', 4, 'backerIndex', 6),
      ('sellerReceive',),
-     (('backerLTCReceiveAddress', 'ltcOfferedPlusCommission'),)
+     (('backerHostCoinReceiveAddress', 'hostCoinOfferedPlusCommission'),)
 	),
     ('PayOnRevealSecret',
      ('amount', 6, 'maxBlock', 4),
@@ -50,7 +50,7 @@ _fundedMappingByTypeCode = (
 _forwardCompatibilityMapping = ('ForwardToFutureNetworkVersion', ('amount', 6, 'maxBlock', 4), ('change',), ())
 
 _unfundedMappingByTypeCode = (
-    ('LTCExchangeCompletion',
+    ('ExchangeCompletion',
      ('pendingExchangeIndex', 6),
      (),
      (('destinationAddress', 'destinationAmount'),)

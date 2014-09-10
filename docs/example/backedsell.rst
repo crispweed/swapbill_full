@@ -71,17 +71,17 @@ The best offer comes first, with 1.1 swapbill offered at an exchange rate of 0.9
 So let's assume we're ok with making an exchange at this rate, but we actually want to exchange a bit more than 1.1 host coin.
 
 ```
-~/git/swapbill $ python Client.py post_ltc_sell --ltcOffered 4 --exchangeRate 0.92 --backerID 0
+~/git/swapbill $ python Client.py post_ltc_sell --hostCoinOffered 4 --exchangeRate 0.92 --backerID 0
 Loaded cached state data successfully
 State update starting from block 306244
 Committed state updated to start of block 306247
 In memory state updated to end of block 306267
-attempting to send BackedSellOffer, sellerReceive output address=msUkYfCkH8vdQGp1TmsnEm8Pm5vgEARBHb, backerIndex=0, backerLTCReceiveAddress=mo4DLT1a7ZhBRZTrXYXs9BRu6efyzrXmM1, exchangeRate=920000000, ltcOfferedPlusCommission=404000000
+attempting to send BackedSellOffer, sellerReceive output address=msUkYfCkH8vdQGp1TmsnEm8Pm5vgEARBHb, backerIndex=0, backerHostCoinReceiveAddress=mo4DLT1a7ZhBRZTrXYXs9BRu6efyzrXmM1, exchangeRate=920000000, hostCoinOfferedPlusCommission=404000000
 Operation successful
 transaction id : 81e8bd072c386fa3b0744779083e98626de6f57719a025b8ae1115230c902fed
 ```
 
-Note that, by default, backers commission will be added to the amount specified here for ltcOffered.
+Note that, by default, backers commission will be added to the amount specified here for hostCoinOffered.
 So, in this case, we'll actually pay 4.04 litecoin in to this transaction.
 If we want to specify an amount to be paid *including backer commission* then we can do this by setting the --includesCommission flag.
 

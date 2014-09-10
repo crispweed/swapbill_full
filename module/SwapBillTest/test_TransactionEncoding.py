@@ -58,12 +58,12 @@ class Test(unittest.TestCase):
 		self.assertRaisesRegexp(Exception, "('Unknown transaction type string', 'Burneeyo')", TransactionEncoding.FromStateTransaction, 'Burneeyo', [], ('destination',), ('_pkh',), {'amount':10})
 		# lengths of keys and outputs spec don't match
 		self.assertRaises(AssertionError, TransactionEncoding.FromStateTransaction, 'Pay', [('sourceTXID',4)], ('change','destination'), ('changePKH'), {'amount':20, 'maxBlock':100})
-		# LTCExchangeCompletion is unfunded, so must not have sourceAccounts list set
-		self.assertRaises(AssertionError, TransactionEncoding.FromStateTransaction, 'LTCExchangeCompletion', [], (), (), {'pendingExchangeIndex':10, 'destinationAddress':'madeUpAddress', 'destinationAmount':10})
+		# ExchangeCompletion is unfunded, so must not have sourceAccounts list set
+		self.assertRaises(AssertionError, TransactionEncoding.FromStateTransaction, 'ExchangeCompletion', [], (), (), {'pendingExchangeIndex':10, 'destinationAddress':'madeUpAddress', 'destinationAmount':10})
 		# control group!
 		TransactionEncoding.FromStateTransaction('Burn', [], ('destination',), ('_pkh',), {'amount':10})
 		TransactionEncoding.FromStateTransaction('Pay', [('sourceTXID',4)], ('change','destination'), ('changePKH', 'destinationPKH'), {'amount':20, 'maxBlock':100})
-		TransactionEncoding.FromStateTransaction('LTCExchangeCompletion', None, (), (), {'pendingExchangeIndex':10, 'destinationAddress':'madeUpAddress', 'destinationAmount':10})
+		TransactionEncoding.FromStateTransaction('ExchangeCompletion', None, (), (), {'pendingExchangeIndex':10, 'destinationAddress':'madeUpAddress', 'destinationAmount':10})
 
 	def test_bad_burn_address(self):
 		tx = TransactionEncoding.FromStateTransaction('Burn', [], ('destination',), ('_pkh',), {'amount':10})
@@ -84,21 +84,21 @@ class Test(unittest.TestCase):
 		tx = TransactionEncoding.FromStateTransaction(
 		    'BuyOffer',
 		    [('sourceTXID',5)],
-		    ('ltcBuy',), ('ltcBuyPKH',),
+		    ('hostCoinBuy',), ('hostCoinBuyPKH',),
 		    {'receivingAddress':'ltcReceivePKH', 'swapBillOffered':22, 'maxBlock':0, 'exchangeRate':123}
 		)
-		self.assertDictEqual(tx.__dict__, {'_outputs': [(b'SB\x02\x16\x00\x00\x00\x00\x00\x00\x00\x00\x00{\x00\x00\x00\x00\x00\x00', 0), ('ltcBuyPKH', 0), ('ltcReceivePKH', 0)], '_inputs': [('sourceTXID', 5)]} )
+		self.assertDictEqual(tx.__dict__, {'_outputs': [(b'SB\x02\x16\x00\x00\x00\x00\x00\x00\x00\x00\x00{\x00\x00\x00\x00\x00\x00', 0), ('hostCoinBuyPKH', 0), ('ltcReceivePKH', 0)], '_inputs': [('sourceTXID', 5)]} )
 		self.checkIgnoredBytes(tx, 3)
 		tx = TransactionEncoding.FromStateTransaction(
 		    'SellOffer',
 		    [('sourceTXID',3)],
-		    ('ltcSell',), ('ltcSellPKH',),
-		    {'ltcOffered':22, 'maxBlock':0, 'exchangeRate':123}
+		    ('hostCoinSell',), ('hostCoinSellPKH',),
+		    {'hostCoinOffered':22, 'maxBlock':0, 'exchangeRate':123}
 		)
-		self.assertDictEqual(tx.__dict__, {'_inputs': [('sourceTXID', 3)], '_outputs': [(b'SB\x03\x16\x00\x00\x00\x00\x00\x00\x00\x00\x00{\x00\x00\x00\x00\x00\x00', 0), ('ltcSellPKH', 0)]} )
+		self.assertDictEqual(tx.__dict__, {'_inputs': [('sourceTXID', 3)], '_outputs': [(b'SB\x03\x16\x00\x00\x00\x00\x00\x00\x00\x00\x00{\x00\x00\x00\x00\x00\x00', 0), ('hostCoinSellPKH', 0)]} )
 		self.checkIgnoredBytes(tx, 3)
 		tx = TransactionEncoding.FromStateTransaction(
-		    'LTCExchangeCompletion',
+		    'ExchangeCompletion',
 		    None,
 		    (), (),
 		    {'pendingExchangeIndex':32, 'destinationAddress':'destinationPKH', 'destinationAmount':999}
@@ -108,10 +108,10 @@ class Test(unittest.TestCase):
 		tx = TransactionEncoding.FromStateTransaction(
 		    'BackLTCSells',
 		    [('sourceTXID',7)],
-		    ('ltcSellBacker',), ('ltcSellBackerPKH',),
-		    {'backingAmount':32, 'transactionsBacked':4, 'ltcReceiveAddress':'receivePKH', 'maxBlock':123, 'commission':0xfffffff}
+		    ('hostCoinSellBacker',), ('hostCoinSellBackerPKH',),
+		    {'backingAmount':32, 'transactionsBacked':4, 'hostCoinReceiveAddress':'receivePKH', 'maxBlock':123, 'commission':0xfffffff}
 		)
-		self.assertDictEqual(tx.__dict__, {'_inputs': [('sourceTXID', 7)], '_outputs': [(b'SB\x04 \x00\x00\x00\x00\x00\x04\x00\x00{\x00\x00\x00\xff\xff\xff\x0f', 0), ('ltcSellBackerPKH', 0), ('receivePKH', 0)]})
+		self.assertDictEqual(tx.__dict__, {'_inputs': [('sourceTXID', 7)], '_outputs': [(b'SB\x04 \x00\x00\x00\x00\x00\x04\x00\x00{\x00\x00\x00\xff\xff\xff\x0f', 0), ('hostCoinSellBackerPKH', 0), ('receivePKH', 0)]})
 		self.checkIgnoredBytes(tx, 0)
 
 	def test_PayOnRevealSecret(self):
@@ -196,7 +196,7 @@ class Test(unittest.TestCase):
 		# after that, we get unfunded transactions
 		tx._outputs[0] = (b'SB\x80\x14\x00\x00\x00\x00\x00d\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00', 0)
 		transactionType, sourceAccounts, outputs, details = TransactionEncoding.ToStateTransaction(tx)
-		self.assertEqual(transactionType, 'LTCExchangeCompletion')
+		self.assertEqual(transactionType, 'ExchangeCompletion')
 		# codes after unfunded not supported (increase the typecode byte, if more unfunded added)
 		tx._outputs[0] = (b'SB\x90\x14\x00\x00\x00\x00\x00d\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00', 0)
 		self.assertRaises(TransactionEncoding.UnsupportedTransaction, TransactionEncoding.ToStateTransaction, tx)
@@ -206,13 +206,13 @@ class Test(unittest.TestCase):
 
 	def test_destination_range(self):
 		details = {'pendingExchangeIndex':32, 'destinationAddress':'destinationPKH', 'destinationAmount':100}
-		tx = TransactionEncoding.FromStateTransaction('LTCExchangeCompletion', None, (), (), details)
+		tx = TransactionEncoding.FromStateTransaction('ExchangeCompletion', None, (), (), details)
 		details['destinationAmount'] = 0
-		tx = TransactionEncoding.FromStateTransaction('LTCExchangeCompletion', None, (), (), details)
+		tx = TransactionEncoding.FromStateTransaction('ExchangeCompletion', None, (), (), details)
 		details['destinationAmount'] = -1
-		self.assertRaisesRegexp(ExceptionReportedToUser, 'Negative output amounts are not permitted', TransactionEncoding.FromStateTransaction, 'LTCExchangeCompletion', None, (), (), details)
+		self.assertRaisesRegexp(ExceptionReportedToUser, 'Negative output amounts are not permitted', TransactionEncoding.FromStateTransaction, 'ExchangeCompletion', None, (), (), details)
 		details['destinationAmount'] = 0xffffffffffffffff
-		tx = TransactionEncoding.FromStateTransaction('LTCExchangeCompletion', None, (), (), details)
+		tx = TransactionEncoding.FromStateTransaction('ExchangeCompletion', None, (), (), details)
 		details['destinationAmount'] += 1
-		self.assertRaisesRegexp(ExceptionReportedToUser, 'Control address output amount exceeds supported range', TransactionEncoding.FromStateTransaction, 'LTCExchangeCompletion', None, (), (), details)
+		self.assertRaisesRegexp(ExceptionReportedToUser, 'Control address output amount exceeds supported range', TransactionEncoding.FromStateTransaction, 'ExchangeCompletion', None, (), (), details)
 

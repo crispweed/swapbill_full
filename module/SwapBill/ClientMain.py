@@ -173,8 +173,8 @@ def Main(commandLineArgs=sys.argv[1:], out=sys.stdout):
 		    'totalCreated':state._totalCreated,
 		    'atEndOfBlock':state._currentBlockIndex - 1, 'balances':formattedBalances, 'syncOutput':syncOut.getvalue(),
 		    #'syncTime':elapsedTime,
-		    'numberOfHostCoinBuyOffers':state._ltcBuys.size(),
-		    'numberOfHostCoinSellOffers':state._ltcSells.size(),
+		    'numberOfHostCoinBuyOffers':state._hostCoinBuys.size(),
+		    'numberOfHostCoinSellOffers':state._hostCoinSells.size(),
 		    'numberOfPendingExchanges':len(state._pendingExchanges),
 		    'numberOfOutputs':len(ownedAccounts.accounts)
 		}
@@ -308,7 +308,7 @@ def Main(commandLineArgs=sys.argv[1:], out=sys.stdout):
 
 	elif args.action == 'buy_offer':
 		transactionType = 'BuyOffer'
-		outputs = ('ltcBuy',)
+		outputs = ('hostCoinBuy',)
 		outputPubKeyHashes = (wallet.addKeyPairAndReturnPubKeyHash(),)
 		details = {
 		    'swapBillOffered':Amounts.FromString(args.swapBillOffered),
@@ -322,29 +322,29 @@ def Main(commandLineArgs=sys.argv[1:], out=sys.stdout):
 		details = {'exchangeRate':Amounts.PercentFromString(args.exchangeRate)}
 		if args.backerID is None:
 			transactionType = 'SellOffer'
-			outputs = ('ltcSell',)
+			outputs = ('hostCoinSell',)
 			details['maxBlock'] = state._currentBlockIndex + args.blocksUntilExpiry
-			details['ltcOffered'] = Amounts.FromString(args.hostCoinOffered)
+			details['hostCoinOffered'] = Amounts.FromString(args.hostCoinOffered)
 		else:
 			backerID = int(args.backerID)
-			if not backerID in state._ltcSellBackers:
+			if not backerID in state._hostCoinSellBackers:
 				raise ExceptionReportedToUser('No backer with the specified ID.')
-			backer = state._ltcSellBackers[backerID]
+			backer = state._hostCoinSellBackers[backerID]
 			transactionType = 'BackedSellOffer'
 			outputs = ('sellerReceive',)
 			ltc = Amounts.FromString(args.hostCoinOffered)
 			if args.includesCommission:
-				details['ltcOfferedPlusCommission'] = ltc
+				details['hostCoinOfferedPlusCommission'] = ltc
 			else:
 				ltcCommission = ltc * backer.commission // Amounts.percentDivisor
-				details['ltcOfferedPlusCommission'] = ltc + ltcCommission
+				details['hostCoinOfferedPlusCommission'] = ltc + ltcCommission
 			details['backerIndex'] = int(args.backerID)
-			details['backerLTCReceiveAddress'] = backer.ltcReceiveAddress
+			details['backerHostCoinReceiveAddress'] = backer.hostCoinReceiveAddress
 		outputPubKeyHashes = (wallet.addKeyPairAndReturnPubKeyHash(),)
 		return CheckAndSend_Funded(transactionType, outputs, outputPubKeyHashes, details)
 
 	elif args.action == 'complete_sell':
-		transactionType = 'LTCExchangeCompletion'
+		transactionType = 'ExchangeCompletion'
 		pendingExchangeID = int(args.pendingExchangeID)
 		if not pendingExchangeID in state._pendingExchanges:
 			raise ExceptionReportedToUser('No pending exchange with the specified ID.')
@@ -372,12 +372,12 @@ def Main(commandLineArgs=sys.argv[1:], out=sys.stdout):
 
 	elif args.action == 'back_sells':
 		transactionType = 'BackLTCSells'
-		outputs = ('ltcSellBacker',)
+		outputs = ('hostCoinSellBacker',)
 		outputPubKeyHashes = (wallet.addKeyPairAndReturnPubKeyHash(),)
 		details = {
 		    'backingAmount':Amounts.FromString(args.backingSwapBill),
 		    'transactionsBacked':int(args.transactionsBacked),
-		    'ltcReceiveAddress':host.getManagedAddress(),
+		    'hostCoinReceiveAddress':host.getManagedAddress(),
 		    'commission':Amounts.PercentFromString(args.commission),
 		    'maxBlock':state._currentBlockIndex + args.blocksUntilExpiry
 		}
@@ -405,7 +405,7 @@ def Main(commandLineArgs=sys.argv[1:], out=sys.stdout):
 
 	elif args.action == 'get_buy_offers':
 		result = []
-		for offer in state._ltcBuys.getSortedOffers():
+		for offer in state._hostCoinBuys.getSortedOffers():
 			mine = offer.refundAccount in ownedAccounts.tradeOfferChangeCounts
 			exchangeAmount = offer._swapBillOffered
 			ltc = offer.ltcEquivalent()
@@ -415,9 +415,9 @@ def Main(commandLineArgs=sys.argv[1:], out=sys.stdout):
 
 	elif args.action == 'get_sell_offers':
 		result = []
-		for offer in state._ltcSells.getSortedOffers():
+		for offer in state._hostCoinSells.getSortedOffers():
 			mine = offer.receivingAccount in ownedAccounts.tradeOfferChangeCounts
-			ltc = offer._ltcOffered
+			ltc = offer._hostCoinOffered
 			depositAmount = offer._swapBillDeposit
 			swapBillEquivalent = offer.swapBillEquivalent()
 			details = {'host coin offered':Amounts.ToString(ltc), 'deposit':Amounts.ToString(depositAmount), 'swapbill equivalent':Amounts.ToString(swapBillEquivalent), 'mine':mine}
@@ -445,9 +445,9 @@ def Main(commandLineArgs=sys.argv[1:], out=sys.stdout):
 
 	elif args.action == 'get_sell_backers':
 		result = []
-		for key in state._ltcSellBackers:
+		for key in state._hostCoinSellBackers:
 			d = {}
-			backer = state._ltcSellBackers[key]
+			backer = state._hostCoinSellBackers[key]
 			d['I am backer'] = backer.refundAccount in ownedAccounts.tradeOfferChangeCounts
 			d['backing amount'] = Amounts.ToString(backer.backingAmount)
 			d['backing amount per transaction'] = Amounts.ToString(backer.transactionMax)

@@ -8,9 +8,9 @@ def totalAccountedFor(state):
 	result = 0
 	for key in state._balances.balances:
 		result += state._balances.balances[key]
-	for offer in state._ltcBuys.getSortedOffers():
+	for offer in state._hostCoinBuys.getSortedOffers():
 		result += offer._swapBillOffered
-	for offer in state._ltcSells.getSortedOffers():
+	for offer in state._hostCoinSells.getSortedOffers():
 		result += offer._swapBillDeposit + state._protocolParams['minimumSwapBillBalance']
 		if offer.isBacked:
 			result += offer.backingSwapBill
@@ -18,8 +18,8 @@ def totalAccountedFor(state):
 		exchange = state._pendingExchanges[key]
 		result += exchange.swapBillAmount
 		result += exchange.swapBillDeposit
-	for key in state._ltcSellBackers:
-		backer = state._ltcSellBackers[key]
+	for key in state._hostCoinSellBackers:
+		backer = state._hostCoinSellBackers[key]
 		result += backer.backingAmount
 	for key in state._pendingPays:
 		result += state._pendingPays[key].amount
@@ -40,11 +40,11 @@ class Test(unittest.TestCase):
 	    'Burn':('destination',),
 	    'Pay':('change','destination'),
 	    'PayOnRevealSecret':('change','destination'),
-	    'BuyOffer':('ltcBuy',),
-	    'SellOffer':('ltcSell',),
-	    'BackLTCSells':('ltcSellBacker',),
+	    'BuyOffer':('hostCoinBuy',),
+	    'SellOffer':('hostCoinSell',),
+	    'BackLTCSells':('hostCoinSellBacker',),
 	    'BackedSellOffer':('sellerReceive',),
-	    'LTCExchangeCompletion':(),
+	    'ExchangeCompletion':(),
 	    'RevealPendingPaymentSecret':(),
 	    'ForwardToFutureNetworkVersion':('change',)
 	    }
@@ -89,8 +89,8 @@ class Test(unittest.TestCase):
 		# (or state checksum..)
 		expectedBalances = state._balances.balances.copy()
 		exchangesBefore = len(state._pendingExchanges)
-		buysBefore = state._ltcBuys.size()
-		sellsBefore = state._ltcSells.size()
+		buysBefore = state._hostCoinBuys.size()
+		sellsBefore = state._hostCoinSells.size()
 		try:
 			state.checkTransaction(transactionType, outputs=outputs, transactionDetails=details, sourceAccounts=sourceAccounts)
 		except (State.BadlyFormedTransaction, State.TransactionFailsAgainstCurrentState, State.InsufficientFundsForTransaction):
@@ -101,8 +101,8 @@ class Test(unittest.TestCase):
 
 		self.assertDictEqual(state._balances.balances, expectedBalances)
 		self.assertEqual(exchangesBefore, len(state._pendingExchanges))
-		self.assertEqual(buysBefore, state._ltcBuys.size())
-		self.assertEqual(sellsBefore, state._ltcSells.size())
+		self.assertEqual(buysBefore, state._hostCoinBuys.size())
+		self.assertEqual(sellsBefore, state._hostCoinSells.size())
 		self.assertEqual(totalAccountedFor(state), state._totalCreated)
 
 		swapBillInput = 0
@@ -131,25 +131,25 @@ class Test(unittest.TestCase):
 
 		self.assertDictEqual(state._balances.balances, expectedBalances)
 		self.assertEqual(exchangesBefore, len(state._pendingExchanges))
-		self.assertEqual(buysBefore, state._ltcBuys.size())
-		self.assertEqual(sellsBefore, state._ltcSells.size())
+		self.assertEqual(buysBefore, state._hostCoinBuys.size())
+		self.assertEqual(sellsBefore, state._hostCoinSells.size())
 		self.assertEqual(totalAccountedFor(state), state._totalCreated)
 		return (txID, 1)
 
 	def Apply_AssertInsufficientFunds(self, state, transactionType, sourceAccounts=None, **details):
 		return self.Apply_AssertFails(state, transactionType, sourceAccounts=sourceAccounts, expectedError='insufficient funds', **details)
 
-	def SellOffer(self, state, source, ltcOffered, exchangeRate, maxBlock=200):
-		details = {'ltcOffered':ltcOffered, 'exchangeRate':exchangeRate, 'maxBlock':maxBlock}
+	def SellOffer(self, state, source, hostCoinOffered, exchangeRate, maxBlock=200):
+		details = {'hostCoinOffered':hostCoinOffered, 'exchangeRate':exchangeRate, 'maxBlock':maxBlock}
 		outputs = self.Apply_AssertSucceeds(state, 'SellOffer', sourceAccounts=[source], **details)
-		return outputs['ltcSell']
+		return outputs['hostCoinSell']
 	def BuyOffer(self, state, source, receiveAddress, swapBillOffered, exchangeRate, maxBlock=200):
 		details = {'receivingAddress':receiveAddress, 'swapBillOffered':swapBillOffered, 'exchangeRate':exchangeRate, 'maxBlock':maxBlock}
 		outputs = self.Apply_AssertSucceeds(state, 'BuyOffer', sourceAccounts=[source], **details)
-		return outputs['ltcBuy']
+		return outputs['hostCoinBuy']
 	def Completion(self, state, pendingExchangeIndex, destinationAddress, destinationAmount):
 		details = {'pendingExchangeIndex':pendingExchangeIndex, 'destinationAddress':destinationAddress, 'destinationAmount':destinationAmount}
-		self.Apply_AssertSucceeds(state, 'LTCExchangeCompletion', **details)
+		self.Apply_AssertSucceeds(state, 'ExchangeCompletion', **details)
 
 	def test_state_setup(self):
 		params = {
@@ -332,7 +332,7 @@ class Test(unittest.TestCase):
 		# cannot post buy or sell offers, because of minimum exchange amount constraint
 		change = self.Apply_AssertFails(state, 'BuyOffer', expectedError='does not satisfy minimum exchange amount', sourceAccounts=[burnOutput], swapBillOffered=100, exchangeRate=500000000, receivingAddress='a_receive', maxBlock=200)
 		self.assertEqual(state._balances.balances, {change:10000})
-		change2 = self.Apply_AssertFails(state, 'SellOffer', expectedError='does not satisfy minimum exchange amount', sourceAccounts=[change], ltcOffered=100//2, exchangeRate=500000000, maxBlock=200)
+		change2 = self.Apply_AssertFails(state, 'SellOffer', expectedError='does not satisfy minimum exchange amount', sourceAccounts=[change], hostCoinOffered=100//2, exchangeRate=500000000, maxBlock=200)
 		self.assertEqual(state._balances.balances, {change2:10000})
 		self.assertEqual(totalAccountedFor(state), state._totalCreated)
 	def test_minimum_exchange_amount2(self):
@@ -343,7 +343,7 @@ class Test(unittest.TestCase):
 		burnOutput = self.Burn(2*e(7))
 		# cannot post buy or sell offers, because of minimum exchange amount constraint
 		change = self.Apply_AssertFails(state, 'BuyOffer', expectedError='does not satisfy minimum exchange amount', sourceAccounts=[burnOutput], swapBillOffered=1*e(7)-1, exchangeRate=500000000, receivingAddress='a_receive', maxBlock=200)
-		self.Apply_AssertFails(state, 'SellOffer', expectedError='does not satisfy minimum exchange amount', sourceAccounts=[change], ltcOffered=1*e(7)//2-1, exchangeRate=500000000, maxBlock=200)
+		self.Apply_AssertFails(state, 'SellOffer', expectedError='does not satisfy minimum exchange amount', sourceAccounts=[change], hostCoinOffered=1*e(7)//2-1, exchangeRate=500000000, maxBlock=200)
 
 	def test_trade_offers_leave_less_than_minimum_balance(self):
 		params = defaultParams.copy()
@@ -355,20 +355,20 @@ class Test(unittest.TestCase):
 		change = self.Apply_AssertInsufficientFunds(state, 'BuyOffer', sourceAccounts=[burn], swapBillOffered=12*e(6), exchangeRate=500000000, receivingAddress='a_receive', maxBlock=200)
 		# but all swapbill input can now be spent by the transaction
 		outputs = self.Apply_AssertSucceeds(state, 'BuyOffer', sourceAccounts=[change], swapBillOffered=2*e(7), exchangeRate=500000000, receivingAddress='a_receive', maxBlock=200)
-		buy = outputs['ltcBuy']
+		buy = outputs['hostCoinBuy']
 		self.assertEqual(state._balances.balances, {buy:0}) # this account is kept open with zero balance for possible future trade payments
 		burn2 = self.Burn(3*e(7))
 		# note that sell offers consume minimum balance, as well as deposit
 		# can't leave less than minimum balance as change
 		deposit = 12*e(6)
 		ltc = deposit*params['depositDivisor']//2
-		change2 = self.Apply_AssertInsufficientFunds(state, 'SellOffer', sourceAccounts=[burn2], ltcOffered=ltc, exchangeRate=500000000, maxBlock=200)
+		change2 = self.Apply_AssertInsufficientFunds(state, 'SellOffer', sourceAccounts=[burn2], hostCoinOffered=ltc, exchangeRate=500000000, maxBlock=200)
 		# but all swapbill input can now be spent by the transaction
 		deposit = 2*e(7)
 		ltc = deposit*params['depositDivisor']//2
 		self.assertEqual(state._balances.balances, {buy:0, change2:3*e(7)})
-		outputs = self.Apply_AssertSucceeds(state, 'SellOffer', sourceAccounts=[change2], ltcOffered=ltc, exchangeRate=500000000, maxBlock=200)
-		sell = outputs['ltcSell']
+		outputs = self.Apply_AssertSucceeds(state, 'SellOffer', sourceAccounts=[change2], hostCoinOffered=ltc, exchangeRate=500000000, maxBlock=200)
+		sell = outputs['hostCoinSell']
 		self.assertEqual(state._balances.balances, {buy:0, sell:0})
 
 	def test_ltc_trading1(self):
@@ -394,8 +394,8 @@ class Test(unittest.TestCase):
 		# bad output specs
 		self.assertRaises(AssertionError, state.checkTransaction, 'BuyOffer', outputs=(), transactionDetails=details, sourceAccounts=[burnA])
 		self.assertRaises(AssertionError, state.checkTransaction, 'BuyOffer', outputs=('madeUpOutput'), transactionDetails=details, sourceAccounts=[burnA])
-		self.assertRaises(AssertionError, state.checkTransaction, 'BuyOffer', outputs=('ltcBuy', 'change'), transactionDetails=details, sourceAccounts=[burnA])
-		self.assertRaises(AssertionError, state.checkTransaction, 'BuyOffer', outputs=('change', 'ltcBuy', 'extraOutput'), transactionDetails=details, sourceAccounts=[burnA])
+		self.assertRaises(AssertionError, state.checkTransaction, 'BuyOffer', outputs=('hostCoinBuy', 'change'), transactionDetails=details, sourceAccounts=[burnA])
+		self.assertRaises(AssertionError, state.checkTransaction, 'BuyOffer', outputs=('change', 'hostCoinBuy', 'extraOutput'), transactionDetails=details, sourceAccounts=[burnA])
 
 		# nonexistant source account
 		self.Apply_AssertInsufficientFunds(state, 'BuyOffer', sourceAccounts=['madeUpAccount'], **details)
@@ -416,7 +416,7 @@ class Test(unittest.TestCase):
 		details['maxBlock'] = 100
 		expectedBalances[expiredBuyOfferChange] = expectedBalances.pop(burnA)
 		self.assertEqual(state._balances.balances, expectedBalances)
-		self.assertEqual(state._ltcBuys.size(), 0)
+		self.assertEqual(state._hostCoinBuys.size(), 0)
 
 		# try offering more than available
 		details['swapBillOffered'] = 3000000000
@@ -430,16 +430,16 @@ class Test(unittest.TestCase):
 		expectedBalances[failedBuyChange2] = expectedBalances.pop(failedBuyChange)
 		self.assertEqual(state._balances.balances, expectedBalances)
 
-		self.assertEqual(state._ltcBuys.size(), 0)
+		self.assertEqual(state._hostCoinBuys.size(), 0)
 
 		# reasonable buy offer that should go through
 		details['swapBillOffered'] = 30000000
 		outputs = self.Apply_AssertSucceeds(state, 'BuyOffer', sourceAccounts=[failedBuyChange2], **details)
-		refundA = outputs['ltcBuy']
+		refundA = outputs['hostCoinBuy']
 		expectedBalances.pop(failedBuyChange2)
 		expectedBalances[refundA]=70000000
 		self.assertEqual(state._balances.balances, expectedBalances)
-		self.assertEqual(state._ltcBuys.size(), 1)
+		self.assertEqual(state._hostCoinBuys.size(), 1)
 
 		# refund account *can* now be completely spent while still referenced by the trade
 		outputs = self.Apply_AssertSucceeds(state, 'Pay', sourceAccounts=[refundA], amount=expectedBalances[refundA], maxBlock=200)
@@ -452,15 +452,15 @@ class Test(unittest.TestCase):
 		# B wants to sell
 
 		details = {
-		    'ltcOffered':40000000//2, 'exchangeRate':500000000,
+		    'hostCoinOffered':40000000//2, 'exchangeRate':500000000,
 		    'maxBlock':200
 		}
 
 		# bad output specs
 		self.assertRaises(AssertionError, state.checkTransaction, 'SellOffer', outputs=(), transactionDetails=details, sourceAccounts=[burnB])
 		self.assertRaises(AssertionError, state.checkTransaction, 'SellOffer', outputs=('madeUpOutput'), transactionDetails=details, sourceAccounts=[burnB])
-		self.assertRaises(AssertionError, state.checkTransaction, 'SellOffer', outputs=('ltcSell', 'change'), transactionDetails=details, sourceAccounts=[burnB])
-		self.assertRaises(AssertionError, state.checkTransaction, 'SellOffer', outputs=('change', 'ltcSell', 'extraOutput'), transactionDetails=details, sourceAccounts=[burnB])
+		self.assertRaises(AssertionError, state.checkTransaction, 'SellOffer', outputs=('hostCoinSell', 'change'), transactionDetails=details, sourceAccounts=[burnB])
+		self.assertRaises(AssertionError, state.checkTransaction, 'SellOffer', outputs=('change', 'hostCoinSell', 'extraOutput'), transactionDetails=details, sourceAccounts=[burnB])
 
 		# nonexistant source account
 
@@ -483,27 +483,27 @@ class Test(unittest.TestCase):
 		expectedBalances[expiredSellOfferChange] = expectedBalances.pop(burnB)
 
 		# try offering more than available
-		details['ltcOffered'] = 40000000000//2
+		details['hostCoinOffered'] = 40000000000//2
 		offerTooHighChange = self.Apply_AssertInsufficientFunds(state, 'SellOffer', sourceAccounts=[expiredSellOfferChange], **details)
 		expectedBalances[offerTooHighChange] = expectedBalances.pop(expiredSellOfferChange)
 
 		# zero amount
-		details['ltcOffered'] = 0
+		details['hostCoinOffered'] = 0
 		zeroAmountChange = self.Apply_AssertFails(state, 'SellOffer', sourceAccounts=[offerTooHighChange], expectedError='does not satisfy minimum exchange amount', **details)
 		expectedBalances[zeroAmountChange] = expectedBalances.pop(offerTooHighChange)
 		self.assertEqual(state._balances.balances, expectedBalances)
 
-		self.assertEqual(state._ltcBuys.size(), 1)
-		self.assertEqual(state._ltcSells.size(), 0)
+		self.assertEqual(state._hostCoinBuys.size(), 1)
+		self.assertEqual(state._hostCoinSells.size(), 0)
 
 		# reasonable sell offer that should go through (and match)
-		details['ltcOffered'] = 40000000//2
+		details['hostCoinOffered'] = 40000000//2
 		outputs = self.Apply_AssertSucceeds(state, 'SellOffer', sourceAccounts=[zeroAmountChange], **details)
-		receivingB = outputs['ltcSell']
+		receivingB = outputs['hostCoinSell']
 		expectedBalances[receivingB] = expectedBalances.pop(zeroAmountChange)-2500000-1
 		self.assertEqual(state._balances.balances, expectedBalances)
-		self.assertEqual(state._ltcBuys.size(), 0)
-		self.assertEqual(state._ltcSells.size(), 1)
+		self.assertEqual(state._hostCoinBuys.size(), 0)
+		self.assertEqual(state._hostCoinSells.size(), 1)
 		self.assertEqual(len(state._pendingExchanges), 1)
 		self.assertTrue(0 in state._pendingExchanges)
 
@@ -512,43 +512,43 @@ class Test(unittest.TestCase):
 		details = {'pendingExchangeIndex':1, 'destinationAddress':'a_receive', 'destinationAmount':20000000}
 
 		# bad output specs
-		self.assertRaises(AssertionError, state.checkTransaction, 'LTCExchangeCompletion', outputs=('madeUpOutput'), transactionDetails=details, sourceAccounts=None)
+		self.assertRaises(AssertionError, state.checkTransaction, 'ExchangeCompletion', outputs=('madeUpOutput'), transactionDetails=details, sourceAccounts=None)
 
 		# bad pending exchange index
-		self.Apply_AssertFails(state, 'LTCExchangeCompletion', expectedError='no pending exchange with the specified index', **details)
+		self.Apply_AssertFails(state, 'ExchangeCompletion', expectedError='no pending exchange with the specified index', **details)
 		# no state change
 		self.assertEqual(state._balances.balances, expectedBalances)
-		self.assertEqual(state._ltcBuys.size(), 0)
-		self.assertEqual(state._ltcSells.size(), 1)
+		self.assertEqual(state._hostCoinBuys.size(), 0)
+		self.assertEqual(state._hostCoinSells.size(), 1)
 		self.assertEqual(len(state._pendingExchanges), 1)
 		self.assertTrue(0 in state._pendingExchanges)
 
 		# bad receive address
-		self.Apply_AssertFails(state, 'LTCExchangeCompletion', expectedError='destination account does not match destination for pending exchange with the specified index', pendingExchangeIndex=0, destinationAddress='randomAddress', destinationAmount=20000000)
+		self.Apply_AssertFails(state, 'ExchangeCompletion', expectedError='destination account does not match destination for pending exchange with the specified index', pendingExchangeIndex=0, destinationAddress='randomAddress', destinationAmount=20000000)
 		# no state change
 		self.assertEqual(state._balances.balances, expectedBalances)
-		self.assertEqual(state._ltcBuys.size(), 0)
-		self.assertEqual(state._ltcSells.size(), 1)
+		self.assertEqual(state._hostCoinBuys.size(), 0)
+		self.assertEqual(state._hostCoinSells.size(), 1)
 		self.assertEqual(len(state._pendingExchanges), 1)
 		self.assertTrue(0 in state._pendingExchanges)
 
 		# insufficient payment
-		self.Apply_AssertFails(state, 'LTCExchangeCompletion', expectedError='amount is less than required payment amount', pendingExchangeIndex=0, destinationAddress='a_receive', destinationAmount=14999999)
+		self.Apply_AssertFails(state, 'ExchangeCompletion', expectedError='amount is less than required payment amount', pendingExchangeIndex=0, destinationAddress='a_receive', destinationAmount=14999999)
 		# no state change (b just loses these ltc)
 		self.assertEqual(state._balances.balances, expectedBalances)
-		self.assertEqual(state._ltcBuys.size(), 0)
-		self.assertEqual(state._ltcSells.size(), 1)
+		self.assertEqual(state._hostCoinBuys.size(), 0)
+		self.assertEqual(state._hostCoinSells.size(), 1)
 		self.assertEqual(len(state._pendingExchanges), 1)
 		self.assertTrue(0 in state._pendingExchanges)
 
 		# pays amount offered for sale, not the amount
 		# state should warn us about the ltc overpay, but allow the transaction to go through
 		details= {'pendingExchangeIndex':0, 'destinationAddress':'a_receive', 'destinationAmount':20000000}
-		self.assertRaisesRegexp(State.TransactionFailsAgainstCurrentState, 'amount is greater than required payment amount', state.checkTransaction, 'LTCExchangeCompletion', outputs=(), transactionDetails=details, sourceAccounts=None)
+		self.assertRaisesRegexp(State.TransactionFailsAgainstCurrentState, 'amount is greater than required payment amount', state.checkTransaction, 'ExchangeCompletion', outputs=(), transactionDetails=details, sourceAccounts=None)
 
 		# pays actual amount required for match with A's buy offer
 		# (well formed completion transaction which should go through)
-		self.Apply_AssertSucceeds(state, 'LTCExchangeCompletion', pendingExchangeIndex=0, destinationAddress='a_receive', destinationAmount=15000000)
+		self.Apply_AssertSucceeds(state, 'ExchangeCompletion', pendingExchangeIndex=0, destinationAddress='a_receive', destinationAmount=15000000)
 		# B gets
 		# payment of the 3*e(7) offered by A
 		# plus fraction of deposit for the amount matched (=1875000)
@@ -556,8 +556,8 @@ class Test(unittest.TestCase):
 		expectedBalances[receivingB] += 3*e(7) + 1875000
 		expectedBalances.pop(changeA) # trade completes, so referenced zero balance account is cleaned up here
 		self.assertEqual(state._balances.balances, expectedBalances)
-		self.assertEqual(state._ltcBuys.size(), 0)
-		self.assertEqual(state._ltcSells.size(), 1)
+		self.assertEqual(state._hostCoinBuys.size(), 0)
+		self.assertEqual(state._hostCoinSells.size(), 1)
 		self.assertEqual(len(state._pendingExchanges), 0)
 
 	def test_ltc_buy_change_added_to_refund(self):
@@ -574,7 +574,7 @@ class Test(unittest.TestCase):
 		state = State.State(protocolParams=params)
 		self.state = state
 		burn = self.Burn(32*e(7))
-		receive = self.SellOffer(state, burn, ltcOffered=3*16*e(7)//2, exchangeRate=500000000)
+		receive = self.SellOffer(state, burn, hostCoinOffered=3*16*e(7)//2, exchangeRate=500000000)
 		# deposit is 3*16*e(7) // 16
 		# seed amount is 1*e(8)
 		self.assertEqual(state._balances.balances, {receive:19*e(7)})
@@ -588,7 +588,7 @@ class Test(unittest.TestCase):
 		swapBillDesired = 19*e(6)
 		deposit = swapBillDesired // params['depositDivisor']
 		burnB = self.Burn(2*e(7) + deposit)
-		receiveB = self.SellOffer(state, burnB, ltcOffered=swapBillDesired//2, exchangeRate=500000000)
+		receiveB = self.SellOffer(state, burnB, hostCoinOffered=swapBillDesired//2, exchangeRate=500000000)
 		expectedBalances = {receiveB:1*e(7)}
 		self.assertEqual(state._balances.balances, expectedBalances)
 		burnA = self.Burn(2*e(7))
@@ -598,8 +598,8 @@ class Test(unittest.TestCase):
 		expectedBalances[refundA] = 1*e(7)
 		self.assertEqual(state._balances.balances, expectedBalances)
 		self.assertEqual(len(state._pendingExchanges), 0)
-		self.assertEqual(state._ltcBuys.size(), 1)
-		self.assertEqual(state._ltcSells.size(), 1)
+		self.assertEqual(state._hostCoinBuys.size(), 1)
+		self.assertEqual(state._hostCoinSells.size(), 1)
 		# *can* now spend whole balance, even though referenced by the sell offer
 		self.assertTrue(state._balances.accountHasBalance(receiveB))
 		self.assertTrue(state._balances.isReferenced(receiveB))
@@ -628,8 +628,8 @@ class Test(unittest.TestCase):
 		expectedBalances[refundC] = 3*e(8)
 		self.assertEqual(state._balances.balances, expectedBalances)
 		self.assertEqual(len(state._pendingExchanges), 1)
-		self.assertEqual(state._ltcBuys.size(), 2)
-		self.assertEqual(state._ltcSells.size(), 0)
+		self.assertEqual(state._hostCoinBuys.size(), 2)
+		self.assertEqual(state._hostCoinSells.size(), 0)
 		# completion
 		self.Completion(state, 0, 'receiveLTC2', swapBillDesired//2)
 		self.assertEqual(len(state._pendingExchanges), 0)
@@ -649,7 +649,7 @@ class Test(unittest.TestCase):
 		swapBillDesired = 1*e(7)
 		deposit = swapBillDesired // params['depositDivisor']
 		burnB = self.Burn(2*e(7) + deposit)
-		receiveB = self.SellOffer(state, burnB, ltcOffered=swapBillDesired//2, exchangeRate=500000000)
+		receiveB = self.SellOffer(state, burnB, hostCoinOffered=swapBillDesired//2, exchangeRate=500000000)
 		expectedBalances = {receiveB:1*e(7)}
 		self.assertEqual(state._balances.balances, expectedBalances)
 		swapBillOffered = 19*e(6)
@@ -659,8 +659,8 @@ class Test(unittest.TestCase):
 		expectedBalances[refundA] = 1*e(7)
 		self.assertEqual(state._balances.balances, expectedBalances)
 		self.assertEqual(len(state._pendingExchanges), 0)
-		self.assertEqual(state._ltcBuys.size(), 1)
-		self.assertEqual(state._ltcSells.size(), 1)
+		self.assertEqual(state._hostCoinBuys.size(), 1)
+		self.assertEqual(state._hostCoinSells.size(), 1)
 		# refund account *can* now be spent completely although still referenced by the trade offer
 		self.assertTrue(state._balances.accountHasBalance(refundA))
 		self.assertTrue(state._balances.isReferenced(refundA))
@@ -676,12 +676,12 @@ class Test(unittest.TestCase):
 		swapBillDesiredC = 4*e(8)
 		depositC = swapBillDesiredC // params['depositDivisor']
 		burnC = self.Burn(depositC + 1*e(7))
-		receiveC = self.SellOffer(state, burnC, ltcOffered=swapBillDesiredC//2, exchangeRate=500000000)
+		receiveC = self.SellOffer(state, burnC, hostCoinOffered=swapBillDesiredC//2, exchangeRate=500000000)
 		expectedBalances[receiveC] = 0
 		self.assertEqual(state._balances.balances, expectedBalances)
 		self.assertEqual(len(state._pendingExchanges), 1)
-		self.assertEqual(state._ltcBuys.size(), 0)
-		self.assertEqual(state._ltcSells.size(), 2)
+		self.assertEqual(state._hostCoinBuys.size(), 0)
+		self.assertEqual(state._hostCoinSells.size(), 2)
 		# completion
 		self.Completion(state, 0, 'receiveLTC', swapBillOffered//2)
 		self.assertEqual(len(state._pendingExchanges), 0)
@@ -698,7 +698,7 @@ class Test(unittest.TestCase):
 		swapBillDesired = 40*e(6)
 		deposit = swapBillDesired // params['depositDivisor']
 		burnB = self.Burn(params['minimumSwapBillBalance'] + deposit)
-		receiveB = self.SellOffer(state, burnB, ltcOffered=swapBillDesired//2, exchangeRate=500000000)
+		receiveB = self.SellOffer(state, burnB, hostCoinOffered=swapBillDesired//2, exchangeRate=500000000)
 		expectedBalances = {receiveB:0}
 		self.assertEqual(state._balances.balances, expectedBalances)
 		swapBillOffered = 41*e(6)
@@ -708,8 +708,8 @@ class Test(unittest.TestCase):
 		expectedBalances[refundA] = 0
 		self.assertEqual(state._balances.balances, expectedBalances)
 		self.assertEqual(len(state._pendingExchanges), 1)
-		self.assertEqual(state._ltcBuys.size(), 1)
-		self.assertEqual(state._ltcSells.size(), 1)
+		self.assertEqual(state._hostCoinBuys.size(), 1)
+		self.assertEqual(state._hostCoinSells.size(), 1)
 		exchangeDetails = {
 			'backerIndex': -1, 'buyerAccount': refundA, 'buyerLTCReceive': 'receiveLTC', 'expiry': 150,
 			'sellerAccount': receiveB,
@@ -727,7 +727,7 @@ class Test(unittest.TestCase):
 		swapBillDesired = 41*e(6)
 		deposit = swapBillDesired // params['depositDivisor']
 		burnB = self.Burn(params['minimumSwapBillBalance'] + deposit)
-		receiveB = self.SellOffer(state, burnB, ltcOffered=swapBillDesired//2, exchangeRate=500000000)
+		receiveB = self.SellOffer(state, burnB, hostCoinOffered=swapBillDesired//2, exchangeRate=500000000)
 		expectedBalances = {receiveB:0}
 		self.assertEqual(state._balances.balances, expectedBalances)
 		swapBillOffered = 39*e(6)
@@ -737,8 +737,8 @@ class Test(unittest.TestCase):
 		expectedBalances[refundA] = 0
 		self.assertEqual(state._balances.balances, expectedBalances)
 		self.assertEqual(len(state._pendingExchanges), 1)
-		self.assertEqual(state._ltcBuys.size(), 1)
-		self.assertEqual(state._ltcSells.size(), 1)
+		self.assertEqual(state._hostCoinBuys.size(), 1)
+		self.assertEqual(state._hostCoinSells.size(), 1)
 		exchangeDetails = {
 			'backerIndex': -1, 'buyerAccount': refundA, 'buyerLTCReceive': 'receiveLTC', 'expiry': 150,
 			'sellerAccount': receiveB,
@@ -754,7 +754,7 @@ class Test(unittest.TestCase):
 		state = State.State(protocolParams=params)
 		self.state = state
 		burnB = self.Burn(1*e(7))
-		receiveB = self.SellOffer(state, burnB, ltcOffered=5*e(6), exchangeRate=500000000)
+		receiveB = self.SellOffer(state, burnB, hostCoinOffered=5*e(6), exchangeRate=500000000)
 		# deposit is 10000000 // 16 = 625000
 		self.assertEqual(state._balances.balances, {receiveB: 1*e(7)-625000-1})
 		burnA = self.Burn(1*e(7)+1)
@@ -774,7 +774,7 @@ class Test(unittest.TestCase):
 		state = State.State(protocolParams=params)
 		self.state = state
 		burnB = self.Burn(1*e(7))
-		receiveB = self.SellOffer(state, burnB, ltcOffered=1*e(7)//2, exchangeRate=500000000)
+		receiveB = self.SellOffer(state, burnB, hostCoinOffered=1*e(7)//2, exchangeRate=500000000)
 		# deposit is 10000000 // 16 = 625000
 		self.assertEqual(state._balances.balances, {receiveB: 1*e(7)-625000-1})
 		burnA = self.Burn(1*e(7)+1)
@@ -797,7 +797,7 @@ class Test(unittest.TestCase):
 		state = State.State(protocolParams=params)
 		self.state = state
 		burnB = self.Burn(1*e(7))
-		receiveB = self.SellOffer(state, burnB, ltcOffered=1*e(7)//4, exchangeRate=250000000)
+		receiveB = self.SellOffer(state, burnB, hostCoinOffered=1*e(7)//4, exchangeRate=250000000)
 		# deposit is 10000000 // 16 = 625000
 		self.assertEqual(state._balances.balances, {receiveB: 1*e(7)-625000-1})
 		burnA = self.Burn(10000001)
@@ -813,7 +813,7 @@ class Test(unittest.TestCase):
 		state = State.State(protocolParams=params)
 		self.state = state
 		burnB = self.Burn(2*e(7))
-		receiveB = self.SellOffer(state, burnB, ltcOffered=2*e(7)//2, exchangeRate=500000000)
+		receiveB = self.SellOffer(state, burnB, hostCoinOffered=2*e(7)//2, exchangeRate=500000000)
 		# deposit is 2*e(7) // 16
 		deposit = 1250000
 		expectedBalances = {receiveB:2*e(7)-deposit-1}
@@ -823,8 +823,8 @@ class Test(unittest.TestCase):
 		expectedBalances[refundA] = 1
 		self.assertEqual(state._balances.balances, expectedBalances)
 		self.assertEqual(len(state._pendingExchanges), 1)
-		self.assertEqual(state._ltcBuys.size(), 0)
-		self.assertEqual(state._ltcSells.size(), 1) ## half of sell offer is left outstanding
+		self.assertEqual(state._hostCoinBuys.size(), 0)
+		self.assertEqual(state._hostCoinSells.size(), 1) ## half of sell offer is left outstanding
 		self.Completion(state, 0, 'receiveLTC', 1*e(7) // 2)
 		self.assertEqual(len(state._pendingExchanges), 0)
 		# b should be refunded half his deposit = 625000, plus payment of 10000000
@@ -866,7 +866,7 @@ class Test(unittest.TestCase):
 		state = State.State(protocolParams=params)
 		self.state = state
 		burnB = self.Burn(20000000)
-		receiveB = self.SellOffer(state, burnB, ltcOffered=20000000//2, exchangeRate=500000000)
+		receiveB = self.SellOffer(state, burnB, hostCoinOffered=20000000//2, exchangeRate=500000000)
 		# deposit is 20000000 // 16 = 1250000
 		self.assertEqual(state._balances.balances, {receiveB:18750000-1})
 		burnA = self.Burn(30000001)
@@ -874,8 +874,8 @@ class Test(unittest.TestCase):
 		# sell offer is consumed completely, so seed amount locked up in this is refunded
 		self.assertEqual(state._balances.balances, {receiveB:18750000, refundA:1})
 		self.assertEqual(len(state._pendingExchanges), 1)
-		self.assertEqual(state._ltcBuys.size(), 1) # half of buy offer is left outstanding
-		self.assertEqual(state._ltcSells.size(), 0)
+		self.assertEqual(state._hostCoinBuys.size(), 1) # half of buy offer is left outstanding
+		self.assertEqual(state._hostCoinSells.size(), 0)
 		self.Completion(state, 0, 'receiveLTC', 20000000 // 2)
 		self.assertEqual(len(state._pendingExchanges), 0)
 		# b should be refunded all his deposit, and receives payment in swapbill
@@ -883,7 +883,7 @@ class Test(unittest.TestCase):
 		self.assertEqual(state._balances.balances, {receiveB:18750000+21250000, refundA:1})
 		# b goes on to sell the rest
 		burnB2 = self.Burn(10000000)
-		receiveB2 = self.SellOffer(state, burnB2, ltcOffered=10000000//2, exchangeRate=500000000)
+		receiveB2 = self.SellOffer(state, burnB2, hostCoinOffered=10000000//2, exchangeRate=500000000)
 		# refund account for a, is still referenced now by the pending exchange
 		self.assertEqual(state._balances.balances, {receiveB:18750000+21250000, receiveB2:9375000, refundA:1})
 		self.assertEqual(len(state._pendingExchanges), 1)
@@ -898,14 +898,14 @@ class Test(unittest.TestCase):
 		state = State.State(protocolParams=params)
 		self.state = state
 		burnB = self.Burn(1*e(7))
-		receiveB = self.SellOffer(state, burnB, ltcOffered=1*e(7)//2, exchangeRate=500000000, maxBlock=101)
+		receiveB = self.SellOffer(state, burnB, hostCoinOffered=1*e(7)//2, exchangeRate=500000000, maxBlock=101)
 		# deposit is 10000000 // 16 = 625000
 		self.assertEqual(state._balances.balances, {receiveB: 1*e(7)-625000-1})
 		state.advanceToNextBlock()
 		self.assertEqual(state._balances.balances, {receiveB: 1*e(7)-625000-1})
-		self.assertEqual(state._ltcSells.size(), 1)
+		self.assertEqual(state._hostCoinSells.size(), 1)
 		state.advanceToNextBlock()
-		self.assertEqual(state._ltcSells.size(), 0)
+		self.assertEqual(state._hostCoinSells.size(), 0)
 		self.assertEqual(state._balances.balances, {receiveB: 1*e(7)})
 		burnA = self.Burn(1*e(7)+1)
 		refundA = self.BuyOffer(state, burnA, 'receiveLTC', swapBillOffered=1*e(7), exchangeRate=500000000, maxBlock=105)
@@ -914,10 +914,10 @@ class Test(unittest.TestCase):
 		state.advanceToNextBlock()
 		state.advanceToNextBlock()
 		self.assertEqual(state._balances.balances, {receiveB: 1*e(7), refundA:1})
-		self.assertEqual(state._ltcBuys.size(), 1)
+		self.assertEqual(state._hostCoinBuys.size(), 1)
 		state.advanceToNextBlock()
 		self.assertEqual(state._balances.balances, {receiveB: 1*e(7), refundA:1*e(7)+1})
-		self.assertEqual(state._ltcBuys.size(), 0)
+		self.assertEqual(state._hostCoinBuys.size(), 0)
 		self.assertEqual(totalAccountedFor(state), state._totalCreated)
 
 	def test_buy_matches_multiple_sells(self):
@@ -929,22 +929,22 @@ class Test(unittest.TestCase):
 		expectedBalances = {}
 		for i in range(4):
 			burn = self.Burn(1*e(7))
-			receiveOutput = self.SellOffer(state, burn, ltcOffered=1*e(7)//2, exchangeRate=500000000)
+			receiveOutput = self.SellOffer(state, burn, hostCoinOffered=1*e(7)//2, exchangeRate=500000000)
 			receiveOutputs.append(receiveOutput)
 			# deposit is 10000000 // 16 = 625000
 			expectedBalances[receiveOutput] = 1*e(7)-625000-1
 		self.assertEqual(state._balances.balances, expectedBalances)
 		burn = self.Burn(3*e(7))
-		self.assertEqual(state._ltcSells.size(), 4)
-		self.assertEqual(state._ltcBuys.size(), 0)
+		self.assertEqual(state._hostCoinSells.size(), 4)
+		self.assertEqual(state._hostCoinBuys.size(), 0)
 		refund = self.BuyOffer(state, burn, 'receiveLTC', swapBillOffered=25*e(6), exchangeRate=500000000)
 		# 2 sellers matched completely (and get seeded amount refunded)
 		# 1 seller partially matched
 		expectedBalances[refund] = 5*e(6)
 		expectedBalances[receiveOutputs[0]] += 1
 		expectedBalances[receiveOutputs[1]] += 1
-		self.assertEqual(state._ltcSells.size(), 2)
-		self.assertEqual(state._ltcBuys.size(), 0)
+		self.assertEqual(state._hostCoinSells.size(), 2)
+		self.assertEqual(state._hostCoinBuys.size(), 0)
 		self.assertEqual(len(state._pendingExchanges), 3)
 		self.assertEqual(state._balances.balances, expectedBalances)
 		self.Completion(state, 0, 'receiveLTC', 5*e(6))
@@ -982,15 +982,15 @@ class Test(unittest.TestCase):
 			expectedBalances[refundOutput] = 1
 		self.assertEqual(state._balances.balances, expectedBalances)
 		burn = self.Burn(25*e(6)//16 + 1)
-		self.assertEqual(state._ltcBuys.size(), 4)
-		self.assertEqual(state._ltcSells.size(), 0)
-		receive = self.SellOffer(state, burn, ltcOffered=25*e(6)//2, exchangeRate=500000000)
+		self.assertEqual(state._hostCoinBuys.size(), 4)
+		self.assertEqual(state._hostCoinSells.size(), 0)
+		receive = self.SellOffer(state, burn, hostCoinOffered=25*e(6)//2, exchangeRate=500000000)
 		# deposit is 25*e(6) // 16
 		# 2 buyers matched completely
 		# 1 buyer partially matched
 		expectedBalances[receive] = 1
-		self.assertEqual(state._ltcBuys.size(), 2)
-		self.assertEqual(state._ltcSells.size(), 0)
+		self.assertEqual(state._hostCoinBuys.size(), 2)
+		self.assertEqual(state._hostCoinSells.size(), 0)
 		self.assertEqual(len(state._pendingExchanges), 3)
 		self.assertEqual(state._balances.balances, expectedBalances)
 		self.Completion(state, 0, 'receiveLTC', 5*e(6))
@@ -1031,11 +1031,11 @@ class Test(unittest.TestCase):
 		state = State.State(defaultParams)
 		self.state = state
 		active = self.Burn(1*e(10))
-		details = {'backingAmount':1*e(10), 'transactionsBacked':100, 'commission':31250000, 'ltcReceiveAddress':'madeUpAddress', 'maxBlock':100}
+		details = {'backingAmount':1*e(10), 'transactionsBacked':100, 'commission':31250000, 'hostCoinReceiveAddress':'madeUpAddress', 'maxBlock':100}
 		# bad outputs specs
 		self.assertRaises(AssertionError, state.checkTransaction, 'BackLTCSells', outputs=(), transactionDetails=details, sourceAccounts=[active])
 		self.assertRaises(AssertionError, state.checkTransaction, 'BackLTCSells', outputs=('madeUpOutput',), transactionDetails=details, sourceAccounts=[active])
-		self.assertRaises(AssertionError, state.checkTransaction, 'BackLTCSells', outputs=('ltcSellBacker','extraOutput'), transactionDetails=details, sourceAccounts=[active])
+		self.assertRaises(AssertionError, state.checkTransaction, 'BackLTCSells', outputs=('hostCoinSellBacker','extraOutput'), transactionDetails=details, sourceAccounts=[active])
 		# attempt to commit more than available
 		details['backingAmount'] = 2*e(10)
 		active = self.Apply_AssertInsufficientFunds(state, 'BackLTCSells', sourceAccounts=[active], **details)
@@ -1059,19 +1059,19 @@ class Test(unittest.TestCase):
 		details['commission'] = 31250000
 		self.assertDictEqual(state._balances.balances, {active:1*e(10)})
 		self.assertFalse(state._balances.isReferenced(active))
-		self.assertEqual(len(state._ltcSellBackers), 0)
+		self.assertEqual(len(state._hostCoinSellBackers), 0)
 		# control transaction which succeeds
 		outputs = self.Apply_AssertSucceeds(state, 'BackLTCSells', sourceAccounts=[active], **details)
-		refund = outputs['ltcSellBacker']
+		refund = outputs['hostCoinSellBacker']
 		active = refund
 		self.assertDictEqual(state._balances.balances, {active:0})
 		self.assertTrue(state._balances.isReferenced(active))
-		self.assertEqual(len(state._ltcSellBackers), 1)
-		self.assertDictEqual(state._ltcSellBackers[0].__dict__, {'backingAmount': 1*e(10), 'commission': 31250000, 'expiry': 100, 'ltcReceiveAddress': 'madeUpAddress', 'refundAccount': refund, 'transactionMax': 1*e(8)})
+		self.assertEqual(len(state._hostCoinSellBackers), 1)
+		self.assertDictEqual(state._hostCoinSellBackers[0].__dict__, {'backingAmount': 1*e(10), 'commission': 31250000, 'expiry': 100, 'hostCoinReceiveAddress': 'madeUpAddress', 'refundAccount': refund, 'transactionMax': 1*e(8)})
 		# but then expires (and is refunded)
 		state.advanceToNextBlock()
 		self.assertFalse(state._balances.isReferenced(active))
-		self.assertEqual(len(state._ltcSellBackers), 0)
+		self.assertEqual(len(state._hostCoinSellBackers), 0)
 		self.assertDictEqual(state._balances.balances, {active:1*e(10)})
 
 	def test_input_credited_during_transaction_regression(self):
@@ -1081,7 +1081,7 @@ class Test(unittest.TestCase):
 		state = State.State(protocolParams=params)
 		self.state = state
 		active = self.Burn(2*e(7)+1)
-		active = self.SellOffer(state, active, ltcOffered=5*e(6), exchangeRate=500000000)
+		active = self.SellOffer(state, active, hostCoinOffered=5*e(6), exchangeRate=500000000)
 		# deposit is 10000000 // 16 = 625000
 		self.assertEqual(state._balances.balances, {active:2*e(7)+1-625000-1})
 		active = self.BuyOffer(state, active, 'receiveLTC', swapBillOffered=1*e(7), exchangeRate=500000000)
@@ -1099,18 +1099,18 @@ class Test(unittest.TestCase):
 		self.state = state
 		# backer commits funds
 		burn = self.Burn(4*e(12))
-		details = {'backingAmount':4*e(12), 'transactionsBacked':1000, 'commission':125000000, 'ltcReceiveAddress':'backerLTCReceivePKH', 'maxBlock':200}
+		details = {'backingAmount':4*e(12), 'transactionsBacked':1000, 'commission':125000000, 'hostCoinReceiveAddress':'backerLTCReceivePKH', 'maxBlock':200}
 		outputs = self.Apply_AssertSucceeds(state, 'BackLTCSells', sourceAccounts=[burn], **details)
-		backer = outputs['ltcSellBacker']
+		backer = outputs['hostCoinSellBacker']
 		expectedBalances = {backer:0}
 		self.assertEqual(state._balances.balances, expectedBalances)
-		self.assertEqual(len(state._ltcSellBackers), 1)
+		self.assertEqual(len(state._hostCoinSellBackers), 1)
 		expectedBackerState = {
 		    'backingAmount': 4*e(12), 'commission': 125000000,
 		    'expiry': 200,
-		    'ltcReceiveAddress': 'backerLTCReceivePKH', 'refundAccount': backer, 'transactionMax': 4*e(9)
+		    'hostCoinReceiveAddress': 'backerLTCReceivePKH', 'refundAccount': backer, 'transactionMax': 4*e(9)
 		}
-		self.assertDictEqual(state._ltcSellBackers[0].__dict__, expectedBackerState)
+		self.assertDictEqual(state._hostCoinSellBackers[0].__dict__, expectedBackerState)
 		# normal buy offer
 		burn = self.Burn(3*e(7))
 		details = {
@@ -1119,46 +1119,46 @@ class Test(unittest.TestCase):
 		    'receivingAddress':'buyerReceivePKH'
 		}
 		outputs = self.Apply_AssertSucceeds(state, 'BuyOffer', sourceAccounts=[burn], **details)
-		buy = outputs['ltcBuy']
+		buy = outputs['hostCoinBuy']
 		expectedBalances[buy]=0
 		self.assertEqual(state._balances.balances, expectedBalances)
-		self.assertEqual(state._ltcBuys.size(), 1)
+		self.assertEqual(state._hostCoinBuys.size(), 1)
 		# backed sell offer
-		ltcOffered = 4*e(7)//2
+		hostCoinOffered = 4*e(7)//2
 		details = {
 		    'backerIndex':0,
-		    'backerLTCReceiveAddress':'backerLTCReceivePKH',
-		    'ltcOfferedPlusCommission':ltcOffered + ltcOffered//8, 'exchangeRate':500000000
+		    'backerHostCoinReceiveAddress':'backerLTCReceivePKH',
+		    'hostCoinOfferedPlusCommission':hostCoinOffered + hostCoinOffered//8, 'exchangeRate':500000000
 		}
 		outputs = self.Apply_AssertSucceeds(state, 'BackedSellOffer', sourceAccounts=[], **details)
 		sell = outputs['sellerReceive']
 		expectedBalances[sell] = 3*e(7) # we get paid straight away!
 		self.assertEqual(state._balances.balances, expectedBalances)
-		self.assertEqual(state._ltcBuys.size(), 0)
-		self.assertEqual(state._ltcSells.size(), 1)
+		self.assertEqual(state._hostCoinBuys.size(), 0)
+		self.assertEqual(state._hostCoinSells.size(), 1)
 		self.assertEqual(len(state._pendingExchanges), 1)
 		self.assertDictEqual(state._pendingExchanges[0].__dict__, {'backerIndex':0, 'buyerAccount':buy, 'buyerLTCReceive':'buyerReceivePKH', 'expiry':150, 'ltc':3*e(7)//2, 'sellerAccount':backer, 'swapBillAmount':3*e(7), 'swapBillDeposit':3*e(7)//params['depositDivisor']})
-		self.assertEqual(len(state._ltcSellBackers), 1)
+		self.assertEqual(len(state._hostCoinSellBackers), 1)
 		expectedBackerState['backingAmount'] -= 4*e(7)
 		expectedBackerState['backingAmount'] -= 4*e(7)//params['depositDivisor']
 		expectedBackerState['backingAmount'] -= params['minimumSwapBillBalance']
-		self.assertDictEqual(state._ltcSellBackers[0].__dict__, expectedBackerState)
+		self.assertDictEqual(state._hostCoinSellBackers[0].__dict__, expectedBackerState)
 		# backer is then responsable for completing the exchange with the buyer
 		details = {'pendingExchangeIndex':0, 'destinationAddress':'buyerReceivePKH', 'destinationAmount':3*e(7)//2}
-		self.Apply_AssertSucceeds(state, 'LTCExchangeCompletion', **details)
+		self.Apply_AssertSucceeds(state, 'ExchangeCompletion', **details)
 		# and backer now gets
 		# payment of the 3*e(7) offered by A
 		# plus fraction of deposit for the amount matched (=1875000)
 		# (the rest of the deposit is left with an outstanding remainder sell offer)
 		expectedBackerState['backingAmount'] += 3*e(7)
 		expectedBackerState['backingAmount'] += 3*e(7)//params['depositDivisor']
-		self.assertDictEqual(state._ltcSellBackers[0].__dict__, expectedBackerState)
+		self.assertDictEqual(state._hostCoinSellBackers[0].__dict__, expectedBackerState)
 		expectedBalances.pop(buy) # trade completes, so referenced zero balance account is cleaned up here
 		self.assertEqual(state._balances.balances, expectedBalances)
-		self.assertEqual(state._ltcBuys.size(), 0)
-		self.assertEqual(state._ltcSells.size(), 1)
+		self.assertEqual(state._hostCoinBuys.size(), 0)
+		self.assertEqual(state._hostCoinSells.size(), 1)
 		self.assertEqual(len(state._pendingExchanges), 0)
-		self.assertEqual(len(state._ltcSellBackers), 1)
+		self.assertEqual(len(state._hostCoinSellBackers), 1)
 		# another buy, to match the outstanding sell remainder
 		burn = self.Burn(1*e(7))
 		details = {
@@ -1167,17 +1167,17 @@ class Test(unittest.TestCase):
 		    'receivingAddress':'buyerReceivePKH2'
 		}
 		outputs = self.Apply_AssertSucceeds(state, 'BuyOffer', sourceAccounts=[burn], **details)
-		buy2 = outputs['ltcBuy']
+		buy2 = outputs['hostCoinBuy']
 		# (matches straight away)
 		expectedBalances[buy2] = 0
 		expectedBalances[sell] += 1*e(7) # seller is paid straight away
 		expectedBackerState['backingAmount'] += params['minimumSwapBillBalance']
-		self.assertEqual(state._ltcBuys.size(), 0)
-		self.assertEqual(state._ltcSells.size(), 0)
+		self.assertEqual(state._hostCoinBuys.size(), 0)
+		self.assertEqual(state._hostCoinSells.size(), 0)
 		self.assertEqual(len(state._pendingExchanges), 1)
 		self.assertDictEqual(state._pendingExchanges[1].__dict__, {'backerIndex':0, 'buyerAccount':buy2, 'buyerLTCReceive':'buyerReceivePKH2', 'expiry':150, 'ltc':1*e(7)//2, 'sellerAccount':backer, 'swapBillAmount':1*e(7), 'swapBillDeposit':1*e(7)//params['depositDivisor']})
 		self.assertEqual(state._balances.balances, expectedBalances)
-		self.assertDictEqual(state._ltcSellBackers[0].__dict__, expectedBackerState)
+		self.assertDictEqual(state._hostCoinSellBackers[0].__dict__, expectedBackerState)
 
 	def test_PayOnRevealSecret(self):
 		state = State.State(defaultParams)
