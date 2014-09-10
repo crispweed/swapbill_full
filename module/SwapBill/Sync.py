@@ -6,7 +6,7 @@ from SwapBill import State, RawTransaction, TransactionEncoding, PickledCache, O
 from SwapBill import ProtocolParameters
 from SwapBill.ExceptionReportedToUser import ExceptionReportedToUser
 
-stateVersion = 2
+stateVersion = 3
 ownedAccountsVersion = 1
 
 def _processTransactions(state, wallet, ownedAccounts, secretsWatchList, secretsWallet, transactions, applyToState, reportPrefix, out):
