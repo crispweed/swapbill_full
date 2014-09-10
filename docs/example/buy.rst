@@ -163,6 +163,7 @@ We can see this with the get_pending_exchanges query::
         I am seller (and need to complete) : False
         expires on block : 279602
         blocks until expiry : 12
+        confirmations : 4
         outstanding host coin payment amount : 0.9
     pending exchange index : 2
         swap bill paid by buyer : 0.33333333
@@ -171,6 +172,7 @@ We can see this with the get_pending_exchanges query::
         I am seller (and need to complete) : False
         expires on block : 279605
         blocks until expiry : 15
+        confirmations : 1
         outstanding host coin payment amount : 0.3
     pending exchange index : 3
         swap bill paid by buyer : 0.17765568
@@ -178,7 +180,8 @@ We can see this with the get_pending_exchanges query::
         deposit paid by seller : 0.01110348
         I am seller (and need to complete) : False
         expires on block : 279606
-        blocks until expiry : 16
+        blocks until expiry : 15
+        confirmations : 1
         outstanding host coin payment amount : 0.15989011
 
 As a host coin buyer, we don't have to take any action here.
@@ -192,6 +195,7 @@ A bit later we can see that one of the exchanges has been completed::
     Operation successful
     pending exchange index : 1
         blocks until expiry : 11
+        confirmations : 5
         I am seller (and need to complete) : True
         I am buyer (and waiting for payment) : False
         expires on block : 279602
@@ -200,6 +204,7 @@ A bit later we can see that one of the exchanges has been completed::
         outstanding host coin payment amount : 0.9
     pending exchange index : 2
         blocks until expiry : 14
+        confirmations : 2
         I am seller (and need to complete) : True
         I am buyer (and waiting for payment) : False
         expires on block : 279605

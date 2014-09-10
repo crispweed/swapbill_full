@@ -184,6 +184,7 @@ corresponding to this offer::
         I am buyer (and waiting for payment) : False
         backer id : 0
         blocks until expiry : 13
+        confirmations : 3
         swap bill paid by buyer : 0.17788234
         expires on block : 279591
         deposit paid by seller : 0.01111765
