@@ -454,10 +454,7 @@ def Main(commandLineArgs=sys.argv[1:], out=sys.stdout):
 			d['expires on block'] = backer.expiry
 			d['blocks until expiry'] = backer.expiry - state._currentBlockIndex + 1
 			d['commission'] = Amounts.PercentToString(backer.commission)
-			maximumExchange = backer.transactionMax - Constraints.minimumSwapBillBalance
-			maximumExchange *= Constraints.depositDivisor
-			maximumExchange //= (Constraints.depositDivisor + 1)
-			d['maximum exchange'] = Amounts.ToString(maximumExchange)
+			d['maximum exchange'] = Amounts.ToString(state.calculateBackerMaximumExchange(backer))
 			result.append(('host coin sell backer index', key, d))
 		return result
 

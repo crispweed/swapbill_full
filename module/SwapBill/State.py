@@ -487,3 +487,9 @@ class State(object):
 		if sourceAccounts is None:
 			return self.applyUnfundedTransaction(transactionType, txID, transactionDetails, outputs)
 		return self.applyFundedTransaction(transactionType, txID, sourceAccounts, transactionDetails, outputs)
+
+	def calculateBackerMaximumExchange(self, backer):
+		maximumExchange = backer.transactionMax - Constraints.minimumSwapBillBalance
+		maximumExchange *= Constraints.depositDivisor
+		maximumExchange //= (Constraints.depositDivisor + 1)
+		return maximumExchange
