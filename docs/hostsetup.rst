@@ -60,8 +60,8 @@ or::
 Bootstrapping
 ---------------
 
-When you first start a full node, it can be worthwhile downloading a 'bootstrap' file to speed up initial synchronisation.
-But we'll just be connecting to the testnet, and bootstrapping is not really necessary for this.
+When you first start a full node, it can be worthwhile downloading a 'bootstrap' file to speed up initial synchronisation,
+but we'll just be connecting to the testnet, and bootstrapping is not really necessary for this.
 Just go ahead and start your node and let it synch to the testnet blockchain!
 
 .. When you first start a full node, it can potentially take a *long* time to download the blockchain history,

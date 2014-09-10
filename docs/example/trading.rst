@@ -12,7 +12,8 @@ Three additional client actions (and associated transaction types) are provided 
 Terminology
 ------------
 
-Note that 'buy' in this context refers to buying host coin (with swapbill), and 'sell' refers to selling host coin (for swapbill).
+The client uses 'buy' to refer to buying host coin (with swapbill), and 'sell' to refer to selling host coin (for swapbill),
+and we'll use the same convention in this documentation.
 
 Buy transactions
 -----------------

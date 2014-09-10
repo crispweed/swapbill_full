@@ -68,7 +68,7 @@ The amount offered is debited from our balance::
     Operation successful
     balance : 0.51098901
 
-And we can see that the top sell offer has been removed:
+And we can see that the top sell offer has been removed::
 
     ~/git/swapbill $ python Client.py get_sell_offers
     ...
@@ -154,7 +154,7 @@ from the seller to complete.
 We can see this with the get_pending_exchanges query::
 
     ~/git/swapbill $ python Client.py get_pending_exchanges
-    .
+    ...
     Operation successful
     pending exchange index : 1
         swap bill paid by buyer : 0.98901099

@@ -26,3 +26,4 @@ Worked examples:
     example/backedsell
     example/buy
     example/unbackedsell
+    example/crosschainexchange

@@ -8,6 +8,8 @@ This is not the recommended way to obtain swapbill,
 but it's an important part of the SwapBill protocol definition,
 so let's see how this works!
 
+Assuming you have sufficient host coin, a burn transaction can be submitted as follows::
+
     ~/git/swapbill $ python Client.py burn --amount 0.5
     Loaded cached state data successfully
     State update starting from block 279288
@@ -39,8 +41,9 @@ Minimum balance constraint
 It's worth noting at this point that the SwapBill protocol includes a constraint on the minimum amount of swapbill associated with any
 given SwapBill 'account', or output. This is a financial motivation for users to minimise the number of active swapbill outputs
 to be tracked, and a discouragement for 'spam' outputs.
-The constraint is currently set to exactly 10000000 satoshis, or 0.1 bitcoin, and so that's the minimum amount we're allowed to burn.
-(If you try to burn less, the client should refuse to submit the transaction and display a suitable error message.)
+For 'bitcoin swapbill', whe constraint is currently set to exactly 0.001 swapbill, or 100000 swapbill satoshis, and so that's the minimum amount we're allowed to burn.
+If you try to burn less, the client should refuse to submit the transaction and display a suitable error message.
+(For 'litecoin swapbill the minimum balance is higher, and is currently set to exactly 0.1 swapbill, or 10000000 swapbill satoshis.)
 
 Transaction confirmation
 --------------------------
