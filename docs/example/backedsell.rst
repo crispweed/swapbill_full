@@ -51,7 +51,7 @@ Lets go ahead and exchange some host coin for swapbill through this backer.
 Listing buy offers
 -------------------
 
-The next step is to check the buy offers currently posted to the blockchain, to get an idea of the current excange rate:
+The next step is to check the buy offers currently posted to the blockchain, to get an idea of the current exchange rate:
 
 
     ~/git/swapbill $ python Client.py get_buy_offers
