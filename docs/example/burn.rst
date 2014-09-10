@@ -102,7 +102,7 @@ For transaction reporting during synchronisation:
 
 
 Better way to obtain swapbill
-----------------------------
+-------------------------------
 
 As noted above, burning host coin is not the recommended way to get initial swapbill.
 You can get a better price if you exchange host coin for swapbill, and we'll look at how to do this a bit later on..

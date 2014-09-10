@@ -451,6 +451,7 @@ def Main(commandLineArgs=sys.argv[1:], out=sys.stdout):
 			d['I am backer'] = backer.refundAccount in ownedAccounts.tradeOfferChangeCounts
 			d['backing amount'] = Amounts.ToString(backer.backingAmount)
 			d['backing amount per transaction'] = Amounts.ToString(backer.transactionMax)
+			d['transactions covered'] = backer.backingAmount // backer.transactionMax
 			d['expires on block'] = backer.expiry
 			d['blocks until expiry'] = backer.expiry - state._currentBlockIndex + 1
 			d['commission'] = Amounts.PercentToString(backer.commission)

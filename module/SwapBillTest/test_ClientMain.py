@@ -783,7 +783,8 @@ class Test(unittest.TestCase):
 		'expires on block': startBlock+22,
 		'blocks until expiry': 20,
 		'backing amount per transaction': '10',
-		'maximum exchange swapbill': '9.31764705'
+		'maximum exchange swapbill': '9.31764705',
+		'transactions covered': 1000
 		}
 		self.assertListEqual(result, [('host coin sell backer index', 0, expectedDetails)])
 		self.assertEqual(host._nextBlock, startBlock+3)
@@ -816,6 +817,7 @@ class Test(unittest.TestCase):
 		'expires on block': startBlock+22,
 		'blocks until expiry': 20,
 		'backing amount per transaction': '10',
+		'transactions covered': 1000,
 		'maximum exchange swapbill': '9.31764705'
 		}
 		self.assertListEqual(result, [('host coin sell backer index', 0, expectedBackerDetails)])
@@ -842,6 +844,7 @@ class Test(unittest.TestCase):
 		expectedBackingAmount -= deposit
 		expectedBackingAmount -= 3*e(8)
 		expectedBackerDetails['backing amount'] = Amounts.ToString(expectedBackingAmount)
+		expectedBackerDetails['transactions covered'] = 999
 		expectedBackerDetails['blocks until expiry'] = 17
 		output, result = RunClient(['get_sell_backers'], owner='backer')
 		self.assertListEqual(result, [('host coin sell backer index', 0, expectedBackerDetails)])
@@ -876,6 +879,7 @@ class Test(unittest.TestCase):
 		expectedBackerDetails = {
 		'commission': '0.0625',
 		'backing amount': Amounts.ToString(expectedBackingAmount), 'I am backer': True,
+		'transactions covered': 1000,
 		'expires on block': startBlock+22,
 		'blocks until expiry': 20,
 		'backing amount per transaction': '10',
@@ -982,6 +986,7 @@ class Test(unittest.TestCase):
 		    'expires on block': startBlock+105,
 		    'backing amount': Amounts.ToString(1*e(12)-6*e(9)-deposit),
 		    'backing amount per transaction': Amounts.ToString(1*e(11)),
+		    'transactions covered': 9,
 		    'maximum exchange swapbill': '941.08235294'
 		}
 		output, result = RunClient(['get_sell_backers'], owner='backer')
@@ -994,6 +999,7 @@ class Test(unittest.TestCase):
 		self.assertEqual(ownerBalances, {'seller':6*e(9)})
 		expectedBackerDetails['backing amount'] = Amounts.ToString(Amounts.FromString(expectedBackerDetails['backing amount']) + 6*e(9)+deposit)
 		expectedBackerDetails['blocks until expiry'] -= 2
+		expectedBackerDetails['transactions covered'] = 10
 		output, result = RunClient(['get_sell_backers'], owner='backer')
 		self.assertListEqual(result, [('host coin sell backer index', 0, expectedBackerDetails)])
 

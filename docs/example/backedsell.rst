@@ -22,12 +22,13 @@ and to find out information about the backers such as rate of commission being c
     ...
     Operation successful
     host coin sell backer index : 0
-    I am backer : False
-    commission : 0.005
-    blocks until expiry : 29999
-    expires on block : 309437
-    backing amount : 190
-    maximum per transaction : 0.19
+        backing amount : 190
+        blocks until expiry : 29872
+        maximum exchange swapbill : 0.17788235
+        I am backer : False
+        backing amount per transaction : 0.19
+        expires on block : 309437
+        commission : 0.005
 
 
 The commission value here indicates that 0.5% commission is payable to the backer on the amount of host coin offered for sale.
