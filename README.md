@@ -26,7 +26,7 @@ required Python dependencies.
 
 The SwapBill documentation can be found here: http://swapbill.readthedocs.org
 
-The bitcointalk announcement thread can be found [here](https://bitcointalk.org/index.php?topic=628547)
+The original bitcointalk announcement thread can be found [here](https://bitcointalk.org/index.php?topic=628547)
 
 The SwapBill source code lives here: https://github.com/crispweed/swapbill
 
