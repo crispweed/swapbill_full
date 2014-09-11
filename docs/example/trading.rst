@@ -26,7 +26,7 @@ Sell transactions
 
 There are then two different kinds of host coin sell offer.
 
-'Backed' sell offers are the recommended method, when there are are 'backers' available.
+'Backed' sell offers are the recommended method, when there are are backers available.
 In this case the backer has already committed a swapbill amount to cover the trade, so you just need to make one sell offer transaction,
 and the backer then takes care of exchange completion payments.
 

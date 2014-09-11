@@ -24,3 +24,16 @@ for entry in os.listdir(publicRoot):
 for entry in ('Client.py', 'README.md'):
 	shutil.copy2(path.join(privateRoot, entry), path.join(publicRoot, entry))
 shutil.copytree(path.join(privateRoot, 'module', 'SwapBill'), path.join(publicRoot, 'module', 'SwapBill'))
+
+docsFrom = path.join(privateRoot, 'docs')
+docsTo = path.join(publicRoot, 'docs')
+os.mkdir(docsTo)
+
+for entry in os.listdir(docsFrom):
+	if entry in ('makefile', '_build'):
+		continue
+	pathedEntry = path.join(docsFrom, entry)
+	if path.isdir(pathedEntry):
+		shutil.copytree(pathedEntry, path.join(docsTo, entry))
+	else:
+		shutil.copy2(pathedEntry, path.join(docsTo, entry))

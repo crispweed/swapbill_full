@@ -198,7 +198,7 @@ And for **b**::
     balance : 350
 
 For this to work, note that we need *both* litecoind *and* bitcoind running and set up as RPC servers.
-(See :doc:`hostsetup`.)
+(See :doc:`/hostsetup`.)
 
 We used payments from the default swapbill wallet, in each case, but you could also use burn transactions or exchanges to
 create these initial balances.
