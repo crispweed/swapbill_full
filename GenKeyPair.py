@@ -15,7 +15,10 @@ pubKeyHash = KeyPair.PublicKeyToPubKeyHash(publicKey)
 #assert Address.ToPubKeyHash(b'\x00', address) == pubKeyHash
 #print('bitcoin:', address)
 
-address = Address.FromPubKeyHash(b'\x6f', pubKeyHash)
-assert Address.ToPubKeyHash(b'\x6f', address) == pubKeyHash
-print('bitcoin or litecoin testnet:', address)
+#address = Address.FromPubKeyHash(b'\x6f', pubKeyHash)
+#assert Address.ToPubKeyHash(b'\x6f', address) == pubKeyHash
+#print('bitcoin or litecoin testnet:', address)
 
+address = Address.FromPubKeyHash(b'\x30', pubKeyHash)
+assert Address.ToPubKeyHash(b'\x30', address) == pubKeyHash
+print('litecoin:', address)
