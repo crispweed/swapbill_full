@@ -1,6 +1,6 @@
 from __future__ import print_function
 import sys
-supportedVersions = ('2.7', '3.2', '3.3', '3.4')
+supportedVersions = ('2.7', '3.2', '3.3', '3.4', '3.5')
 thisVersion = str(sys.version_info.major) + '.' + str(sys.version_info.minor)
 if not thisVersion in supportedVersions:
 	print('This version of python (' + thisVersion + ') is not supported. Supported versions are:', supportedVersions)
